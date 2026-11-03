@@ -284,3 +284,87 @@ FROM (VALUES
           ('Account or access',       'ADMIN')
      ) AS v(name, role_name)
          JOIN role r ON r.role_name = v.role_name;
+
+-- =====================================================================
+-- Siteworks ERP - check-in table (additive migration)
+-- Run AFTER siteworks_schema.sql. Works on PostgreSQL 17 and 18 (so also on Supabase).
+--
+-- One row = one visit to site: face check-in, then check-out.
+-- The detection service creates the row (method FACE) and links the vest;
+-- HSE can add or correct a row by hand (method MANUAL).
+-- =====================================================================
+
+CREATE TABLE check_in (
+                          id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                          user_id         bigint NOT NULL REFERENCES app_user(id),
+                          shift_id        bigint REFERENCES shift(id),        -- planned shift this visit belongs to (may be NULL)
+                          zone_id         bigint REFERENCES zone(id),
+                          camera_id       bigint REFERENCES camera(id),       -- camera that recognised the face (NULL for MANUAL)
+                          ppe_linking_id  bigint REFERENCES ppe_linking(id),  -- vest the worker wore at check-in
+
+                          check_in_at     timestamptz NOT NULL DEFAULT now(),
+                          check_out_at    timestamptz,                        -- NULL = still on site
+
+                          method          text NOT NULL DEFAULT 'FACE'
+                              CHECK (method IN ('FACE', 'MANUAL')),
+                          face_similarity numeric(5,2)                        -- InsightFace match score, 0-100
+                              CHECK (face_similarity BETWEEN 0 AND 100),
+                          snapshot_path   text,                               -- face image taken at the gate
+                          recorded_by     bigint REFERENCES app_user(id),     -- who typed it in (MANUAL only)
+                          note            text,
+
+                          created_at      timestamptz NOT NULL DEFAULT now(),
+                          updated_at      timestamptz NOT NULL DEFAULT now(),
+
+                          CHECK (check_out_at IS NULL OR check_out_at > check_in_at),
+    -- a face check-in must say how sure the match was; a manual one must say who did it
+                          CHECK (method <> 'FACE'   OR face_similarity IS NOT NULL),
+                          CHECK (method <> 'MANUAL' OR recorded_by IS NOT NULL)
+);
+
+-- A worker can only be checked in once at a time
+CREATE UNIQUE INDEX uq_check_in_open ON check_in(user_id) WHERE check_out_at IS NULL;
+
+CREATE INDEX idx_check_in_user_time ON check_in(user_id, check_in_at DESC);
+CREATE INDEX idx_check_in_shift     ON check_in(shift_id);
+
+CREATE TRIGGER trg_check_in_updated BEFORE UPDATE ON check_in
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ---------------------------------------------------------------------
+-- Permissions for the new table (same style as the rest of the schema)
+-- ---------------------------------------------------------------------
+INSERT INTO permission (code, module, action, description) VALUES
+                                                               ('CHECKIN_READ_OWN',  'CHECKIN', 'READ',   'See my own check-ins'),
+                                                               ('CHECKIN_READ_TEAM', 'CHECKIN', 'READ',   'See check-ins of my team'),
+                                                               ('CHECKIN_READ_ALL',  'CHECKIN', 'READ',   'See all check-ins'),
+                                                               ('CHECKIN_EDIT',      'CHECKIN', 'UPDATE', 'Add or correct a check-in by hand');
+
+INSERT INTO role_permission (role_id, permission_id)
+SELECT r.id, p.id
+FROM (VALUES
+          ('WORKER',      'CHECKIN_READ_OWN'),
+          ('HSE_OFFICER', 'CHECKIN_READ_OWN'), ('HSE_OFFICER', 'CHECKIN_READ_ALL'), ('HSE_OFFICER', 'CHECKIN_EDIT'),
+          ('MANAGER',     'CHECKIN_READ_OWN'), ('MANAGER',     'CHECKIN_READ_TEAM')
+     ) AS v(role_name, code)
+         JOIN role r       ON r.role_name = v.role_name
+         JOIN permission p ON p.code = v.code;
+
+INSERT INTO role_permission (role_id, permission_id)   -- Admin gets the new ones too
+SELECT r.id, p.id FROM role r CROSS JOIN permission p
+WHERE r.role_name = 'ADMIN' AND p.module = 'CHECKIN';
+
+-- ---------------------------------------------------------------------
+-- SUPABASE ONLY (safe to skip on a local database)
+-- Supabase exposes every table in the "public" schema through its public
+-- Data API. Turning on Row Level Security with NO policies blocks that API
+-- completely, while your Spring Boot and Python services keep working,
+-- because they connect as the table owner role.
+-- ---------------------------------------------------------------------
+DO $$
+DECLARE t record;
+BEGIN
+FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t.tablename);
+END LOOP;
+END $$;
