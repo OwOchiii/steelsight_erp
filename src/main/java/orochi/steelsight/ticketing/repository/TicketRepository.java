@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface TicketRepository extends SoftDeletableRepository<Ticket, Long> {
 
@@ -15,6 +16,8 @@ public interface TicketRepository extends SoftDeletableRepository<Ticket, Long> 
     List<Ticket> findAllByCreatedByIdAndStatusAndDeletedAtIsNull(Long userId, TicketStatus status);
 
     List<Ticket> findAllByAssigneeIdAndDeletedAtIsNull(Long assigneeId);
+
+    Optional<Ticket> findByViolationIdAndDeletedAtIsNull(Long violationId);
 
     @Query("""
             SELECT t FROM Ticket t
