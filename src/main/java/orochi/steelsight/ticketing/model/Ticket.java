@@ -6,6 +6,7 @@ import lombok.Setter;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.model.SoftDeletableModel;
 import orochi.steelsight.ppe.model.Violation;
+import orochi.steelsight.scheduling.model.Zone;
 
 import java.time.OffsetDateTime;
 
@@ -43,6 +44,15 @@ public class Ticket extends SoftDeletableModel {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "violation_id")
     private Violation violation;
+
+    /** Where the problem is, such as the location of a hazard. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "zone_id")
+    private Zone zone;
+
+    /** Path of a photo in the private storage bucket. */
+    @Column(name = "photo_path")
+    private String photoPath;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

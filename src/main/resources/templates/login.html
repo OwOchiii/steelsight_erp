@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in · Steelsight</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="center">
+<main class="card">
+    <h1>Steelsight</h1>
+    <p class="notice error" th:if="${param.error}">The employee code or password is wrong.</p>
+    <p class="notice" th:if="${param.signedOut}">You have signed out.</p>
+    <form th:action="@{/login}" method="post">
+        <label for="employeeCode">Employee code</label>
+        <input id="employeeCode" name="employeeCode" autocomplete="username" required autofocus>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button type="submit">Sign in</button>
+    </form>
+</main>
+</body>
+</html>

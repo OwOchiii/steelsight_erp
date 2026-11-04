@@ -270,6 +270,17 @@ class ServiceIntegrationTest {
     }
 
     @Test
+    void safetyConcernCanSayWhereTheHazardIsAndShowIt() {
+        TicketService.NewTicket details = new TicketService.NewTicket(
+                category("Safety concern"), "Broken rail", "Level 2 rail is loose", zone, "tickets/rail.jpg");
+
+        Ticket ticket = ticketService.create(worker, details);
+
+        assertThat(ticket.getZone().getId()).isEqualTo(zone);
+        assertThat(ticket.getPhotoPath()).isEqualTo("tickets/rail.jpg");
+    }
+
+    @Test
     void adminCanWorkAnyTicket() {
         Ticket ticket = ticketService.create(worker, category("Equipment request"), "Gloves", "Need new gloves");
 

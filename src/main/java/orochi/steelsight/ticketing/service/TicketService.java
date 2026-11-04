@@ -14,6 +14,7 @@ import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.ppe.model.DisputeStatus;
 import orochi.steelsight.ppe.model.Violation;
 import orochi.steelsight.ppe.repository.ViolationRepository;
+import orochi.steelsight.scheduling.repository.ZoneRepository;
 import orochi.steelsight.ticketing.model.Ticket;
 import orochi.steelsight.ticketing.model.TicketCategory;
 import orochi.steelsight.ticketing.model.TicketComment;
@@ -38,16 +39,30 @@ public class TicketService {
     private final TicketCommentRepository comments;
     private final ViolationRepository violations;
     private final AppUserRepository users;
+    private final ZoneRepository zones;
+
+    public record NewTicket(Long categoryId, String subject, String description, Long zoneId, String photoPath) {
+    }
+
+    public Ticket create(Long actorId, Long categoryId, String subject, String description) {
+        return create(actorId, new NewTicket(categoryId, subject, description, null, null));
+    }
 
     /** Opens an ordinary ticket, such as a Safety concern. Disputes go through {@link #openDispute}. */
-    public Ticket create(Long actorId, Long categoryId, String subject, String description) {
+    public Ticket create(Long actorId, NewTicket details) {
         access.require(actorId, Permissions.TICKET_CREATE);
-        TicketCategory category = categories.findById(categoryId)
-                .orElseThrow(() -> new NotFoundException("Ticket category", categoryId));
+        TicketCategory category = categories.findById(details.categoryId())
+                .orElseThrow(() -> new NotFoundException("Ticket category", details.categoryId()));
         if (PPE_DISPUTE_CATEGORY.equals(category.getCategoryName())) {
             throw new BusinessRuleException("Open a PPE dispute from the violation itself");
         }
-        return tickets.saveAndFlush(newTicket(actorId, category, subject, description));
+        Ticket ticket = newTicket(actorId, category, details.subject(), details.description());
+        ticket.setPhotoPath(details.photoPath());
+        if (details.zoneId() != null) {
+            ticket.setZone(zones.findById(details.zoneId())
+                    .orElseThrow(() -> new NotFoundException("Zone", details.zoneId())));
+        }
+        return tickets.saveAndFlush(ticket);
     }
 
     /** Marks the violation disputed and opens its ticket in one transaction. */

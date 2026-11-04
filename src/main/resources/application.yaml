@@ -25,3 +25,15 @@ spring:
 
 server:
   port: 8080
+  forward-headers-strategy: framework   # Render's proxy handles HTTPS and forwards to this port
+  servlet:
+    session:
+      cookie:
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}   # set to true on Render
+
+steelsight:
+  bootstrap:
+    # Creates the first admin when there is none. Leave the password empty to skip this.
+    admin-employee-code: ${ADMIN_EMPLOYEE_CODE:ADMIN}
+    admin-password: ${ADMIN_PASSWORD:}

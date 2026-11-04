@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Home · Steelsight</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="center">
+<main class="card">
+    <h1 th:text="|Welcome, ${user.fullName}|">Welcome</h1>
+    <p th:text="|Signed in as ${user.username} (${user.roleName})|">Signed in</p>
+    <form th:action="@{/logout}" method="post">
+        <button type="submit">Sign out</button>
+    </form>
+</main>
+</body>
+</html>
