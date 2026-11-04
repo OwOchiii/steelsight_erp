@@ -19,7 +19,7 @@ BEGIN
 
   -- generated column
   INSERT INTO shift (user_id, zone_id, start_at, end_at, created_by)
-  VALUES (v_worker, v_zone, now() - interval '30 hours', now() - interval '22 hours', v_other)
+  VALUES (v_worker, v_zone, now() - interval '56 hours', now() - interval '48 hours', v_other)
   RETURNING id INTO v_shift;
   ASSERT (SELECT duration_hours FROM shift WHERE id = v_shift) = 8, 'duration_hours should be 8';
 
@@ -62,7 +62,7 @@ BEGIN
 
   -- a forgotten check-out closes, and the worker can check in again
   INSERT INTO check_in (user_id, shift_id, check_in_at, face_similarity)
-  VALUES (v_worker, v_shift, now() - interval '30 hours', 90);
+  VALUES (v_worker, v_shift, now() - interval '56 hours', 90);
   v_closed = close_stale_check_ins();
   ASSERT v_closed = 1, 'one visit should auto-close';
   SELECT auto_closed INTO v_auto FROM check_in WHERE user_id = v_worker;

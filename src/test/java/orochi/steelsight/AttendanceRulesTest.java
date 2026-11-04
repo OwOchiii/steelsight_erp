@@ -54,28 +54,37 @@ class AttendanceRulesTest {
     }
 
     @Test
-    void someoneTaggedLateCanLeaveAtTheNormalTimeWithoutAnEarlyTag() {
-        VisitStatus status = assess("09:00", "17:00");
+    void lateTimeWithinTheGracePeriodIsMadeUpMinuteForMinute() {
+        VisitStatus status = assess("08:10", "17:10");
+
+        assertThat(status.isOnTime()).isTrue();
+        assertThat(status.requiredCheckOut()).isEqualTo(at("17:10"));
+    }
+
+    @Test
+    void theRequiredCheckOutStopsAtTheGracePeriodHoweverLateTheArrival() {
+        VisitStatus status = assess("09:00", "17:15");
 
         assertThat(status.minutesLate()).isEqualTo(60);
         assertThat(status.isEarly()).isFalse();
-        assertThat(status.requiredCheckOut()).isEqualTo(at("17:00"));
+        assertThat(status.requiredCheckOut()).isEqualTo(at("17:15"));
     }
 
     @Test
     void oneMinutePastTheGracePeriodIsLate() {
-        VisitStatus status = assess("08:16", "17:00");
+        VisitStatus status = assess("08:16", "17:15");
 
         assertThat(status.minutesLate()).isEqualTo(16);
         assertThat(status.isEarly()).isFalse();
+        assertThat(status.requiredCheckOut()).isEqualTo(at("17:15"));
     }
 
     @Test
-    void someoneTaggedLateWhoLeavesBeforeTheNormalTimeIsAlsoEarly() {
-        VisitStatus status = assess("09:00", "16:00");
+    void someoneTaggedLateWhoLeavesBeforeTheRequiredTimeIsAlsoEarly() {
+        VisitStatus status = assess("09:00", "17:00");
 
         assertThat(status.minutesLate()).isEqualTo(60);
-        assertThat(status.minutesEarly()).isEqualTo(60);
+        assertThat(status.minutesEarly()).isEqualTo(15);
     }
 
     @Test
@@ -108,7 +117,7 @@ class AttendanceRulesTest {
         assertThat(status.isOnSite()).isTrue();
         assertThat(status.isEarly()).isFalse();
         assertThat(status.isLate()).isTrue();
-        assertThat(status.requiredCheckOut()).isEqualTo(at("17:00"));
+        assertThat(status.requiredCheckOut()).isEqualTo(at("17:15"));
         assertThat(status.isOnTime()).isFalse();
     }
 

@@ -12,10 +12,10 @@ import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 
 /**
- * Arriving within the team's grace period is made up at the end of the shift: on an 08:00 to 17:00
- * shift, arriving at 08:15 means working until 17:15. Arriving after it is tagged late instead, and
- * that worker can leave at the shift's normal end. Leaving before the required time is tagged early.
- * Times compare in whole minutes, as pages show them.
+ * Late arrival is made up at the end of the shift, up to the team's grace period: with 15 minutes on
+ * an 08:00 to 17:00 shift, arriving at 08:10 means working until 17:10, and arriving at 08:15 or later
+ * means working until 17:15. Arriving after the grace period is tagged late, and leaving before the
+ * required time is tagged early. Times compare in whole minutes, as pages show them.
  */
 @Component
 public class AttendanceRules {
@@ -32,11 +32,9 @@ public class AttendanceRules {
             return new VisitStatus(visit, null, 0, 0);
         }
         Duration lateBy = positive(Duration.between(toMinute(shift.getStartAt()), toMinute(visit.getCheckInAt())));
-        boolean late = lateBy.compareTo(graceFor(visit)) > 0;
-        OffsetDateTime requiredCheckOut = toMinute(shift.getEndAt());
-        if (!late) {
-            requiredCheckOut = requiredCheckOut.plus(lateBy);
-        }
+        Duration grace = graceFor(visit);
+        boolean late = lateBy.compareTo(grace) > 0;
+        OffsetDateTime requiredCheckOut = toMinute(shift.getEndAt()).plus(late ? grace : lateBy);
         long minutesEarly = 0;
         if (visit.getCheckOutAt() != null && !visit.isAutoClosed()) {
             minutesEarly = positive(Duration.between(toMinute(visit.getCheckOutAt()), requiredCheckOut)).toMinutes();

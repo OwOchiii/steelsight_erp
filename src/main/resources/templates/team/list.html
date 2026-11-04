@@ -8,7 +8,7 @@
     <div th:replace="~{fragments/layout :: messages}"></div>
     <section class="panel" th:unless="${teams.isEmpty()}">
         <h2>Late check-in rule</h2>
-        <p class="quiet">Checking in up to this long after a shift starts isn't tagged late, but the time must be made up at the end of the shift.</p>
+        <p class="quiet">Checking in up to this long after a shift starts isn't tagged late. Late time is made up at the end of the shift, up to this many minutes.</p>
         <form class="setting" method="post" th:each="team : ${teams}" th:action="@{/teams/{id}/late-after(id=${team.id})}">
             <div>
                 <label th:for="|late-${team.id}|" th:text="|${team.name}: minutes|">Minutes</label>

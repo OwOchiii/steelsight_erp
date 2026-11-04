@@ -267,7 +267,8 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
 
         mvc.perform(get("/attendance").with(as(manager)))
                 .andExpect(content().string(containsString("Check-in late (45 min)")))
-                .andExpect(content().string(not(containsString("Check-out early"))));
+                .andExpect(content().string(containsString("Check-out early (15 min)")))
+                .andExpect(content().string(containsString("Must stay until 17:15")));
 
         Long team = jdbc.queryForObject("SELECT team_id FROM app_user WHERE id = ?", Long.class, worker);
         mvc.perform(get("/team").with(as(manager)))
