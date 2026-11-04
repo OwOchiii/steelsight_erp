@@ -28,6 +28,14 @@ public class TicketComment extends IdentifiedModel {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    public static TicketComment on(Ticket ticket, AppUser author, String body) {
+        TicketComment comment = new TicketComment();
+        comment.ticket = ticket;
+        comment.author = author;
+        comment.body = body;
+        return comment;
+    }
+
     @PrePersist
     protected void onCreate() {
         createdAt = OffsetDateTime.now();

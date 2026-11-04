@@ -4,13 +4,14 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import orochi.steelsight.model.SoftDeletableModel;
+import orochi.steelsight.model.Versioned;
 import orochi.steelsight.scheduling.model.Team;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "app_user")
-public class AppUser extends SoftDeletableModel {
+public class AppUser extends SoftDeletableModel implements Versioned {
 
     @Version
     private Long version;

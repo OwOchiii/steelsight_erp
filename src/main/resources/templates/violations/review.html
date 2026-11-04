@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('PPE review')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('review')}"></header>
+<main class="page">
+    <h1>PPE review</h1>
+    <nav class="tabs" aria-label="Violations to show">
+        <a th:href="@{/violations/review}" th:attr="aria-current=${view == 'DISPUTED'} ? 'page' : null">Disputed</a>
+        <a th:href="@{/violations/review(view='UNIDENTIFIED')}" th:attr="aria-current=${view == 'UNIDENTIFIED'} ? 'page' : null">No worker</a>
+        <a th:href="@{/violations/review(view='ALL')}" th:attr="aria-current=${view == 'ALL'} ? 'page' : null">All</a>
+    </nav>
+    <p class="empty" th:if="${violations.isEmpty()}"
+       th:text="${view == 'DISPUTED'} ? 'No disputes are waiting for a decision.' : (${view == 'UNIDENTIFIED'} ? 'Every violation has a worker.' : 'No violations have been recorded.')">Empty</p>
+    <th:block th:unless="${violations.isEmpty()}">
+        <ul th:replace="~{fragments/lists :: violations(${violations}, true)}"></ul>
+        <p th:replace="~{fragments/lists :: limit(${violations})}"></p>
+    </th:block>
+</main>
+</body>
+</html>

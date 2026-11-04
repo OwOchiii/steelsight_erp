@@ -5,7 +5,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import orochi.steelsight.exception.BusinessRuleException;
-import orochi.steelsight.exception.NotFoundException;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.identity.service.AccessPolicy;
@@ -36,13 +35,13 @@ public class TeamService {
 
     public Team changeManager(Long actorId, Long teamId, Long managerId) {
         access.require(actorId, Permissions.USER_MANAGE);
-        Team team = teams.findById(teamId).orElseThrow(() -> new NotFoundException("Team", teamId));
+        Team team = teams.require(teamId);
         team.setManager(manager(managerId));
         return team;
     }
 
     private AppUser manager(Long id) {
-        AppUser manager = users.findByIdAndDeletedAtIsNull(id).orElseThrow(() -> new NotFoundException("User", id));
+        AppUser manager = users.require(id);
         if (!"MANAGER".equals(manager.getRole().getRoleName())) {
             throw new BusinessRuleException("A team's manager must have the MANAGER role");
         }

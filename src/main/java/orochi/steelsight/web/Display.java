@@ -1,34 +1,37 @@
 package orochi.steelsight.web;
 
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import orochi.steelsight.repository.BaseRepository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
 import java.util.Locale;
 
 /** Formatting used by the templates, as ${@display.dateTime(value)}. */
 @Component("display")
+@RequiredArgsConstructor
 public class Display {
 
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.ENGLISH);
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH);
 
-    private final ZoneId zone;
-
-    public Display(@Value("${steelsight.time-zone}") String zone) {
-        this.zone = ZoneId.of(zone);
-    }
+    private final SiteTime siteTime;
 
     public String date(OffsetDateTime value) {
-        return value == null ? "" : DATE.format(value.atZoneSameInstant(zone));
+        return value == null ? "" : date(siteTime.dateOf(value));
+    }
+
+    public String date(LocalDate value) {
+        return value == null ? "" : DATE.format(value);
     }
 
     public String time(OffsetDateTime value) {
-        return value == null ? "" : TIME.format(value.atZoneSameInstant(zone));
+        return value == null ? "" : TIME.format(siteTime.toLocal(value));
     }
 
     public String dateTime(OffsetDateTime value) {
@@ -52,5 +55,10 @@ public class Display {
     /** The class that colours a status badge. */
     public String badge(Enum<?> value) {
         return value == null ? "" : "badge-" + value.name().toLowerCase(Locale.ENGLISH);
+    }
+
+    /** True when a list stopped at the row limit, so the page can say there may be more. */
+    public boolean atLimit(Collection<?> rows) {
+        return rows.size() >= BaseRepository.LIST_LIMIT.max();
     }
 }

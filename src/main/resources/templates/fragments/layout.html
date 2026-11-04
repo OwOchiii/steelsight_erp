@@ -14,6 +14,11 @@
         <a sec:authorize="hasAuthority('SHIFT_READ_OWN')" th:href="@{/timetable}" th:attr="aria-current=${active == 'timetable'} ? 'page'">Timetable</a>
         <a sec:authorize="hasAuthority('VIOLATION_READ_OWN')" th:href="@{/violations}" th:attr="aria-current=${active == 'violations'} ? 'page'">Violations</a>
         <a sec:authorize="hasAuthority('TICKET_READ_OWN')" th:href="@{/tickets}" th:attr="aria-current=${active == 'tickets'} ? 'page'">Tickets</a>
+        <a sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL')" th:href="@{/tickets/queue}" th:attr="aria-current=${active == 'queue'} ? 'page'">Ticket queue</a>
+        <a sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review}" th:attr="aria-current=${active == 'review'} ? 'page'">PPE review</a>
+        <a sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL')" th:href="@{/shifts}" th:attr="aria-current=${active == 'shifts'} ? 'page'">Shifts</a>
+        <a sec:authorize="hasAnyAuthority('USER_UPDATE_TEAM', 'USER_MANAGE')" th:href="@{/team}" th:attr="aria-current=${active == 'team'} ? 'page'">Team</a>
+        <a sec:authorize="hasAnyAuthority('CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')" th:href="@{/attendance}" th:attr="aria-current=${active == 'attendance'} ? 'page'">Attendance</a>
     </nav>
     <form th:action="@{/logout}" method="post">
         <button type="submit" class="link">Sign out</button>

@@ -6,15 +6,7 @@
 <main class="page">
     <h1>PPE violations</h1>
     <p class="empty" th:if="${violations.isEmpty()}">You have no recorded violations.</p>
-    <ul class="rows" th:unless="${violations.isEmpty()}">
-        <li th:each="violation : ${violations}">
-            <a th:href="@{/violations/{id}(id=${violation.id})}">
-                <strong th:text="${@display.label(violation.violationType)}">Type</strong>
-                <span class="quiet" th:text="|${@display.dateTime(violation.detectedAt)}, ${violation.camera.zone.name}|">When</span>
-            </a>
-            <span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span>
-        </li>
-    </ul>
+    <th:block th:unless="${violations.isEmpty()}"><ul th:replace="~{fragments/lists :: violations(${violations}, false)}"></ul></th:block>
 </main>
 </body>
 </html>

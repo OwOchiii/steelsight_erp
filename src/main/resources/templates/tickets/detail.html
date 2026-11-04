@@ -2,9 +2,10 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('Ticket')}"></head>
 <body>
-<header th:replace="~{fragments/layout :: nav('tickets')}"></header>
+<header th:replace="~{fragments/layout :: nav(${ownTicket} ? 'tickets' : 'queue')}"></header>
 <main class="page">
-    <a class="back" th:href="@{/tickets}">Back to tickets</a>
+    <a class="back" th:if="${ownTicket}" th:href="@{/tickets}">Back to tickets</a>
+    <a class="back" th:unless="${ownTicket}" th:href="@{/tickets/queue}">Back to the queue</a>
     <div class="title-row">
         <h1 th:text="${ticket.subject}">Subject</h1>
         <span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span>
@@ -32,11 +33,35 @@
         </li>
     </ul>
 
-    <form method="post" th:if="${ticket.status.name() != 'RESOLVED'}" th:action="@{/tickets/{id}/comments(id=${ticket.id})}">
+    <form method="post" th:unless="${ticket.resolved}" th:action="@{/tickets/{id}/comments(id=${ticket.id})}">
         <label for="body">Add a comment</label>
         <textarea id="body" name="body" rows="3" maxlength="4000" required></textarea>
         <button type="submit" class="btn">Post comment</button>
     </form>
+
+    <section class="panel" th:if="${canHandle and !ticket.resolved and ticket.dispute}">
+        <h2>Handle this dispute</h2>
+        <p class="quiet">Deciding the violation resolves this ticket.</p>
+        <a class="btn" th:href="@{/violations/{id}(id=${ticket.violation.id})}">Go to the decision</a>
+    </section>
+
+    <section class="panel" th:if="${canHandle and !ticket.resolved and !ticket.dispute}">
+        <h2>Handle this ticket</h2>
+        <form method="post" th:action="@{/tickets/{id}/assignee(id=${ticket.id})}">
+            <label for="assigneeId">Assign to</label>
+            <select id="assigneeId" name="assigneeId" required>
+                <option value="">Choose a person</option>
+                <option th:each="person : ${assignees}" th:value="${person.id}" th:text="${person.fullName}"
+                        th:selected="${ticket.assignee != null and ticket.assignee.id == person.id}">Name</option>
+            </select>
+            <button type="submit" class="btn secondary">Assign</button>
+        </form>
+        <form method="post" th:action="@{/tickets/{id}/resolve(id=${ticket.id})}">
+            <label for="note">What was done? <span class="optional">optional, shown to the reporter</span></label>
+            <textarea id="note" name="note" rows="3" maxlength="4000"></textarea>
+            <button type="submit" class="btn">Resolve ticket</button>
+        </form>
+    </section>
 </main>
 </body>
 </html>

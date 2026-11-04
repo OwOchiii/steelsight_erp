@@ -67,4 +67,26 @@ public class Violation extends BaseModel {
 
     @Column(name = "reviewed_at")
     private OffsetDateTime reviewedAt;
+
+    public boolean isIdentified() {
+        return user != null;
+    }
+
+    public boolean belongsTo(Long userId) {
+        return user != null && user.getId().equals(userId);
+    }
+
+    public boolean isDisputed() {
+        return disputeStatus == DisputeStatus.DISPUTED;
+    }
+
+    public boolean canBeDisputedBy(Long userId) {
+        return disputeStatus == DisputeStatus.NONE && belongsTo(userId);
+    }
+
+    public void recordDecision(DisputeStatus decision, AppUser reviewer, OffsetDateTime at) {
+        disputeStatus = decision;
+        reviewedBy = reviewer;
+        reviewedAt = at;
+    }
 }

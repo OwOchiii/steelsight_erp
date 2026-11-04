@@ -19,6 +19,21 @@ public interface ShiftRepository extends BaseRepository<Shift, Long> {
 
     List<Shift> findAllByStartAtBetween(OffsetDateTime from, OffsetDateTime to);
 
+    /** Shifts starting in [from, to), so a shift at midnight belongs to one week only. */
+    List<Shift> findAllByStartAtGreaterThanEqualAndStartAtLessThanOrderByStartAtAsc(OffsetDateTime from, OffsetDateTime to);
+
+    @Query("""
+            SELECT s FROM Shift s
+            WHERE s.user.team.manager.id = :managerId
+            AND s.startAt >= :from AND s.startAt < :to
+            ORDER BY s.startAt
+            """)
+    List<Shift> findTeamShiftsStartingIn(
+            @Param("managerId") Long managerId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to
+    );
+
     @Query("""
             SELECT s FROM Shift s
             JOIN s.user u

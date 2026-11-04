@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${visit} ? 'Correct check-in' : 'Add a check-in')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('attendance')}"></header>
+<main class="page narrow">
+    <a class="back" th:href="@{/attendance}">Back to attendance</a>
+    <h1 th:text="${visit} ? |Correct: ${visit.user.fullName}| : 'Add a check-in'">Check-in</h1>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <form method="post" th:action="${visit} ? @{/attendance/{id}(id=${visit.id})} : @{/attendance}" th:object="${form}">
+        <th:block th:unless="${visit}">
+            <label for="workerId">Worker</label>
+            <select id="workerId" th:field="*{workerId}" required>
+                <option value="">Choose a worker</option>
+                <option th:each="worker : ${workers}" th:value="${worker.id}" th:text="|${worker.fullName} (${worker.employeeCode})|">Name</option>
+            </select>
+
+            <label for="zoneId">Zone <span class="optional">optional</span></label>
+            <select id="zoneId" th:field="*{zoneId}">
+                <option value="">No specific zone</option>
+                <option th:each="zone : ${zones}" th:value="${zone.id}" th:text="${zone.name}">Zone</option>
+            </select>
+        </th:block>
+
+        <label for="checkInAt">Checked in</label>
+        <input id="checkInAt" type="datetime-local" th:field="*{checkInAt}" required>
+
+        <label for="checkOutAt">Checked out <span class="optional">leave empty if still on site</span></label>
+        <input id="checkOutAt" type="datetime-local" th:field="*{checkOutAt}">
+
+        <label for="note">Note <span class="optional">optional</span></label>
+        <textarea id="note" th:field="*{note}" rows="3" maxlength="4000"></textarea>
+
+        <button type="submit" class="btn" th:text="${visit} ? 'Save correction' : 'Add check-in'">Save</button>
+    </form>
+</main>
+</body>
+</html>

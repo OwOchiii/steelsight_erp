@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Team')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('team')}"></header>
+<main class="page">
+    <h1>Team</h1>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <p class="empty" th:if="${members.isEmpty()}">Nobody is on your team yet. Ask an admin to add people.</p>
+    <ul class="rows" th:unless="${members.isEmpty()}">
+        <li th:each="member : ${members}">
+            <div class="grow">
+                <strong th:text="|${member.fullName} (${member.employeeCode})|">Name</strong>
+                <span class="quiet" th:text="${member.team != null} ? |${member.team.name}, ${member.role.roleName}| : ${member.role.roleName}">Team</span>
+                <span class="quiet" th:if="${member.email != null or member.phoneNumber != null}"
+                      th:text="${member.email != null and member.phoneNumber != null} ? |${member.email}, ${member.phoneNumber}| : (${member.email} ?: ${member.phoneNumber})">Contact</span>
+            </div>
+            <span class="badge" th:unless="${member.active}">Inactive</span>
+            <a class="row-link" sec:authorize="hasAnyAuthority('SHIFT_UPDATE_TEAM', 'SHIFT_UPDATE_ALL')" th:if="${member.active}" th:href="@{/shifts/new(workerId=${member.id})}">Add shift</a>
+            <a class="row-link" th:href="@{/team/{id}/edit(id=${member.id})}" th:unless="${member.id == #authentication.principal.userId}">Edit</a>
+        </li>
+    </ul>
+</main>
+</body>
+</html>

@@ -74,3 +74,18 @@ input, select, textarea { width: 100%; padding: 10px 12px; font: inherit; color:
 .comments li { padding: 12px 0; border-top: 1px solid var(--line); }
 .comments .quiet { font-size: 14px; }
 .comments .body-text { margin: 4px 0 0; }
+
+/* Handling work */
+.btn.secondary { color: var(--accent); background: transparent; border: 1px solid var(--accent); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions .btn { margin-top: 16px; }
+.panel { margin-top: 24px; }
+.panel form + form { margin-top: 8px; border-top: 1px solid var(--line); }
+.spaced { margin-top: 32px; }
+.grow { flex: 1 1 200px; }
+.row-link { flex: none !important; font-size: 14px; text-decoration: underline !important; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+.tabs a { padding: 8px 12px; color: var(--quiet); text-decoration: none; border-bottom: 2px solid transparent; }
+.tabs a[aria-current="page"] { color: var(--accent); font-weight: 600; border-color: var(--accent); }
+.week-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.week-nav a { font-size: 14px; }

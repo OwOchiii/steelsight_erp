@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Attendance')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('attendance')}"></header>
+<main class="page" th:with="canEdit=${#authorization.expression('hasAuthority(''CHECKIN_EDIT'')')}">
+    <div class="title-row">
+        <h1>Attendance</h1>
+        <a class="btn" sec:authorize="hasAuthority('CHECKIN_EDIT')" th:href="@{/attendance/new}">Add a check-in</a>
+    </div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+
+    <h2>On site now</h2>
+    <p class="empty" th:if="${onSite.isEmpty()}">Nobody is checked in.</p>
+    <th:block th:unless="${onSite.isEmpty()}"><ul th:replace="~{fragments/lists :: visits(${onSite}, ${canEdit})}"></ul></th:block>
+
+    <h2>Recent visits</h2>
+    <p class="empty" th:if="${recent.isEmpty()}">No visits have been recorded.</p>
+    <th:block th:unless="${recent.isEmpty()}">
+        <ul th:replace="~{fragments/lists :: visits(${recent}, ${canEdit})}"></ul>
+        <p th:replace="~{fragments/lists :: limit(${recent})}"></p>
+    </th:block>
+</main>
+</body>
+</html>

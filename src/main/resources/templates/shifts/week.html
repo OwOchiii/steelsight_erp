@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Shifts')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('shifts')}"></header>
+<main class="page">
+    <div class="title-row">
+        <h1>Shifts</h1>
+        <a class="btn" sec:authorize="hasAnyAuthority('SHIFT_UPDATE_TEAM', 'SHIFT_UPDATE_ALL')" th:href="@{/shifts/new}">New shift</a>
+    </div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <nav class="week-nav" aria-label="Week">
+        <a th:href="@{/shifts(week=${previousWeek})}">Previous week</a>
+        <strong th:text="|${@display.date(monday)} to ${@display.date(sunday)}|">Week</strong>
+        <a th:href="@{/shifts(week=${nextWeek})}">Next week</a>
+    </nav>
+    <section th:each="day : ${days}">
+        <h2 th:text="${@display.date(day.date)}">Day</h2>
+        <p class="quiet" th:if="${day.shifts.isEmpty()}">No shifts.</p>
+        <ul class="rows" th:unless="${day.shifts.isEmpty()}">
+            <li th:each="shift : ${day.shifts}">
+                <a th:href="@{/shifts/{id}/edit(id=${shift.id})}">
+                    <strong th:text="${shift.user.fullName}">Name</strong>
+                    <span class="quiet" th:text="|${@display.time(shift.startAt)} to ${@display.time(shift.endAt)} (${@display.hours(shift.durationHours)} h), ${shift.zone.name}|">Time</span>
+                </a>
+                <span class="badge" th:classappend="${@display.badge(shift.status)}" th:text="${@display.label(shift.status)}">Status</span>
+            </li>
+        </ul>
+    </section>
+</main>
+</body>
+</html>

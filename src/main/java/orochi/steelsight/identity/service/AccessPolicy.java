@@ -20,6 +20,15 @@ public class AccessPolicy {
         allow(has(actorId, permission));
     }
 
+    public void requireAny(Long actorId, String... permissions) {
+        for (String permission : permissions) {
+            if (has(actorId, permission)) {
+                return;
+            }
+        }
+        allow(false);
+    }
+
     public boolean canUpdateUser(Long actorId, Long targetUserId) {
         return ask("SELECT can_update_user(?, ?)", actorId, targetUserId);
     }

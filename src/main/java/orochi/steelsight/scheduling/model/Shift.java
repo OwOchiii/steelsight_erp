@@ -7,6 +7,7 @@ import org.hibernate.annotations.Generated;
 import org.hibernate.generator.EventType;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.model.BaseModel;
+import orochi.steelsight.model.Versioned;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -15,7 +16,7 @@ import java.time.OffsetDateTime;
 @Setter
 @Entity
 @Table(name = "shift")
-public class Shift extends BaseModel {
+public class Shift extends BaseModel implements Versioned {
 
     @Version
     private Long version;
@@ -49,4 +50,16 @@ public class Shift extends BaseModel {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "updated_by")
     private AppUser updatedBy;
+
+    public boolean isScheduled() {
+        return status == ShiftStatus.SCHEDULED;
+    }
+
+    public boolean isUpcoming(OffsetDateTime now) {
+        return isScheduled() && endAt.isAfter(now);
+    }
+
+    public boolean hasStarted(OffsetDateTime now) {
+        return !startAt.isAfter(now);
+    }
 }

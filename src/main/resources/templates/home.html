@@ -25,6 +25,26 @@
             <strong th:text="${violationCount}">0</strong>
             <span th:if="${activeDisputes > 0}" th:text="|${activeDisputes} being reviewed|">Reviewing</span>
         </a>
+        <a class="tile" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL')" th:href="@{/tickets/queue}">
+            <span class="tile-label">Tickets to handle</span>
+            <strong th:text="${queueCount}">0</strong>
+        </a>
+        <a class="tile" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review}">
+            <span class="tile-label">Disputes to decide</span>
+            <strong th:text="${disputesToDecide}">0</strong>
+        </a>
+        <a class="tile" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review(view='UNIDENTIFIED')}">
+            <span class="tile-label">Violations with no worker</span>
+            <strong th:text="${unidentified}">0</strong>
+        </a>
+        <a class="tile" sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL')" th:href="@{/shifts}">
+            <span class="tile-label">Shifts today</span>
+            <strong th:text="${shiftsToday}">0</strong>
+        </a>
+        <a class="tile" sec:authorize="hasAnyAuthority('CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')" th:href="@{/attendance}">
+            <span class="tile-label">On site now</span>
+            <strong th:text="${onSite}">0</strong>
+        </a>
     </section>
 
     <a class="btn" sec:authorize="hasAuthority('TICKET_CREATE')" th:href="@{/tickets/new}">Report a problem</a>

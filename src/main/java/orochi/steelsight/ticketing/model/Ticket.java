@@ -60,4 +60,26 @@ public class Ticket extends SoftDeletableModel {
 
     @Column(name = "resolved_at")
     private OffsetDateTime resolvedAt;
+
+    public boolean isResolved() {
+        return status == TicketStatus.RESOLVED;
+    }
+
+    /** A PPE dispute is resolved by deciding its violation. */
+    public boolean isDispute() {
+        return violation != null;
+    }
+
+    public void assignTo(AppUser user) {
+        assignee = user;
+        if (status == TicketStatus.OPEN) {
+            status = TicketStatus.IN_PROGRESS;
+        }
+    }
+
+    public void resolveBy(AppUser user, OffsetDateTime at) {
+        status = TicketStatus.RESOLVED;
+        resolver = user;
+        resolvedAt = at;
+    }
 }

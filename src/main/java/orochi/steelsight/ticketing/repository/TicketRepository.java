@@ -3,9 +3,12 @@ package orochi.steelsight.ticketing.repository;
 import orochi.steelsight.repository.SoftDeletableRepository;
 import orochi.steelsight.ticketing.model.Ticket;
 import orochi.steelsight.ticketing.model.TicketStatus;
+import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +23,15 @@ public interface TicketRepository extends SoftDeletableRepository<Ticket, Long> 
     List<Ticket> findAllByAssigneeIdAndDeletedAtIsNull(Long assigneeId);
 
     Optional<Ticket> findByViolationIdAndDeletedAtIsNull(Long violationId);
+
+    List<Ticket> findAllByStatusInAndDeletedAtIsNull(Collection<TicketStatus> statuses, Sort sort, Limit limit);
+
+    List<Ticket> findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(
+            Long roleId, Collection<TicketStatus> statuses, Sort sort, Limit limit);
+
+    long countByStatusInAndDeletedAtIsNull(Collection<TicketStatus> statuses);
+
+    long countByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(Long roleId, Collection<TicketStatus> statuses);
 
     @Query("""
             SELECT t FROM Ticket t

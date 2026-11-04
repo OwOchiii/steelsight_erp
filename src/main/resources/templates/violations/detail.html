@@ -2,13 +2,18 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('Violation')}"></head>
 <body>
-<header th:replace="~{fragments/layout :: nav('violations')}"></header>
+<header th:replace="~{fragments/layout :: nav(${reviewList} ? 'review' : 'violations')}"></header>
 <main class="page">
-    <a class="back" th:href="@{/violations}">Back to violations</a>
+    <a class="back" th:if="${reviewList}" th:href="@{/violations/review}">Back to PPE review</a>
+    <a class="back" th:unless="${reviewList}" th:href="@{/violations}">Back to violations</a>
     <h1 th:text="${@display.label(violation.violationType)}">Type</h1>
     <div th:replace="~{fragments/layout :: messages}"></div>
 
     <dl class="facts">
+        <th:block th:if="${canReview}">
+            <dt>Worker</dt>
+            <dd th:text="${violation.identified} ? |${violation.user.fullName} (${violation.user.employeeCode})| : 'Not known yet'">Worker</dd>
+        </th:block>
         <dt>Detected</dt><dd th:text="${@display.dateTime(violation.detectedAt)}">When</dd>
         <dt>Zone</dt><dd th:text="${violation.camera.zone.name}">Zone</dd>
         <dt>Camera</dt><dd th:text="${violation.camera.cameraCode}">Camera</dd>
@@ -18,18 +23,43 @@
             <span th:if="${violation.disputeStatus.name() == 'NONE'}">Not disputed</span>
             <span class="badge" th:unless="${violation.disputeStatus.name() == 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span>
         </dd>
-        <th:block th:if="${violation.reviewedAt}"><dt>Decided</dt><dd th:text="${@display.dateTime(violation.reviewedAt)}">When</dd></th:block>
+        <th:block th:if="${violation.reviewedAt}"><dt>Decided</dt><dd th:text="|${@display.dateTime(violation.reviewedAt)} by ${violation.reviewedBy.fullName}|">When</dd></th:block>
     </dl>
 
-    <p th:if="${disputeTicket}"><a th:href="@{/tickets/{id}(id=${disputeTicket.id})}">Open the dispute ticket</a></p>
+    <th:block th:if="${disputeTicket}">
+        <h2>The worker's reason</h2>
+        <p class="body-text" th:text="${disputeTicket.description}">Reason</p>
+        <p><a th:href="@{/tickets/{id}(id=${disputeTicket.id})}">Open the dispute ticket</a></p>
+    </th:block>
 
-    <form class="panel" method="post" th:if="${violation.disputeStatus.name() == 'NONE' and violation.user != null and violation.user.id == userId}"
-          th:action="@{/violations/{id}/dispute(id=${violation.id})}">
+    <form class="panel" method="post" th:if="${canDispute}" th:action="@{/violations/{id}/dispute(id=${violation.id})}">
         <h2>Think this is wrong?</h2>
         <p class="quiet">The HSE team will review your dispute and decide.</p>
         <label for="reason">Why do you disagree?</label>
         <textarea id="reason" name="reason" rows="4" maxlength="4000" required></textarea>
         <button type="submit" class="btn">Send dispute</button>
+    </form>
+
+    <form class="panel" method="post" th:if="${canDecide}" th:action="@{/violations/{id}/decision(id=${violation.id})}">
+        <h2>Decide this dispute</h2>
+        <p class="quiet">The camera image can't be shown here yet.</p>
+        <label for="note">Note to the worker <span class="optional">optional</span></label>
+        <textarea id="note" name="note" rows="3" maxlength="4000"></textarea>
+        <div class="actions">
+            <button type="submit" class="btn secondary" name="decision" value="UPHELD">Uphold: the violation stands</button>
+            <button type="submit" class="btn secondary" name="decision" value="OVERTURNED">Overturn: the detection was wrong</button>
+        </div>
+    </form>
+
+    <form class="panel" method="post" th:if="${workers}" th:action="@{/violations/{id}/worker(id=${violation.id})}">
+        <h2>Who is this?</h2>
+        <p class="quiet">The camera couldn't identify the worker. Once named, they can see this violation and dispute it.</p>
+        <label for="workerId">Worker</label>
+        <select id="workerId" name="workerId" required>
+            <option value="">Choose a worker</option>
+            <option th:each="worker : ${workers}" th:value="${worker.id}" th:text="|${worker.fullName} (${worker.employeeCode})|">Name</option>
+        </select>
+        <button type="submit" class="btn">Save worker</button>
     </form>
 </main>
 </body>

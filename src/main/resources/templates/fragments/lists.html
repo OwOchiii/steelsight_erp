@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<ul class="rows" th:fragment="tickets(tickets, forHandler)">
+    <li th:each="ticket : ${tickets}">
+        <a th:href="@{/tickets/{id}(id=${ticket.id})}">
+            <strong th:text="${ticket.subject}">Subject</strong>
+            <span class="quiet" th:text="|${ticket.category.categoryName}, ${@display.date(ticket.createdAt)}|">Category</span>
+            <span class="quiet" th:if="${forHandler}"
+                  th:text="|From ${ticket.createdBy.fullName}${ticket.zone != null ? ', ' + ticket.zone.name : ''}${ticket.assignee != null ? ', assigned to ' + ticket.assignee.fullName : ''}|">From</span>
+        </a>
+        <span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span>
+    </li>
+</ul>
+<ul class="rows" th:fragment="violations(violations, forReviewer)">
+    <li th:each="violation : ${violations}">
+        <a th:href="@{/violations/{id}(id=${violation.id})}">
+            <strong th:text="${@display.label(violation.violationType)}">Type</strong>
+            <span class="quiet" th:text="|${@display.dateTime(violation.detectedAt)}, ${violation.camera.zone.name}|">When</span>
+            <span class="quiet" th:if="${forReviewer}" th:text="${violation.identified} ? ${violation.user.fullName} : 'Worker unknown'">Worker</span>
+        </a>
+        <span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span>
+    </li>
+</ul>
+<ul class="rows" th:fragment="visits(visits, canEdit)">
+    <li th:each="visit : ${visits}">
+        <div class="grow">
+            <strong th:text="|${visit.user.fullName} (${visit.user.employeeCode})|">Name</strong>
+            <span class="quiet" th:text="|In ${@display.dateTime(visit.checkInAt)}${visit.zone != null ? ', ' + visit.zone.name : ''}|">In</span>
+            <span class="quiet" th:if="${visit.checkOutAt}" th:text="|Out ${@display.dateTime(visit.checkOutAt)}${visit.autoClosed ? ' (estimated)' : ''}|">Out</span>
+            <span class="quiet" th:if="${visit.note}" th:text="${visit.note}">Note</span>
+        </div>
+        <span class="badge" th:text="${@display.label(visit.method)}">Method</span>
+        <a class="row-link" th:if="${canEdit}" th:href="@{/attendance/{id}/edit(id=${visit.id})}">Correct</a>
+    </li>
+</ul>
+<p class="hint" th:fragment="limit(rows)" th:if="${@display.atLimit(rows)}">Showing the first 100 only.</p>
+</body>
+</html>

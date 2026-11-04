@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import orochi.steelsight.exception.BusinessRuleException;
 import orochi.steelsight.exception.NotFoundException;
 import orochi.steelsight.security.AuthenticatedUser;
 import orochi.steelsight.storage.PhotoStorage;
@@ -26,7 +25,7 @@ import orochi.steelsight.ticketing.service.TicketService;
 
 @Controller
 @RequiredArgsConstructor
-public class TicketController {
+public class TicketController extends PageController {
 
     private final TicketService tickets;
     private final PhotoStorage photos;
@@ -35,6 +34,15 @@ public class TicketController {
     public String list(@AuthenticationPrincipal AuthenticatedUser user, Model model) {
         model.addAttribute("tickets", tickets.listOwn(user.getUserId()));
         return "tickets/list";
+    }
+
+    /** The tickets the user works on, as opposed to the ones they opened. */
+    @GetMapping("/tickets/queue")
+    public String queue(@AuthenticationPrincipal AuthenticatedUser user,
+                        @RequestParam(defaultValue = "false") boolean resolved, Model model) {
+        model.addAttribute("tickets", tickets.listQueue(user.getUserId(), resolved));
+        model.addAttribute("resolved", resolved);
+        return "tickets/queue";
     }
 
     @GetMapping("/tickets/new")
@@ -48,43 +56,53 @@ public class TicketController {
                          @ModelAttribute("form") TicketForm form, BindingResult binding,
                          @RequestParam(required = false) MultipartFile photo,
                          Model model, HttpServletResponse response, RedirectAttributes redirect) {
-        String storedPhoto = null;
-        try {
-            if (binding.hasErrors()) {
-                throw new BusinessRuleException("Choose a category and zone from the lists");
+        return submit(binding, model, response, () -> {
+            String storedPhoto = photos.store(photo);
+            try {
+                Ticket ticket = tickets.create(user.getUserId(), new TicketService.NewTicket(
+                        form.getCategoryId(), form.getSubject(), form.getDescription(), form.getZoneId(), storedPhoto));
+                redirect.addFlashAttribute("success", "Your ticket was sent.");
+                return "redirect:/tickets/" + ticket.getId();
+            } catch (RuntimeException e) {
+                photos.delete(storedPhoto);
+                throw e;
             }
-            storedPhoto = photos.store(photo);
-            Ticket ticket = tickets.create(user.getUserId(), new TicketService.NewTicket(
-                    form.getCategoryId(), form.getSubject(), form.getDescription(), form.getZoneId(), storedPhoto));
-            redirect.addFlashAttribute("success", "Your ticket was sent.");
-            return "redirect:/tickets/" + ticket.getId();
-        } catch (BusinessRuleException e) {
-            photos.delete(storedPhoto);
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            model.addAttribute("error", e.getMessage());
-            return showForm(user, model);
-        } catch (RuntimeException e) {
-            photos.delete(storedPhoto);
-            throw e;
-        }
+        }, () -> showForm(user, model));
     }
 
     @GetMapping("/tickets/{id}")
     public String detail(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, Model model) {
-        model.addAttribute("ticket", tickets.get(user.getUserId(), id));
+        Ticket ticket = tickets.get(user.getUserId(), id);
+        boolean canHandle = tickets.canHandle(user.getUserId(), id);
+        model.addAttribute("ticket", ticket);
         model.addAttribute("comments", tickets.listComments(user.getUserId(), id));
+        model.addAttribute("canHandle", canHandle);
+        model.addAttribute("ownTicket", ticket.getCreatedBy().getId().equals(user.getUserId()));
+        if (canHandle && !ticket.isResolved() && !ticket.isDispute()) {
+            model.addAttribute("assignees", tickets.listPossibleAssignees(user.getUserId(), id));
+        }
         return "tickets/detail";
     }
 
     @PostMapping("/tickets/{id}/comments")
     public String comment(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
                           @RequestParam(required = false) String body, RedirectAttributes redirect) {
-        try {
-            tickets.addComment(user.getUserId(), id, body);
-        } catch (BusinessRuleException e) {
-            redirect.addFlashAttribute("error", e.getMessage());
-        }
-        return "redirect:/tickets/" + id;
+        return attempt(redirect, "/tickets/" + id, "Your comment was added.",
+                () -> tickets.addComment(user.getUserId(), id, body));
+    }
+
+    @PostMapping("/tickets/{id}/assignee")
+    public String assign(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
+                         @RequestParam(required = false) Long assigneeId, RedirectAttributes redirect) {
+        return attempt(redirect, "/tickets/" + id, "The ticket was assigned.",
+                () -> tickets.assign(user.getUserId(), id, assigneeId));
+    }
+
+    @PostMapping("/tickets/{id}/resolve")
+    public String resolve(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
+                          @RequestParam(required = false) String note, RedirectAttributes redirect) {
+        return attempt(redirect, "/tickets/" + id, "The ticket was resolved.",
+                () -> tickets.resolve(user.getUserId(), id, note));
     }
 
     /** Goes through the ticket's read check, because the photo is as private as the ticket. */

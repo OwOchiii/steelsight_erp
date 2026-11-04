@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Ticket queue')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('queue')}"></header>
+<main class="page">
+    <h1>Ticket queue</h1>
+    <nav class="tabs" aria-label="Ticket status">
+        <a th:href="@{/tickets/queue}" th:attr="aria-current=${resolved} ? null : 'page'">To handle</a>
+        <a th:href="@{/tickets/queue(resolved=true)}" th:attr="aria-current=${resolved} ? 'page' : null">Resolved</a>
+    </nav>
+    <p class="empty" th:if="${tickets.isEmpty()}" th:text="${resolved} ? 'No resolved tickets yet.' : 'Nothing to handle right now.'">Empty</p>
+    <th:block th:unless="${tickets.isEmpty()}">
+        <ul th:replace="~{fragments/lists :: tickets(${tickets}, true)}"></ul>
+        <p th:replace="~{fragments/lists :: limit(${tickets})}"></p>
+    </th:block>
+</main>
+</body>
+</html>

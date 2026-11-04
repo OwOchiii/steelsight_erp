@@ -1,5 +1,6 @@
 package orochi.steelsight.attendance.repository;
 
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import orochi.steelsight.attendance.model.CheckIn;
@@ -19,6 +20,22 @@ public interface CheckInRepository extends BaseRepository<CheckIn, Long> {
 
     /** Everyone on site right now. */
     List<CheckIn> findAllByCheckOutAtIsNull();
+
+    List<CheckIn> findAllByOrderByCheckInAtDesc(Limit limit);
+
+    @Query("""
+            SELECT c FROM CheckIn c
+            WHERE c.user.team.manager.id = :managerId AND c.checkOutAt IS NULL
+            ORDER BY c.checkInAt DESC
+            """)
+    List<CheckIn> findTeamOnSite(@Param("managerId") Long managerId);
+
+    @Query("""
+            SELECT c FROM CheckIn c
+            WHERE c.user.team.manager.id = :managerId
+            ORDER BY c.checkInAt DESC
+            """)
+    List<CheckIn> findTeamVisits(@Param("managerId") Long managerId, Limit limit);
 
     @Query("""
             SELECT c FROM CheckIn c

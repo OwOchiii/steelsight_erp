@@ -2,6 +2,7 @@ package orochi.steelsight.ticketing.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.ppe.model.DisputeStatus;
 import orochi.steelsight.ppe.model.Violation;
 import orochi.steelsight.ppe.repository.ViolationRepository;
+import orochi.steelsight.repository.BaseRepository;
 import orochi.steelsight.scheduling.model.Zone;
 import orochi.steelsight.scheduling.repository.ZoneRepository;
 import orochi.steelsight.ticketing.model.Ticket;
@@ -23,10 +25,13 @@ import orochi.steelsight.ticketing.model.TicketStatus;
 import orochi.steelsight.ticketing.repository.TicketCategoryRepository;
 import orochi.steelsight.ticketing.repository.TicketCommentRepository;
 import orochi.steelsight.ticketing.repository.TicketRepository;
+import orochi.steelsight.validation.Text;
 
 import java.time.OffsetDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -34,8 +39,7 @@ import java.util.Optional;
 public class TicketService {
 
     static final String PPE_DISPUTE_CATEGORY = "PPE dispute";
-    private static final int MAX_SUBJECT_LENGTH = 200;
-    private static final int MAX_TEXT_LENGTH = 4000;
+    private static final Set<TicketStatus> UNRESOLVED = EnumSet.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS);
 
     private final AccessPolicy access;
     private final TicketRepository tickets;
@@ -66,8 +70,7 @@ public class TicketService {
         Ticket ticket = newTicket(actorId, category, details.subject(), details.description());
         ticket.setPhotoPath(details.photoPath());
         if (details.zoneId() != null) {
-            ticket.setZone(zones.findById(details.zoneId())
-                    .orElseThrow(() -> new NotFoundException("Zone", details.zoneId())));
+            ticket.setZone(zones.require(details.zoneId()));
         }
         return tickets.saveAndFlush(ticket);
     }
@@ -75,9 +78,8 @@ public class TicketService {
     /** Marks the violation disputed and opens its ticket in one transaction. */
     public Ticket openDispute(Long actorId, Long violationId, String subject, String description) {
         access.require(actorId, Permissions.TICKET_CREATE);
-        Violation violation = violations.findById(violationId)
-                .orElseThrow(() -> new NotFoundException("Violation", violationId));
-        if (violation.getUser() == null || !violation.getUser().getId().equals(actorId)) {
+        Violation violation = violations.require(violationId);
+        if (!violation.belongsTo(actorId)) {
             throw new AccessDeniedException("You can only dispute your own violation");
         }
         if (violation.getDisputeStatus() != DisputeStatus.NONE) {
@@ -122,7 +124,7 @@ public class TicketService {
     @Transactional(readOnly = true)
     public Ticket get(Long actorId, Long ticketId) {
         access.requireCanReadTicket(actorId, ticketId);
-        return ticket(ticketId);
+        return tickets.require(ticketId);
     }
 
     @Transactional(readOnly = true)
@@ -135,7 +137,7 @@ public class TicketService {
     @Transactional(readOnly = true)
     public List<Ticket> listHandled(Long actorId) {
         access.require(actorId, Permissions.TICKET_READ_HANDLED);
-        return tickets.findAllByHandlerRoleId(user(actorId).getRole().getId());
+        return tickets.findAllByHandlerRoleId(users.require(actorId).getRole().getId());
     }
 
     @Transactional(readOnly = true)
@@ -144,29 +146,72 @@ public class TicketService {
         return tickets.findAllByDeletedAtIsNull();
     }
 
+    /**
+     * The tickets this user works on: their role's categories, or every ticket with TICKET_READ_ALL.
+     * Unresolved tickets come oldest first, because they have waited longest; resolved ones newest first.
+     */
+    @Transactional(readOnly = true)
+    public List<Ticket> listQueue(Long actorId, boolean resolved) {
+        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_ALL);
+        Set<TicketStatus> statuses = resolved ? EnumSet.of(TicketStatus.RESOLVED) : UNRESOLVED;
+        Sort sort = resolved ? Sort.by("resolvedAt").descending() : Sort.by("createdAt");
+        if (access.has(actorId, Permissions.TICKET_READ_ALL)) {
+            return tickets.findAllByStatusInAndDeletedAtIsNull(statuses, sort, BaseRepository.LIST_LIMIT);
+        }
+        return tickets.findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(
+                users.require(actorId).getRole().getId(), statuses, sort, BaseRepository.LIST_LIMIT);
+    }
+
+    @Transactional(readOnly = true)
+    public long countUnresolvedInQueue(Long actorId) {
+        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_ALL);
+        if (access.has(actorId, Permissions.TICKET_READ_ALL)) {
+            return tickets.countByStatusInAndDeletedAtIsNull(UNRESOLVED);
+        }
+        return tickets.countByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(
+                users.require(actorId).getRole().getId(), UNRESOLVED);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canHandle(Long actorId, Long ticketId) {
+        return access.canUpdateTicket(actorId, ticketId);
+    }
+
+    /** Active people in the role that handles this ticket's category. */
+    @Transactional(readOnly = true)
+    public List<AppUser> listPossibleAssignees(Long actorId, Long ticketId) {
+        access.requireCanUpdateTicket(actorId, ticketId);
+        return users.findActiveByRole(tickets.require(ticketId).getCategory().getHandlerRole().getId());
+    }
+
     /** The assignee must also be able to work on this ticket. */
     public Ticket assign(Long actorId, Long ticketId, Long assigneeId) {
         access.requireCanUpdateTicket(actorId, ticketId);
-        if (!access.canUpdateTicket(assigneeId, ticketId)) {
+        if (assigneeId == null || !access.canUpdateTicket(assigneeId, ticketId)) {
             throw new BusinessRuleException("That user cannot handle this ticket");
         }
         Ticket ticket = open(ticketId);
-        ticket.setAssignee(user(assigneeId));
-        if (ticket.getStatus() == TicketStatus.OPEN) {
-            ticket.setStatus(TicketStatus.IN_PROGRESS);
-        }
+        ticket.assignTo(users.require(assigneeId));
         return tickets.saveAndFlush(ticket);
     }
 
     public Ticket resolve(Long actorId, Long ticketId) {
+        return resolve(actorId, ticketId, null);
+    }
+
+    /** The note becomes a comment in the same transaction, so the reporter can see the outcome. */
+    public Ticket resolve(Long actorId, Long ticketId, String note) {
         access.requireCanUpdateTicket(actorId, ticketId);
         Ticket ticket = open(ticketId);
-        if (ticket.getViolation() != null) {
+        if (ticket.isDispute()) {
             throw new BusinessRuleException("Resolve a PPE dispute by deciding its violation");
         }
-        ticket.setStatus(TicketStatus.RESOLVED);
-        ticket.setResolver(user(actorId));
-        ticket.setResolvedAt(OffsetDateTime.now());
+        String outcome = Text.optional("A note", note, Text.LONG);
+        AppUser resolver = users.require(actorId);
+        ticket.resolveBy(resolver, OffsetDateTime.now());
+        if (outcome != null) {
+            comments.save(TicketComment.on(ticket, resolver, outcome));
+        }
         return tickets.saveAndFlush(ticket);
     }
 
@@ -176,11 +221,8 @@ public class TicketService {
         if (!ticket.getCreatedBy().getId().equals(actorId)) {
             access.requireCanUpdateTicket(actorId, ticketId);
         }
-        TicketComment comment = new TicketComment();
-        comment.setTicket(ticket);
-        comment.setAuthor(user(actorId));
-        comment.setBody(requireText("A comment", body, MAX_TEXT_LENGTH));
-        return comments.save(comment);
+        return comments.save(TicketComment.on(ticket, users.require(actorId),
+                Text.required("A comment", body, Text.LONG)));
     }
 
     @Transactional(readOnly = true)
@@ -191,7 +233,7 @@ public class TicketService {
 
     public void softDelete(Long actorId, Long ticketId) {
         access.requireCanDeleteTicket(actorId, ticketId);
-        Ticket ticket = ticket(ticketId);
+        Ticket ticket = tickets.require(ticketId);
         Violation violation = ticket.getViolation();
         if (violation != null && violation.getDisputeStatus() == DisputeStatus.DISPUTED) {
             throw new BusinessRuleException("Decide the dispute before deleting its ticket");
@@ -202,36 +244,17 @@ public class TicketService {
     private Ticket newTicket(Long actorId, TicketCategory category, String subject, String description) {
         Ticket ticket = new Ticket();
         ticket.setCategory(category);
-        ticket.setSubject(requireText("A subject", subject, MAX_SUBJECT_LENGTH));
-        ticket.setDescription(requireText("A description", description, MAX_TEXT_LENGTH));
-        ticket.setCreatedBy(user(actorId));
+        ticket.setSubject(Text.required("A subject", subject, Text.SHORT));
+        ticket.setDescription(Text.required("A description", description, Text.LONG));
+        ticket.setCreatedBy(users.require(actorId));
         return ticket;
     }
 
-    private String requireText(String field, String value, int maxLength) {
-        if (value == null || value.isBlank()) {
-            throw new BusinessRuleException(field + " is required");
-        }
-        String trimmed = value.strip();
-        if (trimmed.length() > maxLength) {
-            throw new BusinessRuleException(field + " can be at most " + maxLength + " characters");
-        }
-        return trimmed;
-    }
-
     private Ticket open(Long ticketId) {
-        Ticket ticket = ticket(ticketId);
+        Ticket ticket = tickets.require(ticketId);
         if (ticket.getStatus() == TicketStatus.RESOLVED) {
             throw new BusinessRuleException("This ticket is already resolved");
         }
         return ticket;
-    }
-
-    private Ticket ticket(Long id) {
-        return tickets.findByIdAndDeletedAtIsNull(id).orElseThrow(() -> new NotFoundException("Ticket", id));
-    }
-
-    private AppUser user(Long id) {
-        return users.findByIdAndDeletedAtIsNull(id).orElseThrow(() -> new NotFoundException("User", id));
     }
 }

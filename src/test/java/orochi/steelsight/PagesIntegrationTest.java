@@ -3,24 +3,17 @@ package orochi.steelsight;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
-import orochi.steelsight.identity.repository.AppUserRepository;
-import orochi.steelsight.security.AuthenticatedUser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -32,13 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Import(TestDatabase.class)
 @Transactional
-class PagesIntegrationTest {
+class PagesIntegrationTest extends PageTestSupport {
 
     private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0};
-
-    @Autowired MockMvc mvc;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired AppUserRepository users;
 
     Long worker;
     Long otherWorker;
@@ -281,30 +270,15 @@ class PagesIntegrationTest {
         mvc.perform(get("/violations/999999999").with(as(worker))).andExpect(status().isNotFound());
     }
 
-    private RequestPostProcessor as(Long userId) {
-        return user(new AuthenticatedUser(users.findById(userId).orElseThrow()));
-    }
-
-    private Long userWithRole(String code, String name, String role) {
-        return jdbc.queryForObject("""
-                INSERT INTO app_user (role_id, employee_code, full_name, password_hash)
-                SELECT id, ?, ?, 'x' FROM role WHERE role_name = ? RETURNING id""", Long.class, code, name, role);
-    }
-
     private void shift(Long user, String start, String end) {
-        jdbc.update("INSERT INTO shift (user_id, zone_id, start_at, end_at, created_by) VALUES (?, ?, "
-                + start + ", " + end + ", ?)", user, zone, user);
+        shift(user, zone, start, end);
     }
 
     private Long violation(Long user, String type) {
-        return jdbc.queryForObject("""
-                INSERT INTO violation (user_id, camera_id, violation_type, detected_at, snapshot_path)
-                VALUES (?, ?, ?, now(), 'page.jpg') RETURNING id""", Long.class, user, camera, type);
+        return violation(user, camera, type);
     }
 
     private Long ticket(Long creator, String subject) {
-        return jdbc.queryForObject("""
-                INSERT INTO ticket (category_id, subject, description, created_by)
-                VALUES (?, ?, 'details', ?) RETURNING id""", Long.class, safetyConcern, subject, creator);
+        return ticket(safetyConcern, creator, subject);
     }
 }

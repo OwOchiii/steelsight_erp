@@ -6,7 +6,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import orochi.steelsight.scheduling.model.Shift;
-import orochi.steelsight.scheduling.model.ShiftStatus;
 import orochi.steelsight.scheduling.service.ShiftService;
 import orochi.steelsight.security.AuthenticatedUser;
 
@@ -24,13 +23,9 @@ public class TimetableController {
     public String timetable(@AuthenticationPrincipal AuthenticatedUser user, Model model) {
         OffsetDateTime now = OffsetDateTime.now();
         List<Shift> own = shifts.listOwn(user.getUserId());
-        model.addAttribute("upcoming", own.stream().filter(shift -> isUpcoming(shift, now)).toList());
-        model.addAttribute("earlier", own.stream().filter(shift -> !isUpcoming(shift, now))
+        model.addAttribute("upcoming", own.stream().filter(shift -> shift.isUpcoming(now)).toList());
+        model.addAttribute("earlier", own.stream().filter(shift -> !shift.isUpcoming(now))
                 .sorted(Comparator.comparing(Shift::getStartAt).reversed()).toList());
         return "timetable";
-    }
-
-    private boolean isUpcoming(Shift shift, OffsetDateTime now) {
-        return shift.getStatus() == ShiftStatus.SCHEDULED && shift.getEndAt().isAfter(now);
     }
 }

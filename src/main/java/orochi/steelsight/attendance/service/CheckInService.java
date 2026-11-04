@@ -8,14 +8,15 @@ import orochi.steelsight.attendance.model.CheckIn;
 import orochi.steelsight.attendance.model.CheckInMethod;
 import orochi.steelsight.attendance.repository.CheckInRepository;
 import orochi.steelsight.exception.BusinessRuleException;
-import orochi.steelsight.exception.NotFoundException;
-import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.identity.service.AccessPolicy;
 import orochi.steelsight.identity.service.Permissions;
+import orochi.steelsight.repository.BaseRepository;
 import orochi.steelsight.scheduling.model.Shift;
+import orochi.steelsight.scheduling.model.Zone;
 import orochi.steelsight.scheduling.repository.ShiftRepository;
 import orochi.steelsight.scheduling.repository.ZoneRepository;
+import orochi.steelsight.validation.Text;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -54,24 +55,56 @@ public class CheckInService {
         return checkIns.findAllByCheckOutAtIsNull();
     }
 
+    /** Who is on site now, as far as this user may see: their teams, or everyone with CHECKIN_READ_ALL. */
+    @Transactional(readOnly = true)
+    public List<CheckIn> listOnSiteInScope(Long actorId) {
+        if (access.has(actorId, Permissions.CHECKIN_READ_ALL)) {
+            return checkIns.findAllByCheckOutAtIsNull();
+        }
+        access.require(actorId, Permissions.CHECKIN_READ_TEAM);
+        return checkIns.findTeamOnSite(actorId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CheckIn> listRecentInScope(Long actorId) {
+        if (access.has(actorId, Permissions.CHECKIN_READ_ALL)) {
+            return checkIns.findAllByOrderByCheckInAtDesc(BaseRepository.LIST_LIMIT);
+        }
+        access.require(actorId, Permissions.CHECKIN_READ_TEAM);
+        return checkIns.findTeamVisits(actorId, BaseRepository.LIST_LIMIT);
+    }
+
+    @Transactional(readOnly = true)
+    public CheckIn getForEdit(Long actorId, Long checkInId) {
+        access.require(actorId, Permissions.CHECKIN_EDIT);
+        return checkIns.require(checkInId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Zone> listZones(Long actorId) {
+        access.require(actorId, Permissions.CHECKIN_EDIT);
+        return zones.findAllByOrderByNameAsc();
+    }
+
     public CheckIn recordManual(Long actorId, ManualCheckIn details) {
         access.require(actorId, Permissions.CHECKIN_EDIT);
+        if (details.workerId() == null) {
+            throw new BusinessRuleException("Choose a worker");
+        }
         requireOrder(details.checkInAt(), details.checkOutAt());
 
         CheckIn visit = new CheckIn();
         visit.setMethod(CheckInMethod.MANUAL);
-        visit.setRecordedBy(user(actorId));
-        visit.setUser(user(details.workerId()));
+        visit.setRecordedBy(users.require(actorId));
+        visit.setUser(users.require(details.workerId()));
         visit.setCheckInAt(details.checkInAt());
         visit.setCheckOutAt(details.checkOutAt());
-        visit.setNote(details.note());
+        visit.setNote(Text.optional("A note", details.note(), Text.LONG));
         if (details.zoneId() != null) {
-            visit.setZone(zones.findById(details.zoneId())
-                    .orElseThrow(() -> new NotFoundException("Zone", details.zoneId())));
+            visit.setZone(zones.require(details.zoneId()));
         }
         if (details.shiftId() != null) {
-            Shift shift = shifts.findById(details.shiftId())
-                    .orElseThrow(() -> new NotFoundException("Shift", details.shiftId()));
+            Shift shift = shifts.require(details.shiftId());
             if (!shift.getUser().getId().equals(details.workerId())) {
                 throw new BusinessRuleException("That shift belongs to another worker");
             }
@@ -84,12 +117,12 @@ public class CheckInService {
     public CheckIn correct(Long actorId, Long checkInId, OffsetDateTime checkInAt, OffsetDateTime checkOutAt, String note) {
         access.require(actorId, Permissions.CHECKIN_EDIT);
         requireOrder(checkInAt, checkOutAt);
-        CheckIn visit = checkIns.findById(checkInId).orElseThrow(() -> new NotFoundException("Check-in", checkInId));
+        CheckIn visit = checkIns.require(checkInId);
         visit.setCheckInAt(checkInAt);
         visit.setCheckOutAt(checkOutAt);
         visit.setAutoClosed(false);
-        visit.setRecordedBy(user(actorId));
-        visit.setNote(note);
+        visit.setRecordedBy(users.require(actorId));
+        visit.setNote(Text.optional("A note", note, Text.LONG));
         return save(visit);
     }
 
@@ -110,7 +143,4 @@ public class CheckInService {
         }
     }
 
-    private AppUser user(Long id) {
-        return users.findByIdAndDeletedAtIsNull(id).orElseThrow(() -> new NotFoundException("User", id));
-    }
 }
