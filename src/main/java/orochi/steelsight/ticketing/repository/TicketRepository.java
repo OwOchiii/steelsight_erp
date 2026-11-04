@@ -13,6 +13,8 @@ public interface TicketRepository extends SoftDeletableRepository<Ticket, Long> 
 
     List<Ticket> findAllByCreatedByIdAndDeletedAtIsNull(Long userId);
 
+    List<Ticket> findAllByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long userId);
+
     List<Ticket> findAllByCreatedByIdAndStatusAndDeletedAtIsNull(Long userId, TicketStatus status);
 
     List<Ticket> findAllByAssigneeIdAndDeletedAtIsNull(Long assigneeId);

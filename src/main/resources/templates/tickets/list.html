@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Tickets')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('tickets')}"></header>
+<main class="page">
+    <div class="title-row">
+        <h1>My tickets</h1>
+        <a class="btn" th:href="@{/tickets/new}">New ticket</a>
+    </div>
+    <p class="empty" th:if="${tickets.isEmpty()}">You haven't opened any tickets.</p>
+    <ul class="rows" th:unless="${tickets.isEmpty()}">
+        <li th:each="ticket : ${tickets}">
+            <a th:href="@{/tickets/{id}(id=${ticket.id})}">
+                <strong th:text="${ticket.subject}">Subject</strong>
+                <span class="quiet" th:text="|${ticket.category.categoryName}, ${@display.date(ticket.createdAt)}|">Category</span>
+            </a>
+            <span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span>
+        </li>
+    </ul>
+</main>
+</body>
+</html>

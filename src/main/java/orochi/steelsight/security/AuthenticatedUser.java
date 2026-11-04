@@ -39,6 +39,10 @@ public class AuthenticatedUser implements UserDetails {
         this.authorities = List.copyOf(granted);
     }
 
+    public boolean can(String permission) {
+        return authorities.contains(new SimpleGrantedAuthority(permission));
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return authorities;

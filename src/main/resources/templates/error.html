@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Error')}"></head>
+<body class="center">
+<main class="card">
+    <h1 th:text="${error} ?: 'Something went wrong'">Something went wrong</h1>
+    <p th:text="${#strings.isEmpty(message)} ? 'Please try again.' : ${message}">Please try again.</p>
+    <a class="btn" th:href="@{/}">Back to home</a>
+</main>
+</body>
+</html>

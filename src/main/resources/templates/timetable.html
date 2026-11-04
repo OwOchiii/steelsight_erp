@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Timetable')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('timetable')}"></header>
+<main class="page">
+    <h1>Timetable</h1>
+
+    <h2>Upcoming</h2>
+    <p class="empty" th:if="${upcoming.isEmpty()}">You have no shifts planned.</p>
+    <ul class="rows" th:unless="${upcoming.isEmpty()}">
+        <li th:each="shift : ${upcoming}">
+            <div>
+                <strong th:text="${@display.date(shift.startAt)}">Date</strong>
+                <span class="quiet" th:text="|${@display.time(shift.startAt)} to ${@display.time(shift.endAt)} (${@display.hours(shift.durationHours)} h)|">Time</span>
+            </div>
+            <span th:text="${shift.zone.name}">Zone</span>
+        </li>
+    </ul>
+
+    <th:block th:unless="${earlier.isEmpty()}">
+        <h2>Earlier</h2>
+        <ul class="rows">
+            <li th:each="shift : ${earlier}">
+                <div>
+                    <strong th:text="${@display.date(shift.startAt)}">Date</strong>
+                    <span class="quiet" th:text="|${@display.time(shift.startAt)} to ${@display.time(shift.endAt)}, ${shift.zone.name}|">Time</span>
+                </div>
+                <span class="badge" th:classappend="${@display.badge(shift.status)}" th:text="${@display.label(shift.status)}">Status</span>
+            </li>
+        </ul>
+    </th:block>
+</main>
+</body>
+</html>

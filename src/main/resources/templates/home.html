@@ -1,18 +1,33 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Home · Steelsight</title>
-    <link rel="stylesheet" th:href="@{/css/app.css}">
-</head>
-<body class="center">
-<main class="card">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Home')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('home')}"></header>
+<main class="page">
     <h1 th:text="|Welcome, ${user.fullName}|">Welcome</h1>
-    <p th:text="|Signed in as ${user.username} (${user.roleName})|">Signed in</p>
-    <form th:action="@{/logout}" method="post">
-        <button type="submit">Sign out</button>
-    </form>
+    <p class="quiet" th:text="|Signed in as ${user.username} (${user.roleName})|">Signed in</p>
+
+    <section class="tiles">
+        <a class="tile" sec:authorize="hasAuthority('SHIFT_READ_OWN')" th:href="@{/timetable}">
+            <span class="tile-label">Next shift</span>
+            <th:block th:if="${nextShift}">
+                <strong th:text="${@display.date(nextShift.startAt)}">Date</strong>
+                <span th:text="|${@display.time(nextShift.startAt)} to ${@display.time(nextShift.endAt)}, ${nextShift.zone.name}|">Time</span>
+            </th:block>
+            <strong th:unless="${nextShift}">Nothing planned</strong>
+        </a>
+        <a class="tile" sec:authorize="hasAuthority('TICKET_READ_OWN')" th:href="@{/tickets}">
+            <span class="tile-label">Open tickets</span>
+            <strong th:text="${openTickets}">0</strong>
+        </a>
+        <a class="tile" sec:authorize="hasAuthority('VIOLATION_READ_OWN')" th:href="@{/violations}">
+            <span class="tile-label">PPE violations</span>
+            <strong th:text="${violationCount}">0</strong>
+            <span th:if="${activeDisputes > 0}" th:text="|${activeDisputes} being reviewed|">Reviewing</span>
+        </a>
+    </section>
+
+    <a class="btn" sec:authorize="hasAuthority('TICKET_CREATE')" th:href="@{/tickets/new}">Report a problem</a>
 </main>
 </body>
 </html>

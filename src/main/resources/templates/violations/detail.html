@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Violation')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('violations')}"></header>
+<main class="page">
+    <a class="back" th:href="@{/violations}">Back to violations</a>
+    <h1 th:text="${@display.label(violation.violationType)}">Type</h1>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+
+    <dl class="facts">
+        <dt>Detected</dt><dd th:text="${@display.dateTime(violation.detectedAt)}">When</dd>
+        <dt>Zone</dt><dd th:text="${violation.camera.zone.name}">Zone</dd>
+        <dt>Camera</dt><dd th:text="${violation.camera.cameraCode}">Camera</dd>
+        <th:block th:if="${violation.confidence}"><dt>Confidence</dt><dd th:text="|${violation.confidence}%|">90%</dd></th:block>
+        <dt>Dispute</dt>
+        <dd>
+            <span th:if="${violation.disputeStatus.name() == 'NONE'}">Not disputed</span>
+            <span class="badge" th:unless="${violation.disputeStatus.name() == 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span>
+        </dd>
+        <th:block th:if="${violation.reviewedAt}"><dt>Decided</dt><dd th:text="${@display.dateTime(violation.reviewedAt)}">When</dd></th:block>
+    </dl>
+
+    <p th:if="${disputeTicket}"><a th:href="@{/tickets/{id}(id=${disputeTicket.id})}">Open the dispute ticket</a></p>
+
+    <form class="panel" method="post" th:if="${violation.disputeStatus.name() == 'NONE' and violation.user != null and violation.user.id == userId}"
+          th:action="@{/violations/{id}/dispute(id=${violation.id})}">
+        <h2>Think this is wrong?</h2>
+        <p class="quiet">The HSE team will review your dispute and decide.</p>
+        <label for="reason">Why do you disagree?</label>
+        <textarea id="reason" name="reason" rows="4" maxlength="4000" required></textarea>
+        <button type="submit" class="btn">Send dispute</button>
+    </form>
+</main>
+</body>
+</html>

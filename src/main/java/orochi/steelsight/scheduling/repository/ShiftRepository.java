@@ -13,6 +13,8 @@ public interface ShiftRepository extends BaseRepository<Shift, Long> {
 
     List<Shift> findAllByUserId(Long userId);
 
+    List<Shift> findAllByUserIdOrderByStartAtAsc(Long userId);
+
     List<Shift> findAllByUserIdAndStatus(Long userId, ShiftStatus status);
 
     List<Shift> findAllByStartAtBetween(OffsetDateTime from, OffsetDateTime to);

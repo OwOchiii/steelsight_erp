@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('New ticket')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('tickets')}"></header>
+<main class="page narrow">
+    <a class="back" th:href="@{/tickets}">Back to tickets</a>
+    <h1>New ticket</h1>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <p class="quiet">To contest a PPE violation, open it from your violations and choose dispute.</p>
+
+    <form method="post" enctype="multipart/form-data" th:action="@{/tickets}" th:object="${form}">
+        <label for="categoryId">Category</label>
+        <select id="categoryId" th:field="*{categoryId}" required>
+            <option value="">Choose a category</option>
+            <option th:each="category : ${categories}" th:value="${category.id}" th:text="${category.categoryName}">Category</option>
+        </select>
+
+        <label for="subject">Subject</label>
+        <input id="subject" th:field="*{subject}" maxlength="200" required>
+
+        <label for="description">Details</label>
+        <textarea id="description" th:field="*{description}" rows="5" maxlength="4000" required></textarea>
+
+        <label for="zoneId">Zone <span class="optional">optional</span></label>
+        <select id="zoneId" th:field="*{zoneId}">
+            <option value="">No specific zone</option>
+            <option th:each="zone : ${zones}" th:value="${zone.id}" th:text="${zone.name}">Zone</option>
+        </select>
+
+        <label for="photo">Photo <span class="optional">optional</span></label>
+        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+        <p class="hint">JPEG, PNG or WebP, up to 5 MB.</p>
+
+        <button type="submit" class="btn">Send ticket</button>
+    </form>
+</main>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:fragment="head(title)">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|${title} · Steelsight|">Steelsight</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<header class="topbar" th:fragment="nav(active)">
+    <a class="brand" th:href="@{/}">Steelsight</a>
+    <nav aria-label="Main">
+        <a th:href="@{/}" th:attr="aria-current=${active == 'home'} ? 'page'">Home</a>
+        <a sec:authorize="hasAuthority('SHIFT_READ_OWN')" th:href="@{/timetable}" th:attr="aria-current=${active == 'timetable'} ? 'page'">Timetable</a>
+        <a sec:authorize="hasAuthority('VIOLATION_READ_OWN')" th:href="@{/violations}" th:attr="aria-current=${active == 'violations'} ? 'page'">Violations</a>
+        <a sec:authorize="hasAuthority('TICKET_READ_OWN')" th:href="@{/tickets}" th:attr="aria-current=${active == 'tickets'} ? 'page'">Tickets</a>
+    </nav>
+    <form th:action="@{/logout}" method="post">
+        <button type="submit" class="link">Sign out</button>
+    </form>
+</header>
+<div th:fragment="messages">
+    <p class="notice success" role="status" th:if="${success}" th:text="${success}"></p>
+    <p class="notice error" role="alert" th:if="${error}" th:text="${error}"></p>
+</div>
+</body>
+</html>

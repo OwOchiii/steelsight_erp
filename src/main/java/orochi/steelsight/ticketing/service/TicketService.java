@@ -14,6 +14,7 @@ import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.ppe.model.DisputeStatus;
 import orochi.steelsight.ppe.model.Violation;
 import orochi.steelsight.ppe.repository.ViolationRepository;
+import orochi.steelsight.scheduling.model.Zone;
 import orochi.steelsight.scheduling.repository.ZoneRepository;
 import orochi.steelsight.ticketing.model.Ticket;
 import orochi.steelsight.ticketing.model.TicketCategory;
@@ -25,6 +26,7 @@ import orochi.steelsight.ticketing.repository.TicketRepository;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -32,6 +34,8 @@ import java.util.List;
 public class TicketService {
 
     static final String PPE_DISPUTE_CATEGORY = "PPE dispute";
+    private static final int MAX_SUBJECT_LENGTH = 200;
+    private static final int MAX_TEXT_LENGTH = 4000;
 
     private final AccessPolicy access;
     private final TicketRepository tickets;
@@ -51,6 +55,9 @@ public class TicketService {
     /** Opens an ordinary ticket, such as a Safety concern. Disputes go through {@link #openDispute}. */
     public Ticket create(Long actorId, NewTicket details) {
         access.require(actorId, Permissions.TICKET_CREATE);
+        if (details.categoryId() == null) {
+            throw new BusinessRuleException("Choose a category");
+        }
         TicketCategory category = categories.findById(details.categoryId())
                 .orElseThrow(() -> new NotFoundException("Ticket category", details.categoryId()));
         if (PPE_DISPUTE_CATEGORY.equals(category.getCategoryName())) {
@@ -89,6 +96,29 @@ public class TicketService {
         }
     }
 
+    /** Categories a user can pick when opening a ticket. A dispute starts from its violation instead. */
+    @Transactional(readOnly = true)
+    public List<TicketCategory> listCategoriesForNewTicket(Long actorId) {
+        access.require(actorId, Permissions.TICKET_CREATE);
+        return categories.findAll().stream()
+                .filter(category -> !PPE_DISPUTE_CATEGORY.equals(category.getCategoryName()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Zone> listZonesForNewTicket(Long actorId) {
+        access.require(actorId, Permissions.TICKET_CREATE);
+        return zones.findAllByOrderByNameAsc();
+    }
+
+    /** The live dispute ticket of a violation, if it has one. */
+    @Transactional(readOnly = true)
+    public Optional<Ticket> findDispute(Long actorId, Long violationId) {
+        Optional<Ticket> dispute = tickets.findByViolationIdAndDeletedAtIsNull(violationId);
+        dispute.ifPresent(ticket -> access.requireCanReadTicket(actorId, ticket.getId()));
+        return dispute;
+    }
+
     @Transactional(readOnly = true)
     public Ticket get(Long actorId, Long ticketId) {
         access.requireCanReadTicket(actorId, ticketId);
@@ -98,7 +128,7 @@ public class TicketService {
     @Transactional(readOnly = true)
     public List<Ticket> listOwn(Long actorId) {
         access.require(actorId, Permissions.TICKET_READ_OWN);
-        return tickets.findAllByCreatedByIdAndDeletedAtIsNull(actorId);
+        return tickets.findAllByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(actorId);
     }
 
     /** Tickets in the categories the actor's role handles. */
@@ -149,7 +179,7 @@ public class TicketService {
         TicketComment comment = new TicketComment();
         comment.setTicket(ticket);
         comment.setAuthor(user(actorId));
-        comment.setBody(body);
+        comment.setBody(requireText("A comment", body, MAX_TEXT_LENGTH));
         return comments.save(comment);
     }
 
@@ -172,10 +202,21 @@ public class TicketService {
     private Ticket newTicket(Long actorId, TicketCategory category, String subject, String description) {
         Ticket ticket = new Ticket();
         ticket.setCategory(category);
-        ticket.setSubject(subject);
-        ticket.setDescription(description);
+        ticket.setSubject(requireText("A subject", subject, MAX_SUBJECT_LENGTH));
+        ticket.setDescription(requireText("A description", description, MAX_TEXT_LENGTH));
         ticket.setCreatedBy(user(actorId));
         return ticket;
+    }
+
+    private String requireText(String field, String value, int maxLength) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessRuleException(field + " is required");
+        }
+        String trimmed = value.strip();
+        if (trimmed.length() > maxLength) {
+            throw new BusinessRuleException(field + " can be at most " + maxLength + " characters");
+        }
+        return trimmed;
     }
 
     private Ticket open(Long ticketId) {

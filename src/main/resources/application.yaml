@@ -23,6 +23,11 @@ spring:
   thymeleaf:
     cache: false
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
 server:
   port: 8080
   forward-headers-strategy: framework   # Render's proxy handles HTTPS and forwards to this port
@@ -37,3 +42,8 @@ steelsight:
     # Creates the first admin when there is none. Leave the password empty to skip this.
     admin-employee-code: ${ADMIN_EMPLOYEE_CODE:ADMIN}
     admin-password: ${ADMIN_PASSWORD:}
+  # Times are stored in UTC and shown in this zone.
+  time-zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
+  storage:
+    # Ticket photos. Render's disk is wiped on deploy, so production needs Supabase Storage instead.
+    dir: ${STORAGE_DIR:./uploads}

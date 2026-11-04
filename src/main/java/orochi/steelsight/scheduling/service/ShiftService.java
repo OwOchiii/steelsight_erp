@@ -62,7 +62,7 @@ public class ShiftService {
     @Transactional(readOnly = true)
     public List<Shift> listOwn(Long actorId) {
         access.require(actorId, Permissions.SHIFT_READ_OWN);
-        return shifts.findAllByUserId(actorId);
+        return shifts.findAllByUserIdOrderByStartAtAsc(actorId);
     }
 
     @Transactional(readOnly = true)

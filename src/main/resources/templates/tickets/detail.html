@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Ticket')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: nav('tickets')}"></header>
+<main class="page">
+    <a class="back" th:href="@{/tickets}">Back to tickets</a>
+    <div class="title-row">
+        <h1 th:text="${ticket.subject}">Subject</h1>
+        <span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span>
+    </div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+
+    <dl class="facts">
+        <dt>Category</dt><dd th:text="${ticket.category.categoryName}">Category</dd>
+        <dt>Opened</dt><dd th:text="|${@display.dateTime(ticket.createdAt)} by ${ticket.createdBy.fullName}|">When</dd>
+        <th:block th:if="${ticket.zone}"><dt>Zone</dt><dd th:text="${ticket.zone.name}">Zone</dd></th:block>
+        <th:block th:if="${ticket.assignee}"><dt>Assigned to</dt><dd th:text="${ticket.assignee.fullName}">Name</dd></th:block>
+        <th:block th:if="${ticket.resolvedAt}"><dt>Resolved</dt><dd th:text="|${@display.dateTime(ticket.resolvedAt)} by ${ticket.resolver.fullName}|">When</dd></th:block>
+        <th:block th:if="${ticket.violation}"><dt>Violation</dt><dd><a th:href="@{/violations/{id}(id=${ticket.violation.id})}">View the violation</a></dd></th:block>
+    </dl>
+
+    <p class="body-text" th:text="${ticket.description}">Details</p>
+    <img class="photo" th:if="${ticket.photoPath}" th:src="@{/tickets/{id}/photo(id=${ticket.id})}" alt="Photo attached to this ticket">
+
+    <h2>Comments</h2>
+    <p class="empty" th:if="${comments.isEmpty()}">No comments yet.</p>
+    <ul class="comments" th:unless="${comments.isEmpty()}">
+        <li th:each="comment : ${comments}">
+            <span class="quiet" th:text="|${comment.author.fullName}, ${@display.dateTime(comment.createdAt)}|">Who</span>
+            <p class="body-text" th:text="${comment.body}">Comment</p>
+        </li>
+    </ul>
+
+    <form method="post" th:if="${ticket.status.name() != 'RESOLVED'}" th:action="@{/tickets/{id}/comments(id=${ticket.id})}">
+        <label for="body">Add a comment</label>
+        <textarea id="body" name="body" rows="3" maxlength="4000" required></textarea>
+        <button type="submit" class="btn">Post comment</button>
+    </form>
+</main>
+</body>
+</html>
