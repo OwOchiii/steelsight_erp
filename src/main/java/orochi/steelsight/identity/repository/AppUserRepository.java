@@ -1,5 +1,7 @@
 package orochi.steelsight.identity.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import orochi.steelsight.identity.model.AppUser;
@@ -18,8 +20,8 @@ public interface AppUserRepository extends SoftDeletableRepository<AppUser, Long
 
     List<AppUser> findAllByRoleIdAndDeletedAtIsNull(Long roleId);
 
-    @Query("SELECT u FROM AppUser u WHERE u.deletedAt IS NULL ORDER BY u.fullName")
-    List<AppUser> findAllLiveByName();
+    @Query("SELECT u FROM AppUser u WHERE u.deletedAt IS NULL ORDER BY u.fullName, u.id")
+    Page<AppUser> findAllLiveByName(Pageable page);
 
     @Query("SELECT u FROM AppUser u WHERE u.isActive = true AND u.deletedAt IS NULL ORDER BY u.fullName")
     List<AppUser> findAllActiveByName();
@@ -31,9 +33,16 @@ public interface AppUserRepository extends SoftDeletableRepository<AppUser, Long
     @Query("""
             SELECT u FROM AppUser u
             WHERE u.team.manager.id = :managerId AND u.id <> :managerId AND u.deletedAt IS NULL
-            ORDER BY u.fullName
+            ORDER BY u.fullName, u.id
             """)
     List<AppUser> findTeamMembers(@Param("managerId") Long managerId);
+
+    @Query("""
+            SELECT u FROM AppUser u
+            WHERE u.team.manager.id = :managerId AND u.id <> :managerId AND u.deletedAt IS NULL
+            ORDER BY u.fullName, u.id
+            """)
+    Page<AppUser> findTeamMembers(@Param("managerId") Long managerId, Pageable page);
 
     boolean existsByEmployeeCode(String employeeCode);
 

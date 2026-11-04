@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.model.BaseModel;
+import orochi.steelsight.model.Versioned;
 import orochi.steelsight.ppe.model.Camera;
 import orochi.steelsight.ppe.model.PpeLinking;
 import orochi.steelsight.scheduling.model.Shift;
@@ -18,7 +19,10 @@ import java.time.OffsetDateTime;
 @Setter
 @Entity
 @Table(name = "check_in")
-public class CheckIn extends BaseModel {
+public class CheckIn extends BaseModel implements Versioned {
+
+    @Version
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)

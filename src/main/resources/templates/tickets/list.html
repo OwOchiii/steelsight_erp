@@ -8,8 +8,9 @@
         <h1>My tickets</h1>
         <a class="btn" th:href="@{/tickets/new}">New ticket</a>
     </div>
-    <p class="empty" th:if="${tickets.isEmpty()}">You haven't opened any tickets.</p>
+    <p class="empty" th:if="${tickets.totalElements == 0}">You haven't opened any tickets.</p>
     <th:block th:unless="${tickets.isEmpty()}"><ul th:replace="~{fragments/lists :: tickets(${tickets}, false)}"></ul></th:block>
+    <nav th:replace="~{fragments/lists :: pager(${tickets})}"></nav>
 </main>
 </body>
 </html>

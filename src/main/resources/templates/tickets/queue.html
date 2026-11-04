@@ -9,11 +9,11 @@
         <a th:href="@{/tickets/queue}" th:attr="aria-current=${resolved} ? null : 'page'">To handle</a>
         <a th:href="@{/tickets/queue(resolved=true)}" th:attr="aria-current=${resolved} ? 'page' : null">Resolved</a>
     </nav>
-    <p class="empty" th:if="${tickets.isEmpty()}" th:text="${resolved} ? 'No resolved tickets yet.' : 'Nothing to handle right now.'">Empty</p>
+    <p class="empty" th:if="${tickets.totalElements == 0}" th:text="${resolved} ? 'No resolved tickets yet.' : 'Nothing to handle right now.'">Empty</p>
     <th:block th:unless="${tickets.isEmpty()}">
         <ul th:replace="~{fragments/lists :: tickets(${tickets}, true)}"></ul>
-        <p th:replace="~{fragments/lists :: limit(${tickets})}"></p>
-    </th:block>
+        </th:block>
+    <nav th:replace="~{fragments/lists :: pager(${tickets})}"></nav>
 </main>
 </body>
 </html>

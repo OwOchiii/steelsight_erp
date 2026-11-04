@@ -257,6 +257,76 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
         mvc.perform(get("/attendance/new").with(as(manager))).andExpect(status().isForbidden());
     }
 
+    @Test
+    void attendanceTagsFollowTheTeamsRuleWhichTheManagerCanChange() throws Exception {
+        Long shift = shift(worker, zone, "timestamptz '2026-11-02 08:00+07'", "timestamptz '2026-11-02 17:00+07'");
+        jdbc.update("""
+                INSERT INTO check_in (user_id, shift_id, method, recorded_by, check_in_at, check_out_at)
+                VALUES (?, ?, 'MANUAL', ?, timestamptz '2026-11-02 08:45+07', timestamptz '2026-11-02 17:00+07')""",
+                worker, shift, hse);
+
+        mvc.perform(get("/attendance").with(as(manager)))
+                .andExpect(content().string(containsString("Check-in late (45 min)")))
+                .andExpect(content().string(not(containsString("Check-out early"))));
+
+        Long team = jdbc.queryForObject("SELECT team_id FROM app_user WHERE id = ?", Long.class, worker);
+        mvc.perform(get("/team").with(as(manager)))
+                .andExpect(content().string(containsString("/teams/" + team + "/late-after")))
+                .andExpect(content().string(containsString("value=\"15\"")));
+        mvc.perform(post("/teams/" + team + "/late-after").param("minutes", "60").with(as(manager)).with(csrf()))
+                .andExpect(flash().attributeExists("success"));
+
+        mvc.perform(get("/attendance").with(as(manager)))
+                .andExpect(content().string(not(containsString("Check-in late"))))
+                .andExpect(content().string(containsString("Check-out early (45 min)")))
+                .andExpect(content().string(containsString("Must stay until 17:45")));
+    }
+
+    @Test
+    void onlyTheTeamsManagerOrAnAdminCanChangeTheLateRule() throws Exception {
+        Long team = jdbc.queryForObject("SELECT team_id FROM app_user WHERE id = ?", Long.class, worker);
+
+        for (Long person : new Long[]{otherManager, worker, hse}) {
+            mvc.perform(post("/teams/" + team + "/late-after").param("minutes", "60").with(as(person)).with(csrf()))
+                    .andExpect(status().isForbidden());
+        }
+        assertThat(textColumn("SELECT late_after_minutes::text FROM team WHERE id = ?", team)).isEqualTo("15");
+
+        mvc.perform(post("/teams/" + team + "/late-after").param("minutes", "30").with(as(admin)).with(csrf()))
+                .andExpect(flash().attributeExists("success"));
+        assertThat(textColumn("SELECT late_after_minutes::text FROM team WHERE id = ?", team)).isEqualTo("30");
+    }
+
+    @Test
+    void theLateRuleMustBeASensibleNumber() throws Exception {
+        Long team = jdbc.queryForObject("SELECT team_id FROM app_user WHERE id = ?", Long.class, worker);
+
+        for (String minutes : new String[]{"-1", "241", ""}) {
+            mvc.perform(post("/teams/" + team + "/late-after").param("minutes", minutes).with(as(manager)).with(csrf()))
+                    .andExpect(flash().attribute("error", "Enter between 0 and 240 minutes"));
+        }
+        assertThat(textColumn("SELECT late_after_minutes::text FROM team WHERE id = ?", team)).isEqualTo("15");
+    }
+
+    @Test
+    void teamAndTimetableArePaged() throws Exception {
+        Long team = jdbc.queryForObject("SELECT team_id FROM app_user WHERE id = ?", Long.class, worker);
+        for (int i = 1; i <= 20; i++) {
+            joinTeam(userWithRole("MGR-P" + i, "Paged Person " + i, "WORKER"), team);
+            shift(worker, zone, "now() - interval '" + (i * 2) + " days'", "now() - interval '" + (i * 2 - 1) + " days'");
+        }
+
+        mvc.perform(get("/team").with(as(manager)))
+                .andExpect(content().string(containsString("Page 1 of 2")));
+        mvc.perform(get("/team").param("page", "1").with(as(manager)))
+                .andExpect(content().string(containsString("Wanda Worker")));
+        mvc.perform(get("/timetable").with(as(worker)))
+                .andExpect(content().string(not(containsString("Page 1 of"))));
+        shift(worker, zone, "now() - interval '100 days'", "now() - interval '99 days'");
+        mvc.perform(get("/timetable").with(as(worker)))
+                .andExpect(content().string(containsString("Page 1 of 2")));
+    }
+
     private org.springframework.util.LinkedMultiValueMap<String, String> form(Long workerId, String start, String end) {
         var form = new org.springframework.util.LinkedMultiValueMap<String, String>();
         form.add("workerId", workerId.toString());

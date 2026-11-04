@@ -1,6 +1,8 @@
 package orochi.steelsight.web;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -10,6 +12,13 @@ import java.util.function.Supplier;
 
 /** The two ways a page handles a rule the user broke. Other failures go to PageExceptionHandler. */
 abstract class PageController {
+
+    private static final int PAGE_SIZE = 20;
+
+    /** A list page from the page number in the URL, which starts at 0. */
+    protected Pageable pageOf(int number) {
+        return PageRequest.of(Math.max(number, 0), PAGE_SIZE);
+    }
 
     /** For a button: runs the action, then goes to the target page with a message saying how it went. */
     protected String attempt(RedirectAttributes redirect, String target, String successMessage, Runnable action) {

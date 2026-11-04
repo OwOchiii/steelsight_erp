@@ -6,7 +6,20 @@
 <main class="page">
     <h1>Team</h1>
     <div th:replace="~{fragments/layout :: messages}"></div>
-    <p class="empty" th:if="${members.isEmpty()}">Nobody is on your team yet. Ask an admin to add people.</p>
+    <section class="panel" th:unless="${teams.isEmpty()}">
+        <h2>Late check-in rule</h2>
+        <p class="quiet">Checking in up to this long after a shift starts isn't tagged late, but the time must be made up at the end of the shift.</p>
+        <form class="setting" method="post" th:each="team : ${teams}" th:action="@{/teams/{id}/late-after(id=${team.id})}">
+            <div>
+                <label th:for="|late-${team.id}|" th:text="|${team.name}: minutes|">Minutes</label>
+                <input th:id="|late-${team.id}|" type="number" name="minutes" min="0" max="240" required th:value="${team.lateAfterMinutes}">
+            </div>
+            <button type="submit" class="btn secondary">Save</button>
+        </form>
+    </section>
+
+    <h2>People</h2>
+    <p class="empty" th:if="${members.totalElements == 0}">Nobody is on your team yet. Ask an admin to add people.</p>
     <ul class="rows" th:unless="${members.isEmpty()}">
         <li th:each="member : ${members}">
             <div class="grow">
@@ -20,6 +33,7 @@
             <a class="row-link" th:href="@{/team/{id}/edit(id=${member.id})}" th:unless="${member.id == #authentication.principal.userId}">Edit</a>
         </li>
     </ul>
+    <nav th:replace="~{fragments/lists :: pager(${members})}"></nav>
 </main>
 </body>
 </html>

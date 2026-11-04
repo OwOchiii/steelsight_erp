@@ -3,8 +3,8 @@ package orochi.steelsight.ticketing.repository;
 import orochi.steelsight.repository.SoftDeletableRepository;
 import orochi.steelsight.ticketing.model.Ticket;
 import orochi.steelsight.ticketing.model.TicketStatus;
-import org.springframework.data.domain.Limit;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -24,10 +24,12 @@ public interface TicketRepository extends SoftDeletableRepository<Ticket, Long> 
 
     Optional<Ticket> findByViolationIdAndDeletedAtIsNull(Long violationId);
 
-    List<Ticket> findAllByStatusInAndDeletedAtIsNull(Collection<TicketStatus> statuses, Sort sort, Limit limit);
+    Page<Ticket> findAllByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(Long userId, Pageable page);
 
-    List<Ticket> findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(
-            Long roleId, Collection<TicketStatus> statuses, Sort sort, Limit limit);
+    Page<Ticket> findAllByStatusInAndDeletedAtIsNull(Collection<TicketStatus> statuses, Pageable page);
+
+    Page<Ticket> findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(
+            Long roleId, Collection<TicketStatus> statuses, Pageable page);
 
     long countByStatusInAndDeletedAtIsNull(Collection<TicketStatus> statuses);
 

@@ -5,27 +5,24 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import orochi.steelsight.scheduling.model.Shift;
+import org.springframework.web.bind.annotation.RequestParam;
 import orochi.steelsight.scheduling.service.ShiftService;
 import orochi.steelsight.security.AuthenticatedUser;
 
 import java.time.OffsetDateTime;
-import java.util.Comparator;
-import java.util.List;
 
 @Controller
 @RequiredArgsConstructor
-public class TimetableController {
+public class TimetableController extends PageController {
 
     private final ShiftService shifts;
 
     @GetMapping("/timetable")
-    public String timetable(@AuthenticationPrincipal AuthenticatedUser user, Model model) {
+    public String timetable(@AuthenticationPrincipal AuthenticatedUser user,
+                            @RequestParam(defaultValue = "0") int page, Model model) {
         OffsetDateTime now = OffsetDateTime.now();
-        List<Shift> own = shifts.listOwn(user.getUserId());
-        model.addAttribute("upcoming", own.stream().filter(shift -> shift.isUpcoming(now)).toList());
-        model.addAttribute("earlier", own.stream().filter(shift -> !shift.isUpcoming(now))
-                .sorted(Comparator.comparing(Shift::getStartAt).reversed()).toList());
+        model.addAttribute("upcoming", shifts.listOwnUpcoming(user.getUserId(), now));
+        model.addAttribute("earlier", shifts.listOwnEarlier(user.getUserId(), now, pageOf(page)));
         return "timetable";
     }
 }

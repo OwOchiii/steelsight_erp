@@ -2,6 +2,8 @@ package orochi.steelsight.identity.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,12 +74,12 @@ public class UserService {
 
     /** The people this user manages: their teams, or everyone with USER_MANAGE. */
     @Transactional(readOnly = true)
-    public List<AppUser> listManaged(Long actorId) {
+    public Page<AppUser> listManaged(Long actorId, Pageable page) {
         if (access.has(actorId, Permissions.USER_MANAGE)) {
-            return users.findAllLiveByName();
+            return users.findAllLiveByName(page);
         }
         access.require(actorId, Permissions.USER_UPDATE_TEAM);
-        return users.findTeamMembers(actorId);
+        return users.findTeamMembers(actorId, page);
     }
 
     @Transactional(readOnly = true)

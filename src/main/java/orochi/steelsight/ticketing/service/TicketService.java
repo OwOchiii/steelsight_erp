@@ -2,6 +2,9 @@ package orochi.steelsight.ticketing.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -15,7 +18,6 @@ import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.ppe.model.DisputeStatus;
 import orochi.steelsight.ppe.model.Violation;
 import orochi.steelsight.ppe.repository.ViolationRepository;
-import orochi.steelsight.repository.BaseRepository;
 import orochi.steelsight.scheduling.model.Zone;
 import orochi.steelsight.scheduling.repository.ZoneRepository;
 import orochi.steelsight.ticketing.model.Ticket;
@@ -133,6 +135,12 @@ public class TicketService {
         return tickets.findAllByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(actorId);
     }
 
+    @Transactional(readOnly = true)
+    public Page<Ticket> listOwn(Long actorId, Pageable page) {
+        access.require(actorId, Permissions.TICKET_READ_OWN);
+        return tickets.findAllByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(actorId, page);
+    }
+
     /** Tickets in the categories the actor's role handles. */
     @Transactional(readOnly = true)
     public List<Ticket> listHandled(Long actorId) {
@@ -151,15 +159,16 @@ public class TicketService {
      * Unresolved tickets come oldest first, because they have waited longest; resolved ones newest first.
      */
     @Transactional(readOnly = true)
-    public List<Ticket> listQueue(Long actorId, boolean resolved) {
+    public Page<Ticket> listQueue(Long actorId, boolean resolved, Pageable page) {
         access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_ALL);
         Set<TicketStatus> statuses = resolved ? EnumSet.of(TicketStatus.RESOLVED) : UNRESOLVED;
-        Sort sort = resolved ? Sort.by("resolvedAt").descending() : Sort.by("createdAt");
+        Sort sort = resolved ? Sort.by("resolvedAt", "id").descending() : Sort.by("createdAt", "id");
+        Pageable sorted = PageRequest.of(page.getPageNumber(), page.getPageSize(), sort);
         if (access.has(actorId, Permissions.TICKET_READ_ALL)) {
-            return tickets.findAllByStatusInAndDeletedAtIsNull(statuses, sort, BaseRepository.LIST_LIMIT);
+            return tickets.findAllByStatusInAndDeletedAtIsNull(statuses, sorted);
         }
         return tickets.findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(
-                users.require(actorId).getRole().getId(), statuses, sort, BaseRepository.LIST_LIMIT);
+                users.require(actorId).getRole().getId(), statuses, sorted);
     }
 
     @Transactional(readOnly = true)

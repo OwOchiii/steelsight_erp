@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import orochi.steelsight.attendance.model.CheckIn;
 import orochi.steelsight.attendance.service.CheckInService;
@@ -26,9 +27,13 @@ public class AttendanceController extends PageController {
     private final SiteTime siteTime;
 
     @GetMapping("/attendance")
-    public String list(@AuthenticationPrincipal AuthenticatedUser user, Model model) {
-        model.addAttribute("onSite", checkIns.listOnSiteInScope(user.getUserId()));
-        model.addAttribute("recent", checkIns.listRecentInScope(user.getUserId()));
+    public String list(@AuthenticationPrincipal AuthenticatedUser user,
+                       @RequestParam(defaultValue = "false") boolean onSite,
+                       @RequestParam(defaultValue = "0") int page, Model model) {
+        model.addAttribute("onSite", onSite);
+        model.addAttribute("visits", onSite
+                ? checkIns.listOnSiteInScope(user.getUserId(), pageOf(page))
+                : checkIns.listRecentInScope(user.getUserId(), pageOf(page)));
         return "attendance/list";
     }
 
@@ -58,6 +63,7 @@ public class AttendanceController extends PageController {
         form.setCheckInAt(siteTime.toLocal(visit.getCheckInAt()));
         form.setCheckOutAt(siteTime.toLocal(visit.getCheckOutAt()));
         form.setNote(visit.getNote());
+        form.setVersion(visit.getVersion());
         model.addAttribute("form", form);
         model.addAttribute("visit", visit);
         return "attendance/form";
@@ -69,7 +75,7 @@ public class AttendanceController extends PageController {
                           Model model, HttpServletResponse response, RedirectAttributes redirect) {
         return submit(binding, model, response, () -> {
             checkIns.correct(user.getUserId(), id, siteTime.toInstant(form.getCheckInAt()),
-                    siteTime.toInstant(form.getCheckOutAt()), form.getNote());
+                    siteTime.toInstant(form.getCheckOutAt()), form.getNote(), form.getVersion());
             redirect.addFlashAttribute("success", "The check-in was corrected.");
             return "redirect:/attendance";
         }, () -> {

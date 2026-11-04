@@ -1,6 +1,7 @@
 package orochi.steelsight.attendance.repository;
 
-import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import orochi.steelsight.attendance.model.CheckIn;
@@ -21,21 +22,23 @@ public interface CheckInRepository extends BaseRepository<CheckIn, Long> {
     /** Everyone on site right now. */
     List<CheckIn> findAllByCheckOutAtIsNull();
 
-    List<CheckIn> findAllByOrderByCheckInAtDesc(Limit limit);
+    Page<CheckIn> findAllByOrderByCheckInAtDescIdDesc(Pageable page);
+
+    Page<CheckIn> findAllByCheckOutAtIsNullOrderByCheckInAtDescIdDesc(Pageable page);
 
     @Query("""
             SELECT c FROM CheckIn c
             WHERE c.user.team.manager.id = :managerId AND c.checkOutAt IS NULL
-            ORDER BY c.checkInAt DESC
+            ORDER BY c.checkInAt DESC, c.id DESC
             """)
-    List<CheckIn> findTeamOnSite(@Param("managerId") Long managerId);
+    Page<CheckIn> findTeamOnSite(@Param("managerId") Long managerId, Pageable page);
 
     @Query("""
             SELECT c FROM CheckIn c
             WHERE c.user.team.manager.id = :managerId
-            ORDER BY c.checkInAt DESC
+            ORDER BY c.checkInAt DESC, c.id DESC
             """)
-    List<CheckIn> findTeamVisits(@Param("managerId") Long managerId, Limit limit);
+    Page<CheckIn> findTeamVisits(@Param("managerId") Long managerId, Pageable page);
 
     @Query("""
             SELECT c FROM CheckIn c

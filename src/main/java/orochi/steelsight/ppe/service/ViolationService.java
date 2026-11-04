@@ -1,6 +1,8 @@
 package orochi.steelsight.ppe.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,7 +14,6 @@ import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.ppe.model.DisputeStatus;
 import orochi.steelsight.ppe.model.Violation;
 import orochi.steelsight.ppe.repository.ViolationRepository;
-import orochi.steelsight.repository.BaseRepository;
 import orochi.steelsight.ticketing.model.TicketComment;
 import orochi.steelsight.ticketing.repository.TicketCommentRepository;
 import orochi.steelsight.ticketing.repository.TicketRepository;
@@ -52,22 +53,28 @@ public class ViolationService {
     }
 
     @Transactional(readOnly = true)
-    public List<Violation> listAll(Long actorId) {
-        access.require(actorId, Permissions.VIOLATION_READ_ALL);
-        return violations.findAllByOrderByDetectedAtDesc(BaseRepository.LIST_LIMIT);
+    public Page<Violation> listOwn(Long actorId, Pageable page) {
+        access.require(actorId, Permissions.VIOLATION_READ_OWN);
+        return violations.findAllByUserIdOrderByDetectedAtDescIdDesc(actorId, page);
     }
 
     @Transactional(readOnly = true)
-    public List<Violation> listDisputed(Long actorId) {
+    public Page<Violation> listAll(Long actorId, Pageable page) {
         access.require(actorId, Permissions.VIOLATION_READ_ALL);
-        return violations.findAllByDisputeStatusOrderByDetectedAtAsc(DisputeStatus.DISPUTED, BaseRepository.LIST_LIMIT);
+        return violations.findAllByOrderByDetectedAtDescIdDesc(page);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Violation> listDisputed(Long actorId, Pageable page) {
+        access.require(actorId, Permissions.VIOLATION_READ_ALL);
+        return violations.findAllByDisputeStatusOrderByDetectedAtAscIdAsc(DisputeStatus.DISPUTED, page);
     }
 
     /** The HSE queue of violations with no known worker. */
     @Transactional(readOnly = true)
-    public List<Violation> listUnidentified(Long actorId) {
+    public Page<Violation> listUnidentified(Long actorId, Pageable page) {
         access.require(actorId, Permissions.VIOLATION_READ_ALL);
-        return violations.findAllByUserIsNullOrderByDetectedAtDesc(BaseRepository.LIST_LIMIT);
+        return violations.findAllByUserIsNullOrderByDetectedAtDescIdDesc(page);
     }
 
     @Transactional(readOnly = true)

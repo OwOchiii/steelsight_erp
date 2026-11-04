@@ -10,9 +10,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.identity.service.UserService;
+import orochi.steelsight.scheduling.service.TeamService;
 import orochi.steelsight.security.AuthenticatedUser;
 
 @Controller
@@ -20,11 +22,21 @@ import orochi.steelsight.security.AuthenticatedUser;
 public class TeamController extends PageController {
 
     private final UserService users;
+    private final TeamService teams;
 
     @GetMapping("/team")
-    public String list(@AuthenticationPrincipal AuthenticatedUser user, Model model) {
-        model.addAttribute("members", users.listManaged(user.getUserId()));
+    public String list(@AuthenticationPrincipal AuthenticatedUser user,
+                       @RequestParam(defaultValue = "0") int page, Model model) {
+        model.addAttribute("members", users.listManaged(user.getUserId(), pageOf(page)));
+        model.addAttribute("teams", teams.listManaged(user.getUserId()));
         return "team/list";
+    }
+
+    @PostMapping("/teams/{id}/late-after")
+    public String setLateAfter(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
+                               @RequestParam(required = false) Integer minutes, RedirectAttributes redirect) {
+        return attempt(redirect, "/team", "The late check-in rule was saved.",
+                () -> teams.setLateAfterMinutes(user.getUserId(), id, minutes));
     }
 
     @GetMapping("/team/{id}/edit")

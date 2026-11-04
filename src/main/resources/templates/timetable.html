@@ -18,7 +18,7 @@
         </li>
     </ul>
 
-    <th:block th:unless="${earlier.isEmpty()}">
+    <th:block th:unless="${earlier.totalElements == 0}">
         <h2>Earlier</h2>
         <ul class="rows">
             <li th:each="shift : ${earlier}">
@@ -29,6 +29,7 @@
                 <span class="badge" th:classappend="${@display.badge(shift.status)}" th:text="${@display.label(shift.status)}">Status</span>
             </li>
         </ul>
+        <nav th:replace="~{fragments/lists :: pager(${earlier})}"></nav>
     </th:block>
 </main>
 </body>

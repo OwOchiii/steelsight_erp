@@ -2,6 +2,8 @@ package orochi.steelsight.scheduling.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import orochi.steelsight.exception.BusinessRuleException;
@@ -76,6 +78,18 @@ public class ShiftService {
     public List<Shift> listAll(Long actorId, OffsetDateTime from, OffsetDateTime to) {
         access.require(actorId, Permissions.SHIFT_READ_ALL);
         return shifts.findAllByStartAtBetween(from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Shift> listOwnUpcoming(Long actorId, OffsetDateTime now) {
+        access.require(actorId, Permissions.SHIFT_READ_OWN);
+        return shifts.findUpcoming(actorId, now);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Shift> listOwnEarlier(Long actorId, OffsetDateTime now, Pageable page) {
+        access.require(actorId, Permissions.SHIFT_READ_OWN);
+        return shifts.findEarlier(actorId, now, page);
     }
 
     /** The shifts this user manages: their teams', or everyone's with SHIFT_READ_ALL. */

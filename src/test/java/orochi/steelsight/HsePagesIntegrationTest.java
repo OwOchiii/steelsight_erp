@@ -244,7 +244,7 @@ class HsePagesIntegrationTest extends PageTestSupport {
 
     @Test
     void anOfficerCanAddAndCorrectACheckIn() throws Exception {
-        mvc.perform(get("/attendance").with(as(hse)))
+        mvc.perform(get("/attendance").param("onSite", "true").with(as(hse)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Nobody is checked in")));
         mvc.perform(post("/attendance")
@@ -262,14 +262,19 @@ class HsePagesIntegrationTest extends PageTestSupport {
 
         mvc.perform(get("/attendance/" + id + "/edit").with(as(hse)))
                 .andExpect(content().string(containsString("Correct: Wanda Worker")));
-        mvc.perform(post("/attendance/" + id).param("checkInAt", "2026-11-04T08:00").param("checkOutAt", "2026-11-04T07:00")
+        mvc.perform(post("/attendance/" + id).param("checkInAt", "2026-11-04T08:00").param("checkOutAt", "2026-11-04T07:00").param("version", "0")
                         .with(as(hse)).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(containsString("Check-out must be after check-in")));
-        mvc.perform(post("/attendance/" + id).param("checkInAt", "2026-11-04T08:00").param("checkOutAt", "2026-11-04T16:00")
+        mvc.perform(post("/attendance/" + id).param("checkInAt", "2026-11-04T08:00").param("checkOutAt", "2026-11-04T16:00").param("version", "0")
                         .with(as(hse)).with(csrf()))
                 .andExpect(status().is3xxRedirection());
         assertThat(jdbc.queryForObject("SELECT check_out_at IS NOT NULL FROM check_in WHERE id = ?", Boolean.class, id)).isTrue();
+
+        // The same form again is now out of date
+        mvc.perform(post("/attendance/" + id).param("checkInAt", "2026-11-04T09:00").param("version", "0")
+                        .with(as(hse)).with(csrf()))
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -292,5 +297,37 @@ class HsePagesIntegrationTest extends PageTestSupport {
 
     private String disputeStatus(Long violation) {
         return textColumn("SELECT dispute_status FROM violation WHERE id = ?", violation);
+    }
+
+    @Test
+    void longListsArePagedAndKeepTheirFilter() throws Exception {
+        for (int i = 1; i <= 21; i++) {
+            violation(null, camera, "NO_GLOVES");
+        }
+
+        mvc.perform(get("/violations/review?view=UNIDENTIFIED").with(as(hse)))
+                .andExpect(content().string(containsString("Page 1 of 2")))
+                .andExpect(content().string(containsString("/violations/review?view=UNIDENTIFIED&amp;page=1")))
+                .andExpect(content().string(not(containsString(">Previous<"))));
+        mvc.perform(get("/violations/review").param("view", "UNIDENTIFIED").param("page", "1").with(as(hse)))
+                .andExpect(content().string(containsString("Page 2 of 2")))
+                .andExpect(content().string(containsString(">Previous<")))
+                .andExpect(content().string(not(containsString(">Next<"))))
+                .andExpect(content().string(containsString("No gloves")));
+    }
+
+    @Test
+    void oddPageNumbersDoNotBreakTheList() throws Exception {
+        violation(null, camera, "NO_GLOVES");
+
+        mvc.perform(get("/violations/review").param("view", "ALL").param("page", "-5").with(as(hse)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("No gloves")));
+        mvc.perform(get("/violations/review").param("view", "ALL").param("page", "99").with(as(hse)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("No violations have been recorded"))))
+                .andExpect(content().string(containsString("page=0")));
+        mvc.perform(get("/violations/review").param("view", "ALL").param("page", "abc").with(as(hse)))
+                .andExpect(status().isNotFound());
     }
 }

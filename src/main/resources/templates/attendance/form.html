@@ -8,6 +8,7 @@
     <h1 th:text="${visit} ? |Correct: ${visit.user.fullName}| : 'Add a check-in'">Check-in</h1>
     <div th:replace="~{fragments/layout :: messages}"></div>
     <form method="post" th:action="${visit} ? @{/attendance/{id}(id=${visit.id})} : @{/attendance}" th:object="${form}">
+        <input type="hidden" th:field="*{version}">
         <th:block th:unless="${visit}">
             <label for="workerId">Worker</label>
             <select id="workerId" th:field="*{workerId}" required>

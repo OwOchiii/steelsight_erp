@@ -16,4 +16,5 @@ public class CheckInForm {
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime checkOutAt;
     private String note;
+    private long version;
 }

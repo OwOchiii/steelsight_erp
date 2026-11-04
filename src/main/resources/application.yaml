@@ -42,6 +42,9 @@ steelsight:
     # Creates the first admin when there is none. Leave the password empty to skip this.
     admin-employee-code: ${ADMIN_EMPLOYEE_CODE:ADMIN}
     admin-password: ${ADMIN_PASSWORD:}
+  attendance:
+    # For workers with no team. Each team has its own value, which a manager or admin edits on the Team page.
+    late-after-minutes: ${LATE_AFTER_MINUTES:15}
   # Times are stored in UTC and shown in this zone.
   time-zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
   storage:

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -418,14 +419,14 @@ class ServiceIntegrationTest {
         Violation unknown = violation(null);
         em.flush();
 
-        assertThat(violationService.listUnidentified(hse)).containsExactly(unknown);
-        assertThatThrownBy(() -> violationService.listUnidentified(worker)).isInstanceOf(AccessDeniedException.class);
+        assertThat(violationService.listUnidentified(hse, Pageable.unpaged())).containsExactly(unknown);
+        assertThatThrownBy(() -> violationService.listUnidentified(worker, Pageable.unpaged())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> violationService.assignWorker(manager, unknown.getId(), worker))
                 .isInstanceOf(AccessDeniedException.class);
 
         violationService.assignWorker(hse, unknown.getId(), worker);
 
-        assertThat(violationService.listUnidentified(hse)).isEmpty();
+        assertThat(violationService.listUnidentified(hse, Pageable.unpaged())).isEmpty();
         assertThat(violationService.listOwn(worker)).containsExactly(unknown);
         assertThat(violationService.get(worker, unknown.getId())).isEqualTo(unknown);
         assertThatThrownBy(() -> violationService.get(otherWorker, unknown.getId())).isInstanceOf(AccessDeniedException.class);
@@ -465,10 +466,23 @@ class ServiceIntegrationTest {
         visit.setAutoClosed(true);
         em.flush();
 
-        CheckIn fixed = checkInService.correct(hse, visit.getId(), in, in.plusHours(8), "Left at 17:00");
+        CheckIn fixed = checkInService.correct(hse, visit.getId(), in, in.plusHours(8), "Left at 17:00", visit.getVersion());
 
         assertThat(fixed.isAutoClosed()).isFalse();
         assertThat(fixed.getNote()).isEqualTo("Left at 17:00");
+    }
+
+    @Test
+    void aStaleCorrectionFailsEvenIfOnlyPlainSqlChangedTheVisit() {
+        OffsetDateTime in = OffsetDateTime.now().minusHours(9);
+        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, in, null, null));
+        long versionInForm = visit.getVersion();
+        // What the detection service does when a worker checks out
+        em.createNativeQuery("UPDATE check_in SET check_out_at = now() WHERE id = :id").setParameter("id", visit.getId()).executeUpdate();
+        em.clear();
+
+        assertThatThrownBy(() -> checkInService.correct(hse, visit.getId(), in, in.plusHours(1), null, versionInForm))
+                .isInstanceOf(StaleEditException.class);
     }
 
     @Test

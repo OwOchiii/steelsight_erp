@@ -31,16 +31,18 @@ public class TicketController extends PageController {
     private final PhotoStorage photos;
 
     @GetMapping("/tickets")
-    public String list(@AuthenticationPrincipal AuthenticatedUser user, Model model) {
-        model.addAttribute("tickets", tickets.listOwn(user.getUserId()));
+    public String list(@AuthenticationPrincipal AuthenticatedUser user,
+                       @RequestParam(defaultValue = "0") int page, Model model) {
+        model.addAttribute("tickets", tickets.listOwn(user.getUserId(), pageOf(page)));
         return "tickets/list";
     }
 
     /** The tickets the user works on, as opposed to the ones they opened. */
     @GetMapping("/tickets/queue")
     public String queue(@AuthenticationPrincipal AuthenticatedUser user,
-                        @RequestParam(defaultValue = "false") boolean resolved, Model model) {
-        model.addAttribute("tickets", tickets.listQueue(user.getUserId(), resolved));
+                        @RequestParam(defaultValue = "false") boolean resolved,
+                        @RequestParam(defaultValue = "0") int page, Model model) {
+        model.addAttribute("tickets", tickets.listQueue(user.getUserId(), resolved, pageOf(page)));
         model.addAttribute("resolved", resolved);
         return "tickets/queue";
     }

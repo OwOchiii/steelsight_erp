@@ -2,6 +2,8 @@ package orochi.steelsight.attendance.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import orochi.steelsight.attendance.model.CheckIn;
@@ -11,7 +13,6 @@ import orochi.steelsight.exception.BusinessRuleException;
 import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.identity.service.AccessPolicy;
 import orochi.steelsight.identity.service.Permissions;
-import orochi.steelsight.repository.BaseRepository;
 import orochi.steelsight.scheduling.model.Shift;
 import orochi.steelsight.scheduling.model.Zone;
 import orochi.steelsight.scheduling.repository.ShiftRepository;
@@ -20,6 +21,7 @@ import orochi.steelsight.validation.Text;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.function.Supplier;
 
 /** Face check-ins come from the detection service; this covers viewing them and manual entries. */
 @Service
@@ -32,6 +34,7 @@ public class CheckInService {
     private final AppUserRepository users;
     private final ShiftRepository shifts;
     private final ZoneRepository zones;
+    private final AttendanceRules rules;
 
     public record ManualCheckIn(Long workerId, Long shiftId, Long zoneId, OffsetDateTime checkInAt,
                                 OffsetDateTime checkOutAt, String note) {
@@ -57,21 +60,24 @@ public class CheckInService {
 
     /** Who is on site now, as far as this user may see: their teams, or everyone with CHECKIN_READ_ALL. */
     @Transactional(readOnly = true)
-    public List<CheckIn> listOnSiteInScope(Long actorId) {
-        if (access.has(actorId, Permissions.CHECKIN_READ_ALL)) {
-            return checkIns.findAllByCheckOutAtIsNull();
-        }
-        access.require(actorId, Permissions.CHECKIN_READ_TEAM);
-        return checkIns.findTeamOnSite(actorId);
+    public Page<VisitStatus> listOnSiteInScope(Long actorId, Pageable page) {
+        Page<CheckIn> visits = access.has(actorId, Permissions.CHECKIN_READ_ALL)
+                ? checkIns.findAllByCheckOutAtIsNullOrderByCheckInAtDescIdDesc(page)
+                : teamVisits(actorId, () -> checkIns.findTeamOnSite(actorId, page));
+        return visits.map(rules::assess);
     }
 
     @Transactional(readOnly = true)
-    public List<CheckIn> listRecentInScope(Long actorId) {
-        if (access.has(actorId, Permissions.CHECKIN_READ_ALL)) {
-            return checkIns.findAllByOrderByCheckInAtDesc(BaseRepository.LIST_LIMIT);
-        }
+    public Page<VisitStatus> listRecentInScope(Long actorId, Pageable page) {
+        Page<CheckIn> visits = access.has(actorId, Permissions.CHECKIN_READ_ALL)
+                ? checkIns.findAllByOrderByCheckInAtDescIdDesc(page)
+                : teamVisits(actorId, () -> checkIns.findTeamVisits(actorId, page));
+        return visits.map(rules::assess);
+    }
+
+    private Page<CheckIn> teamVisits(Long actorId, Supplier<Page<CheckIn>> query) {
         access.require(actorId, Permissions.CHECKIN_READ_TEAM);
-        return checkIns.findTeamVisits(actorId, BaseRepository.LIST_LIMIT);
+        return query.get();
     }
 
     @Transactional(readOnly = true)
@@ -113,11 +119,13 @@ public class CheckInService {
         return save(visit);
     }
 
-    /** Corrects the times on any visit. A corrected check-out is no longer an estimate. */
-    public CheckIn correct(Long actorId, Long checkInId, OffsetDateTime checkInAt, OffsetDateTime checkOutAt, String note) {
+    /** Corrects the times on any visit; a stale form fails. A corrected check-out is no longer an estimate. */
+    public CheckIn correct(Long actorId, Long checkInId, OffsetDateTime checkInAt, OffsetDateTime checkOutAt,
+                           String note, long expectedVersion) {
         access.require(actorId, Permissions.CHECKIN_EDIT);
         requireOrder(checkInAt, checkOutAt);
         CheckIn visit = checkIns.require(checkInId);
+        visit.requireVersion(expectedVersion);
         visit.setCheckInAt(checkInAt);
         visit.setCheckOutAt(checkOutAt);
         visit.setAutoClosed(false);

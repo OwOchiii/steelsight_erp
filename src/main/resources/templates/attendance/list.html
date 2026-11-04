@@ -10,16 +10,13 @@
     </div>
     <div th:replace="~{fragments/layout :: messages}"></div>
 
-    <h2>On site now</h2>
-    <p class="empty" th:if="${onSite.isEmpty()}">Nobody is checked in.</p>
-    <th:block th:unless="${onSite.isEmpty()}"><ul th:replace="~{fragments/lists :: visits(${onSite}, ${canEdit})}"></ul></th:block>
-
-    <h2>Recent visits</h2>
-    <p class="empty" th:if="${recent.isEmpty()}">No visits have been recorded.</p>
-    <th:block th:unless="${recent.isEmpty()}">
-        <ul th:replace="~{fragments/lists :: visits(${recent}, ${canEdit})}"></ul>
-        <p th:replace="~{fragments/lists :: limit(${recent})}"></p>
-    </th:block>
+    <nav class="tabs" aria-label="Visits to show">
+        <a th:href="@{/attendance}" th:attr="aria-current=${onSite} ? null : 'page'">Recent visits</a>
+        <a th:href="@{/attendance(onSite=true)}" th:attr="aria-current=${onSite} ? 'page' : null">On site now</a>
+    </nav>
+    <p class="empty" th:if="${visits.totalElements == 0}" th:text="${onSite} ? 'Nobody is checked in.' : 'No visits have been recorded.'">Empty</p>
+    <th:block th:unless="${visits.isEmpty()}"><ul th:replace="~{fragments/lists :: visits(${visits}, ${canEdit})}"></ul></th:block>
+    <nav th:replace="~{fragments/lists :: pager(${visits})}"></nav>
 </main>
 </body>
 </html>

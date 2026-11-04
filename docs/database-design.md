@@ -164,6 +164,7 @@ erDiagram
         bigint id PK
         text name UK
         bigint manager_id FK
+        integer late_after_minutes
     }
     check_in {
         bigint id PK
@@ -183,6 +184,7 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         uuid event_id UK
+        bigint version
     }
     face_embedding {
         bigint id PK
@@ -206,6 +208,7 @@ A group of workers under one manager.
 | 1 | id | bigint | 8 bytes | PK | No | Yes | Generated team ID |
 | 2 | name | text | Variable |  | No | Yes | Team name |
 | 3 | manager_id | bigint | 8 bytes | FK → app_user(id) | Yes | No | The team's manager |
+| 4 | late_after_minutes | integer | 4 bytes |  | No | No | Minutes after a shift starts before a check-in is tagged late, 0 to 240; defaults to 15 |
 
 #### 1.2.2 check_in
 
@@ -230,6 +233,7 @@ One visit to site, from check-in to check-out.
 | 15 | created_at | timestamptz | 8 bytes |  | No | No | When the row was created |
 | 16 | updated_at | timestamptz | 8 bytes |  | No | No | When the row last changed; set by a trigger |
 | 17 | event_id | uuid | 16 bytes |  | Yes | Yes | Outbox event ID from the detection service; makes retries safe |
+| 18 | version | bigint | 8 bytes |  | No | No | Optimistic lock, so a stale correction fails; a trigger also counts changes made with plain SQL; defaults to 0 |
 
 #### 1.2.3 face_embedding
 

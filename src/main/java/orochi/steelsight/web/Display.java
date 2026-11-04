@@ -2,14 +2,14 @@ package orochi.steelsight.web;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import orochi.steelsight.repository.BaseRepository;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.util.UriComponents;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
 import java.util.Locale;
 
 /** Formatting used by the templates, as ${@display.dateTime(value)}. */
@@ -57,8 +57,10 @@ public class Display {
         return value == null ? "" : "badge-" + value.name().toLowerCase(Locale.ENGLISH);
     }
 
-    /** True when a list stopped at the row limit, so the page can say there may be more. */
-    public boolean atLimit(Collection<?> rows) {
-        return rows.size() >= BaseRepository.LIST_LIMIT.max();
+    /** A link to another page of the current list, keeping its other filters. */
+    public String pageLink(int number) {
+        UriComponents link = ServletUriComponentsBuilder.fromCurrentRequest()
+                .replaceQueryParam("page", Math.max(number, 0)).build();
+        return link.getPath() + "?" + link.getQuery();
     }
 }

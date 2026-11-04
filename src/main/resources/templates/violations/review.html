@@ -10,12 +10,12 @@
         <a th:href="@{/violations/review(view='UNIDENTIFIED')}" th:attr="aria-current=${view == 'UNIDENTIFIED'} ? 'page' : null">No worker</a>
         <a th:href="@{/violations/review(view='ALL')}" th:attr="aria-current=${view == 'ALL'} ? 'page' : null">All</a>
     </nav>
-    <p class="empty" th:if="${violations.isEmpty()}"
+    <p class="empty" th:if="${violations.totalElements == 0}"
        th:text="${view == 'DISPUTED'} ? 'No disputes are waiting for a decision.' : (${view == 'UNIDENTIFIED'} ? 'Every violation has a worker.' : 'No violations have been recorded.')">Empty</p>
     <th:block th:unless="${violations.isEmpty()}">
         <ul th:replace="~{fragments/lists :: violations(${violations}, true)}"></ul>
-        <p th:replace="~{fragments/lists :: limit(${violations})}"></p>
-    </th:block>
+        </th:block>
+    <nav th:replace="~{fragments/lists :: pager(${violations})}"></nav>
 </main>
 </body>
 </html>

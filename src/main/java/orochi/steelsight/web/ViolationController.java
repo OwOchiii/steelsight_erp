@@ -1,6 +1,7 @@
 package orochi.steelsight.web;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -19,8 +20,6 @@ import orochi.steelsight.security.AuthenticatedUser;
 import orochi.steelsight.ticketing.model.Ticket;
 import orochi.steelsight.ticketing.service.TicketService;
 
-import java.util.List;
-
 @Controller
 @RequiredArgsConstructor
 public class ViolationController extends PageController {
@@ -33,19 +32,21 @@ public class ViolationController extends PageController {
     private final Display display;
 
     @GetMapping("/violations")
-    public String list(@AuthenticationPrincipal AuthenticatedUser user, Model model) {
-        model.addAttribute("violations", violations.listOwn(user.getUserId()));
+    public String list(@AuthenticationPrincipal AuthenticatedUser user,
+                       @RequestParam(defaultValue = "0") int page, Model model) {
+        model.addAttribute("violations", violations.listOwn(user.getUserId(), pageOf(page)));
         return "violations/list";
     }
 
     @GetMapping("/violations/review")
     public String review(@AuthenticationPrincipal AuthenticatedUser user,
-                         @RequestParam(defaultValue = "DISPUTED") ReviewView view, Model model) {
+                         @RequestParam(defaultValue = "DISPUTED") ReviewView view,
+                         @RequestParam(defaultValue = "0") int page, Model model) {
         Long id = user.getUserId();
-        List<Violation> rows = switch (view) {
-            case DISPUTED -> violations.listDisputed(id);
-            case UNIDENTIFIED -> violations.listUnidentified(id);
-            case ALL -> violations.listAll(id);
+        Page<Violation> rows = switch (view) {
+            case DISPUTED -> violations.listDisputed(id, pageOf(page));
+            case UNIDENTIFIED -> violations.listUnidentified(id, pageOf(page));
+            case ALL -> violations.listAll(id, pageOf(page));
         };
         model.addAttribute("violations", rows);
         model.addAttribute("view", view.name());

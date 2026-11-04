@@ -41,7 +41,7 @@
             <span class="tile-label">Shifts today</span>
             <strong th:text="${shiftsToday}">0</strong>
         </a>
-        <a class="tile" sec:authorize="hasAnyAuthority('CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')" th:href="@{/attendance}">
+        <a class="tile" sec:authorize="hasAnyAuthority('CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')" th:href="@{/attendance(onSite=true)}">
             <span class="tile-label">On site now</span>
             <strong th:text="${onSite}">0</strong>
         </a>

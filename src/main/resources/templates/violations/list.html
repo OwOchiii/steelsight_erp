@@ -5,8 +5,9 @@
 <header th:replace="~{fragments/layout :: nav('violations')}"></header>
 <main class="page">
     <h1>PPE violations</h1>
-    <p class="empty" th:if="${violations.isEmpty()}">You have no recorded violations.</p>
+    <p class="empty" th:if="${violations.totalElements == 0}">You have no recorded violations.</p>
     <th:block th:unless="${violations.isEmpty()}"><ul th:replace="~{fragments/lists :: violations(${violations}, false)}"></ul></th:block>
+    <nav th:replace="~{fragments/lists :: pager(${violations})}"></nav>
 </main>
 </body>
 </html>

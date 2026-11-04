@@ -22,18 +22,28 @@
         <span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span>
     </li>
 </ul>
-<ul class="rows" th:fragment="visits(visits, canEdit)">
-    <li th:each="visit : ${visits}">
+<ul class="rows" th:fragment="visits(statuses, canEdit)">
+    <li th:each="status : ${statuses}" th:with="visit=${status.visit}">
         <div class="grow">
             <strong th:text="|${visit.user.fullName} (${visit.user.employeeCode})|">Name</strong>
             <span class="quiet" th:text="|In ${@display.dateTime(visit.checkInAt)}${visit.zone != null ? ', ' + visit.zone.name : ''}|">In</span>
             <span class="quiet" th:if="${visit.checkOutAt}" th:text="|Out ${@display.dateTime(visit.checkOutAt)}${visit.autoClosed ? ' (estimated)' : ''}|">Out</span>
+            <span class="quiet" th:if="${status.hasShift() and (status.onSite or status.early)}" th:text="|Must stay until ${@display.time(status.requiredCheckOut)}|">Until</span>
             <span class="quiet" th:if="${visit.note}" th:text="${visit.note}">Note</span>
         </div>
+        <span class="badge badge-late" th:if="${status.late}" th:text="|Check-in late (${status.minutesLate} min)|">Late</span>
+        <span class="badge badge-late" th:if="${status.early}" th:text="|Check-out early (${status.minutesEarly} min)|">Early</span>
+        <span class="badge badge-late" th:if="${status.missingCheckOut}">No check-out</span>
+        <span class="badge badge-resolved" th:if="${status.onTime}">On time</span>
+        <span class="badge" th:unless="${status.hasShift()}">No shift</span>
         <span class="badge" th:text="${@display.label(visit.method)}">Method</span>
         <a class="row-link" th:if="${canEdit}" th:href="@{/attendance/{id}/edit(id=${visit.id})}">Correct</a>
     </li>
 </ul>
-<p class="hint" th:fragment="limit(rows)" th:if="${@display.atLimit(rows)}">Showing the first 100 only.</p>
+<nav class="pager" th:fragment="pager(rows)" th:if="${rows.totalPages > 1 or rows.number > 0}" aria-label="Pages">
+    <a th:if="${rows.hasPrevious()}" th:href="${@display.pageLink(rows.number > rows.totalPages ? rows.totalPages - 1 : rows.number - 1)}">Previous</a>
+    <span class="quiet" th:text="|Page ${rows.number + 1} of ${rows.totalPages}|">Page</span>
+    <a th:if="${rows.hasNext()}" th:href="${@display.pageLink(rows.number + 1)}">Next</a>
+</nav>
 </body>
 </html>

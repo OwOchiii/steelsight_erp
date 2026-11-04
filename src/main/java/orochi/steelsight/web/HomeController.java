@@ -1,6 +1,7 @@
 package orochi.steelsight.web;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -59,7 +60,7 @@ public class HomeController {
             model.addAttribute("shiftsToday", todays.stream().filter(Shift::isScheduled).count());
         }
         if (user.can(Permissions.CHECKIN_READ_TEAM) || user.can(Permissions.CHECKIN_READ_ALL)) {
-            model.addAttribute("onSite", checkIns.listOnSiteInScope(id).size());
+            model.addAttribute("onSite", checkIns.listOnSiteInScope(id, PageRequest.of(0, 1)).getTotalElements());
         }
         return "home";
     }
