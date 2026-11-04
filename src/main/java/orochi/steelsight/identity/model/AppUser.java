@@ -1,16 +1,19 @@
 package orochi.steelsight.identity.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import orochi.steelsight.model.SoftDeletableModel;
 import orochi.steelsight.scheduling.model.Team;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 @Entity
 @Table(name = "app_user")
 public class AppUser extends SoftDeletableModel {
+
+    @Version
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "role_id", nullable = false)

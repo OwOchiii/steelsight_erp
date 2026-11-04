@@ -1,19 +1,22 @@
 package orochi.steelsight.ticketing.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.model.SoftDeletableModel;
 import orochi.steelsight.ppe.model.Violation;
 
 import java.time.OffsetDateTime;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 @Entity
 @Table(name = "ticket")
 public class Ticket extends SoftDeletableModel {
+
+    @Version
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)

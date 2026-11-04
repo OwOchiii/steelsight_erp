@@ -1,5 +1,5 @@
 -- =====================================================================
--- Siteworks ERP - PostgreSQL schema (v3)
+-- Steelsight ERP - PostgreSQL schema (v3)
 -- Written for PostgreSQL 17 and 18, so it also fits Supabase. Needs the pgvector extension.
 --
 -- The idea in plain words:
@@ -66,6 +66,7 @@ CREATE TABLE app_user (                           -- "user" is a reserved word i
                           password_hash  text   NOT NULL,
                           face_file_path text,
                           is_active      boolean     NOT NULL DEFAULT true,
+                          version        bigint      NOT NULL DEFAULT 0,  -- optimistic lock: a stale edit fails
                           created_at     timestamptz NOT NULL DEFAULT now(),
                           updated_at     timestamptz NOT NULL DEFAULT now(),
                           deleted_at     timestamptz                      -- soft delete
@@ -93,6 +94,7 @@ CREATE TABLE shift (
                            CHECK (status IN ('SCHEDULED','COMPLETED','CANCELLED')),
                        created_by bigint NOT NULL REFERENCES app_user(id),
                        updated_by bigint REFERENCES app_user(id),
+                       version    bigint NOT NULL DEFAULT 0,                 -- optimistic lock: a stale edit fails
                        created_at timestamptz NOT NULL DEFAULT now(),
                        updated_at timestamptz NOT NULL DEFAULT now(),
                        CHECK (end_at > start_at),
@@ -147,6 +149,7 @@ CREATE TABLE violation (
                                CHECK (dispute_status IN ('NONE','DISPUTED','UPHELD','OVERTURNED')),
                            reviewed_by     bigint REFERENCES app_user(id),
                            reviewed_at     timestamptz,
+                           version         bigint NOT NULL DEFAULT 0,      -- optimistic lock: two HSE officers cannot both decide
                            created_at      timestamptz NOT NULL DEFAULT now(),
                            updated_at      timestamptz NOT NULL DEFAULT now(),
                            CHECK (dispute_status NOT IN ('UPHELD','OVERTURNED')
@@ -203,14 +206,19 @@ CREATE TABLE ticket (
                         status      text NOT NULL DEFAULT 'OPEN'
                             CHECK (status IN ('OPEN','IN_PROGRESS','RESOLVED')),
                         resolved_at timestamptz,
+                        version     bigint NOT NULL DEFAULT 0,                -- optimistic lock: a stale edit fails
                         created_at  timestamptz NOT NULL DEFAULT now(),
                         updated_at  timestamptz NOT NULL DEFAULT now(),
                         deleted_at  timestamptz,                              -- soft delete
-                        CHECK (status <> 'RESOLVED' OR (resolver_id IS NOT NULL AND resolved_at IS NOT NULL))
+                        -- resolver and time are set exactly when the ticket is resolved
+                        CHECK ((status = 'RESOLVED') = (resolver_id IS NOT NULL)),
+                        CHECK ((status = 'RESOLVED') = (resolved_at IS NOT NULL))
 );
 
 CREATE INDEX idx_ticket_creator  ON ticket(created_by, created_at DESC);
 CREATE INDEX idx_ticket_category ON ticket(category_id, status);
+-- a violation can have only one live dispute ticket
+CREATE UNIQUE INDEX uq_ticket_violation ON ticket(violation_id) WHERE violation_id IS NOT NULL AND deleted_at IS NULL;
 CREATE TRIGGER trg_ticket_updated BEFORE UPDATE ON ticket
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
@@ -238,24 +246,40 @@ $$ LANGUAGE sql STABLE;
 
 -- HSE can edit a ticket only if its category is handled by HSE, a manager only for the manager's categories ...
 CREATE OR REPLACE FUNCTION can_update_ticket(p_user bigint, p_ticket bigint) RETURNS boolean AS $$
-SELECT has_permission(p_user, 'TICKET_UPDATE_HANDLED')
+SELECT (has_permission(p_user, 'TICKET_UPDATE_ALL')
+            AND EXISTS (SELECT 1 FROM ticket t WHERE t.id = p_ticket AND t.deleted_at IS NULL))
+    OR (has_permission(p_user, 'TICKET_UPDATE_HANDLED')
            AND EXISTS (
         SELECT 1
         FROM ticket t
                  JOIN ticket_category c ON c.id = t.category_id
                  JOIN app_user u        ON u.id = p_user AND u.role_id = c.handler_role_id
-        WHERE t.id = p_ticket AND t.deleted_at IS NULL);
+        WHERE t.id = p_ticket AND t.deleted_at IS NULL));
 $$ LANGUAGE sql STABLE;
 
 -- A manager can edit a shift only for workers in a team the manager runs
 CREATE OR REPLACE FUNCTION can_edit_shift(p_user bigint, p_shift bigint) RETURNS boolean AS $$
-SELECT has_permission(p_user, 'SHIFT_UPDATE_TEAM')
+SELECT (has_permission(p_user, 'SHIFT_UPDATE_ALL')
+            AND EXISTS (SELECT 1 FROM shift s WHERE s.id = p_shift))
+    OR (has_permission(p_user, 'SHIFT_UPDATE_TEAM')
            AND EXISTS (
         SELECT 1
         FROM shift s
                  JOIN app_user w ON w.id = s.user_id
                  JOIN team t     ON t.id = w.team_id AND t.manager_id = p_user
-        WHERE s.id = p_shift);
+        WHERE s.id = p_shift));
+$$ LANGUAGE sql STABLE;
+
+-- A manager can edit workers in a team the manager runs (not themselves); USER_MANAGE covers everyone
+CREATE OR REPLACE FUNCTION can_update_user(p_user bigint, p_target bigint) RETURNS boolean AS $$
+SELECT (has_permission(p_user, 'USER_MANAGE')
+            AND EXISTS (SELECT 1 FROM app_user w WHERE w.id = p_target AND w.deleted_at IS NULL))
+    OR (has_permission(p_user, 'USER_UPDATE_TEAM')
+           AND EXISTS (
+        SELECT 1
+        FROM app_user w
+                 JOIN team t ON t.id = w.team_id AND t.manager_id = p_user
+        WHERE w.id = p_target AND w.id <> p_user AND w.deleted_at IS NULL));
 $$ LANGUAGE sql STABLE;
 
 -- ---------------------------------------------------------------------
@@ -268,14 +292,20 @@ INSERT INTO permission (code, module, action, description) VALUES
                                                                ('TICKET_READ_OWN',        'TICKET',    'READ',   'See tickets I opened'),
                                                                ('TICKET_READ_HANDLED',    'TICKET',    'READ',   'See tickets in categories my role handles'),
                                                                ('TICKET_UPDATE_HANDLED',  'TICKET',    'UPDATE', 'Reply, assign, resolve tickets in my role''s categories'),
+                                                               ('TICKET_READ_ALL',        'TICKET',    'READ',   'See every ticket'),
+                                                               ('TICKET_UPDATE_ALL',      'TICKET',    'UPDATE', 'Reply, assign, resolve any ticket'),
+                                                               ('TICKET_DELETE_ALL',      'TICKET',    'DELETE', 'Soft-delete any ticket'),
                                                                ('TICKET_DELETE_HANDLED',  'TICKET',    'DELETE', 'Soft-delete tickets in my role''s categories'),
                                                                ('SHIFT_READ_OWN',         'SHIFT',     'READ',   'See my own timetable'),
                                                                ('SHIFT_READ_TEAM',        'SHIFT',     'READ',   'See the timetable of my team'),
                                                                ('SHIFT_UPDATE_TEAM',      'SHIFT',     'UPDATE', 'Create and edit shifts for my team'),
+                                                               ('SHIFT_READ_ALL',         'SHIFT',     'READ',   'See every timetable'),
+                                                               ('SHIFT_UPDATE_ALL',       'SHIFT',     'UPDATE', 'Create and edit any shift'),
                                                                ('VIOLATION_READ_OWN',     'VIOLATION', 'READ',   'See my own PPE violations'),
                                                                ('VIOLATION_READ_ALL',     'VIOLATION', 'READ',   'See all PPE violations'),
                                                                ('VIOLATION_REVIEW',       'VIOLATION', 'REVIEW', 'Decide a disputed violation'),
                                                                ('USER_MANAGE',            'USER',      'MANAGE', 'Create users, change roles'),
+                                                               ('USER_UPDATE_TEAM',       'USER',      'UPDATE', 'Edit workers on my team; no role changes or new accounts'),
                                                                ('ROLE_MANAGE',            'USER',      'MANAGE', 'Edit roles and permissions');
 
 INSERT INTO role_permission (role_id, permission_id)
@@ -290,7 +320,7 @@ FROM (VALUES
 
           ('MANAGER',     'TICKET_CREATE'), ('MANAGER', 'TICKET_READ_OWN'), ('MANAGER', 'SHIFT_READ_OWN'),
           ('MANAGER',     'TICKET_READ_HANDLED'), ('MANAGER', 'TICKET_UPDATE_HANDLED'), ('MANAGER', 'TICKET_DELETE_HANDLED'),
-          ('MANAGER',     'SHIFT_READ_TEAM'), ('MANAGER', 'SHIFT_UPDATE_TEAM')
+          ('MANAGER',     'SHIFT_READ_TEAM'), ('MANAGER', 'SHIFT_UPDATE_TEAM'), ('MANAGER', 'USER_UPDATE_TEAM')
      ) AS v(role_name, code)
          JOIN role r       ON r.role_name = v.role_name
          JOIN permission p ON p.code = v.code;
@@ -312,8 +342,7 @@ FROM (VALUES
          JOIN role r ON r.role_name = v.role_name;
 
 -- =====================================================================
--- Siteworks ERP - check-in table (additive migration)
--- Run AFTER siteworks_schema.sql. Works on PostgreSQL 17 and 18 (so also on Supabase).
+-- Check-in table
 --
 -- One row = one visit to site: face check-in, then check-out.
 -- The detection service creates the row (method FACE) and links the vest;
@@ -357,6 +386,24 @@ CREATE INDEX idx_check_in_shift     ON check_in(shift_id);
 
 CREATE TRIGGER trg_check_in_updated BEFORE UPDATE ON check_in
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- The shift and vest link on a visit must belong to the worker on that visit
+CREATE OR REPLACE FUNCTION check_in_same_worker() RETURNS trigger AS $$
+BEGIN
+  IF NEW.shift_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM shift WHERE id = NEW.shift_id AND user_id = NEW.user_id) THEN
+    RAISE EXCEPTION 'shift % does not belong to user %', NEW.shift_id, NEW.user_id;
+  END IF;
+  IF NEW.ppe_linking_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM ppe_linking WHERE id = NEW.ppe_linking_id AND user_id = NEW.user_id) THEN
+    RAISE EXCEPTION 'vest link % does not belong to user %', NEW.ppe_linking_id, NEW.user_id;
+  END IF;
+RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_in_worker BEFORE INSERT OR UPDATE OF user_id, shift_id, ppe_linking_id ON check_in
+    FOR EACH ROW EXECUTE FUNCTION check_in_same_worker();
 
 -- Closes visits nobody checked out of, otherwise uq_check_in_open blocks the worker's next check-in.
 -- Closes at shift end + p_grace, or check-in + p_no_shift_limit when there is no shift.
@@ -428,66 +475,61 @@ CREATE TABLE face_embedding (
 CREATE TRIGGER trg_face_embedding_updated BEFORE UPDATE ON face_embedding
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- Soft-deleting a worker erases the embedding in the same transaction
+CREATE OR REPLACE FUNCTION app_user_erase_embedding() RETURNS trigger AS $$
+BEGIN
+DELETE FROM face_embedding WHERE user_id = NEW.id;
+RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_user_erase_embedding AFTER UPDATE OF deleted_at ON app_user
+    FOR EACH ROW WHEN (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL)
+    EXECUTE FUNCTION app_user_erase_embedding();
+
 -- ---------------------------------------------------------------------
 -- Database role for the detection service: only what it needs, no password hashes
 -- Created without login, so no password sits in this file. Run this by hand once:
---   ALTER ROLE siteworks_detection LOGIN PASSWORD '<a strong password>';
+--   ALTER ROLE steelsight_detection LOGIN PASSWORD '<a strong password>';
 -- The ERP connects as the table owner, because it runs the migrations.
 -- ---------------------------------------------------------------------
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'siteworks_detection') THEN
-    CREATE ROLE siteworks_detection NOLOGIN;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'steelsight_detection') THEN
+    CREATE ROLE steelsight_detection NOLOGIN;
   END IF;
 END $$;
 
-GRANT USAGE ON SCHEMA public TO siteworks_detection;
+GRANT USAGE ON SCHEMA public TO steelsight_detection;
 
-GRANT SELECT ON zone, camera, ppe_vest, shift TO siteworks_detection;
-GRANT SELECT (id, employee_code, face_file_path, is_active, deleted_at) ON app_user TO siteworks_detection;
-GRANT SELECT, INSERT ON ppe_linking TO siteworks_detection;
-GRANT UPDATE (unlinked_at) ON ppe_linking TO siteworks_detection;
-GRANT SELECT, INSERT ON check_in TO siteworks_detection;
-GRANT UPDATE (check_out_at, auto_closed, ppe_linking_id) ON check_in TO siteworks_detection;
-GRANT SELECT ON violation TO siteworks_detection;
+GRANT SELECT ON zone, camera, ppe_vest, shift TO steelsight_detection;
+GRANT SELECT (id, employee_code, face_file_path, is_active, deleted_at) ON app_user TO steelsight_detection;
+GRANT SELECT, INSERT ON ppe_linking TO steelsight_detection;
+GRANT UPDATE (unlinked_at) ON ppe_linking TO steelsight_detection;
+GRANT SELECT, INSERT ON check_in TO steelsight_detection;
+GRANT UPDATE (check_out_at, auto_closed, ppe_linking_id) ON check_in TO steelsight_detection;
+GRANT SELECT ON violation TO steelsight_detection;
 GRANT INSERT (user_id, ppe_linking_id, camera_id, violation_type, detected_at, confidence,
-              snapshot_path, box_x, box_y, box_w, box_h) ON violation TO siteworks_detection;
-GRANT SELECT ON face_embedding TO siteworks_detection;
-GRANT UPDATE (status, embedding, model_name, error_message) ON face_embedding TO siteworks_detection;
+              snapshot_path, box_x, box_y, box_w, box_h) ON violation TO steelsight_detection;
+GRANT SELECT ON face_embedding TO steelsight_detection;
+GRANT UPDATE (status, embedding, model_name, error_message) ON face_embedding TO steelsight_detection;
 
 REVOKE EXECUTE ON FUNCTION close_stale_check_ins(interval, interval) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION close_stale_check_ins(interval, interval) TO siteworks_detection;
+GRANT EXECUTE ON FUNCTION close_stale_check_ins(interval, interval) TO steelsight_detection;
 
--- RLS is switched on below, so each grant above also needs a policy
-CREATE POLICY detection_read ON zone           FOR SELECT TO siteworks_detection USING (true);
-CREATE POLICY detection_read ON camera         FOR SELECT TO siteworks_detection USING (true);
-CREATE POLICY detection_read ON ppe_vest       FOR SELECT TO siteworks_detection USING (true);
-CREATE POLICY detection_read ON shift          FOR SELECT TO siteworks_detection USING (true);
-CREATE POLICY detection_read ON app_user       FOR SELECT TO siteworks_detection USING (true);
-CREATE POLICY detection_read ON ppe_linking    FOR SELECT TO siteworks_detection USING (true);
-CREATE POLICY detection_add  ON ppe_linking    FOR INSERT TO siteworks_detection WITH CHECK (true);
-CREATE POLICY detection_edit ON ppe_linking    FOR UPDATE TO siteworks_detection USING (true) WITH CHECK (true);
-CREATE POLICY detection_read ON check_in       FOR SELECT TO siteworks_detection USING (true);
-CREATE POLICY detection_add  ON check_in       FOR INSERT TO siteworks_detection WITH CHECK (true);
-CREATE POLICY detection_edit ON check_in       FOR UPDATE TO siteworks_detection USING (true) WITH CHECK (true);
-CREATE POLICY detection_read ON violation      FOR SELECT TO siteworks_detection USING (true);
-CREATE POLICY detection_add  ON violation      FOR INSERT TO siteworks_detection WITH CHECK (true);
-CREATE POLICY detection_read ON face_embedding FOR SELECT TO siteworks_detection USING (true);
-CREATE POLICY detection_edit ON face_embedding FOR UPDATE TO siteworks_detection USING (true) WITH CHECK (true);
-
--- ---------------------------------------------------------------------
--- SUPABASE ONLY (safe to skip on a local database)
--- Supabase exposes every table in the "public" schema through its public
--- Data API. Turning on Row Level Security blocks that API completely, because the
--- only policies are for siteworks_detection. Spring Boot keeps working because it
--- connects as the table owner, and Python keeps working through those policies.
--- The detection policies depend on this block only for enforcement: skip it and
--- the role is limited by its grants alone.
--- ---------------------------------------------------------------------
-DO $$
-DECLARE t record;
-BEGIN
-FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
-    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t.tablename);
-END LOOP;
-END $$;
+-- RLS is switched on by afterMigrate__enable_rls.sql, so each grant above also needs a policy
+CREATE POLICY detection_read ON zone           FOR SELECT TO steelsight_detection USING (true);
+CREATE POLICY detection_read ON camera         FOR SELECT TO steelsight_detection USING (true);
+CREATE POLICY detection_read ON ppe_vest       FOR SELECT TO steelsight_detection USING (true);
+CREATE POLICY detection_read ON shift          FOR SELECT TO steelsight_detection USING (true);
+CREATE POLICY detection_read ON app_user       FOR SELECT TO steelsight_detection USING (true);
+CREATE POLICY detection_read ON ppe_linking    FOR SELECT TO steelsight_detection USING (true);
+CREATE POLICY detection_add  ON ppe_linking    FOR INSERT TO steelsight_detection WITH CHECK (true);
+CREATE POLICY detection_edit ON ppe_linking    FOR UPDATE TO steelsight_detection USING (true) WITH CHECK (true);
+CREATE POLICY detection_read ON check_in       FOR SELECT TO steelsight_detection USING (true);
+CREATE POLICY detection_add  ON check_in       FOR INSERT TO steelsight_detection WITH CHECK (true);
+CREATE POLICY detection_edit ON check_in       FOR UPDATE TO steelsight_detection USING (true) WITH CHECK (true);
+CREATE POLICY detection_read ON violation      FOR SELECT TO steelsight_detection USING (true);
+CREATE POLICY detection_add  ON violation      FOR INSERT TO steelsight_detection WITH CHECK (true);
+CREATE POLICY detection_read ON face_embedding FOR SELECT TO steelsight_detection USING (true);
+CREATE POLICY detection_edit ON face_embedding FOR UPDATE TO steelsight_detection USING (true) WITH CHECK (true);

@@ -1,16 +1,15 @@
 package orochi.steelsight.scheduling.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import orochi.steelsight.model.IdentifiedModel;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "zone")
-public class Zone {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class Zone extends IdentifiedModel {
 
     @Column(nullable = false, unique = true)
     private String name;

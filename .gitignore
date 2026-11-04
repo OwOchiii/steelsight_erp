@@ -4,7 +4,6 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 .env
-src/main/resources/application.yaml
 
 ### STS ###
 .apt_generated
@@ -33,4 +32,3 @@ build/
 
 ### VS Code ###
 .vscode/
-src/main/resources/application.yaml

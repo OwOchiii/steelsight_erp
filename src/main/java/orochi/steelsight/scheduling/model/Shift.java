@@ -1,19 +1,24 @@
 package orochi.steelsight.scheduling.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.model.BaseModel;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 @Entity
 @Table(name = "shift")
 public class Shift extends BaseModel {
+
+    @Version
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
@@ -29,6 +34,7 @@ public class Shift extends BaseModel {
     @Column(name = "end_at", nullable = false)
     private OffsetDateTime endAt;
 
+    @Generated(event = {EventType.INSERT, EventType.UPDATE})
     @Column(name = "duration_hours", insertable = false, updatable = false)
     private BigDecimal durationHours;
 
