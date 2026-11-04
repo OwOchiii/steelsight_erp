@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('Shifts')}"></head>
 <body>
 <header th:replace="~{fragments/layout :: nav('shifts')}"></header>
-<main class="page">
+<main class="page wide">
     <div class="title-row">
         <h1>Shifts</h1>
-        <a class="btn" sec:authorize="hasAnyAuthority('SHIFT_UPDATE_TEAM', 'SHIFT_UPDATE_ALL')" th:href="@{/shifts/new}">New shift</a>
+        <a class="btn" th:if="${canPlan}" th:href="@{/shifts/new}">New shift</a>
     </div>
     <div th:replace="~{fragments/layout :: messages}"></div>
     <nav class="week-nav" aria-label="Week">
@@ -14,19 +14,42 @@
         <strong th:text="|${@display.date(monday)} to ${@display.date(sunday)}|">Week</strong>
         <a th:href="@{/shifts(week=${nextWeek})}">Next week</a>
     </nav>
-    <section th:each="day : ${days}">
-        <h2 th:text="${@display.date(day.date)}">Day</h2>
-        <p class="quiet" th:if="${day.shifts.isEmpty()}">No shifts.</p>
-        <ul class="rows" th:unless="${day.shifts.isEmpty()}">
-            <li th:each="shift : ${day.shifts}">
-                <a th:href="@{/shifts/{id}/edit(id=${shift.id})}">
-                    <strong th:text="${shift.user.fullName}">Name</strong>
-                    <span class="quiet" th:text="|${@display.time(shift.startAt)} to ${@display.time(shift.endAt)} (${@display.hours(shift.durationHours)} h), ${shift.zone.name}|">Time</span>
-                </a>
-                <span class="badge" th:classappend="${@display.badge(shift.status)}" th:text="${@display.label(shift.status)}">Status</span>
-            </li>
-        </ul>
-    </section>
+
+    <p class="empty" th:if="${rows.totalElements == 0}">Nobody is on your team yet. Ask an admin to add people.</p>
+    <div class="grid-scroll" tabindex="0" role="region" aria-label="Shifts by person and day" th:unless="${rows.isEmpty()}">
+        <table class="shift-grid">
+            <thead>
+            <tr>
+                <th scope="col">Person</th>
+                <th scope="col" th:each="day : ${days}" th:classappend="${day == today} ? 'today'" th:attr="aria-current=${day == today} ? 'date' : null">
+                    <span th:text="${@display.weekday(day)}">Mon</span>
+                    <span class="day-number" th:text="${@display.dayMonth(day)}">2 Nov</span>
+                </th>
+                <th scope="col">Hours</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="row : ${rows}">
+                <th scope="row">
+                    <span th:text="${row.worker.fullName}">Name</span>
+                    <span class="quiet" th:text="${row.worker.employeeCode}">Code</span>
+                </th>
+                <td th:each="cell : ${row.cells}" th:classappend="${cell.date == today} ? 'today'">
+                    <a class="shift-chip" th:each="shift : ${cell.shifts}" th:classappend="|chip-${shift.status.name().toLowerCase()}|" th:href="@{/shifts/{id}/edit(id=${shift.id})}">
+                        <strong th:text="|${@display.time(shift.startAt)} to ${@display.time(shift.endAt)}|">Time</strong>
+                        <span th:text="|(${@display.hours(shift.durationHours)} h) ${shift.zone.name}|">Zone</span>
+                        <span class="chip-status" th:unless="${shift.scheduled}" th:text="${@display.label(shift.status)}">Status</span>
+                    </a>
+                    <a class="add-shift" th:if="${canPlan and row.worker.active and cell.shifts.isEmpty()}"
+                       th:href="@{/shifts/new(workerId=${row.worker.id},date=${cell.date})}"
+                       th:attr="aria-label=|Add a shift for ${row.worker.fullName} on ${@display.date(cell.date)}|">+</a>
+                </td>
+                <td class="hours" th:text="${@display.hours(row.hours)}">40</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <nav th:replace="~{fragments/lists :: pager(${rows})}"></nav>
 </main>
 </body>
 </html>

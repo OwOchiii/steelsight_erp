@@ -77,7 +77,7 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
     }
 
     @Test
-    void weekShowsOnlyYourTeamAndNavigates() throws Exception {
+    void gridShowsOnlyYourTeamAndNavigates() throws Exception {
         shift(worker, zone, "timestamptz '2026-11-04 08:00+07'", "timestamptz '2026-11-04 16:00+07'");
         shift(outsider, zone, "timestamptz '2026-11-04 08:00+07'", "timestamptz '2026-11-04 16:00+07'");
 
@@ -85,24 +85,104 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Mon 2 Nov 2026 to Sun 8 Nov 2026")))
                 .andExpect(content().string(containsString("Wanda Worker")))
-                .andExpect(content().string(containsString("08:00 to 16:00 (8 h)")))
+                .andExpect(content().string(containsString("08:00 to 16:00")))
+                .andExpect(content().string(containsString("(8 h) Mgr Zone")))
                 .andExpect(content().string(not(containsString("Otto Outsider"))))
                 .andExpect(content().string(containsString("week=2026-10-26")))
                 .andExpect(content().string(containsString("week=2026-11-09")));
         mvc.perform(get("/shifts").param("week", "2026-11-09").with(as(manager)))
-                .andExpect(content().string(not(containsString("Wanda Worker"))));
+                .andExpect(content().string(not(containsString("08:00 to 16:00"))));
         mvc.perform(get("/shifts").param("week", "nonsense").with(as(manager)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void aMidnightShiftBelongsToTheWeekAndDayItStartsIn() throws Exception {
-        shift(worker, zone, "timestamptz '2026-11-09 00:00+07'", "timestamptz '2026-11-09 08:00+07'");
+    void aShiftAppearsUnderTheDayItStarts() throws Exception {
+        shift(worker, zone, "timestamptz '2026-11-04 08:00+07'", "timestamptz '2026-11-04 16:00+07'");
+
+        String page = mvc.perform(get("/shifts").param("week", "2026-11-02").with(as(manager)))
+                .andReturn().getResponse().getContentAsString();
+        String row = page.substring(page.indexOf("Wanda Worker"));
+
+        // Monday and Tuesday are empty, Wednesday has the shift, Thursday is empty again
+        assertThat(row).contains("date=2026-11-02", "date=2026-11-03", "date=2026-11-05");
+        assertThat(row).doesNotContain("date=2026-11-04");
+        assertThat(row.indexOf("date=2026-11-03")).isLessThan(row.indexOf("08:00 to 16:00"));
+        assertThat(row.indexOf("08:00 to 16:00")).isLessThan(row.indexOf("date=2026-11-05"));
+    }
+
+    @Test
+    void anOvernightShiftBelongsToTheDayItStartsAndAMidnightOneToTheNextWeek() throws Exception {
+        shift(worker, zone, "timestamptz '2026-11-08 22:00+07'", "timestamptz '2026-11-09 06:00+07'");
+        Long other = userWithRole("MGR-W3", "Nina Night", "WORKER");
+        joinTeam(other, jdbc.queryForObject("SELECT team_id FROM app_user WHERE id = ?", Long.class, worker));
+        shift(other, zone, "timestamptz '2026-11-09 00:00+07'", "timestamptz '2026-11-09 08:00+07'");
 
         mvc.perform(get("/shifts").param("week", "2026-11-02").with(as(manager)))
-                .andExpect(content().string(not(containsString("Wanda Worker"))));
+                .andExpect(content().string(containsString("22:00 to 06:00")))
+                .andExpect(content().string(not(containsString("00:00 to 08:00"))));
         mvc.perform(get("/shifts").param("week", "2026-11-09").with(as(manager)))
+                .andExpect(content().string(containsString("00:00 to 08:00")))
+                .andExpect(content().string(not(containsString("22:00 to 06:00"))));
+    }
+
+    @Test
+    void gridTotalsHoursWithoutCancelledShiftsAndMarksThem() throws Exception {
+        shift(worker, zone, "timestamptz '2026-11-02 08:00+07'", "timestamptz '2026-11-02 16:00+07'");
+        Long cancelled = shift(worker, zone, "timestamptz '2026-11-03 08:00+07'", "timestamptz '2026-11-03 18:00+07'");
+        jdbc.update("UPDATE shift SET status = 'CANCELLED' WHERE id = ?", cancelled);
+
+        mvc.perform(get("/shifts").param("week", "2026-11-02").with(as(manager)))
+                .andExpect(content().string(containsString("chip-cancelled")))
+                .andExpect(content().string(containsString("<td class=\"hours\">8</td>")));
+    }
+
+    @Test
+    void aDeactivatedWorkerKeepsTheirRowButCannotGetNewShifts() throws Exception {
+        shift(worker, zone, "timestamptz '2026-11-02 08:00+07'", "timestamptz '2026-11-02 16:00+07'");
+        jdbc.update("UPDATE app_user SET is_active = false WHERE id = ?", worker);
+
+        mvc.perform(get("/shifts").param("week", "2026-11-02").with(as(manager)))
+                .andExpect(content().string(containsString("Wanda Worker")))
+                .andExpect(content().string(not(containsString("workerId=" + worker))));
+        mvc.perform(get("/shifts").param("week", "2026-11-09").with(as(manager)))
+                .andExpect(content().string(not(containsString("Wanda Worker"))));
+    }
+
+    @Test
+    void anEmptyCellOpensTheFormWithItsWorkerAndDate() throws Exception {
+        mvc.perform(get("/shifts/new").param("workerId", worker.toString()).param("date", "2026-11-10").with(as(manager)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("2026-11-10T08:00")))
+                .andExpect(content().string(containsString("2026-11-10T17:00")));
+        mvc.perform(get("/shifts/new").param("date", "nonsense").with(as(manager)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aLongGridIsPagedAndKeepsItsWeek() throws Exception {
+        Long team = jdbc.queryForObject("SELECT team_id FROM app_user WHERE id = ?", Long.class, worker);
+        for (int i = 1; i <= 20; i++) {
+            joinTeam(userWithRole("MGR-G" + i, "Grid Person " + i, "WORKER"), team);
+        }
+
+        mvc.perform(get("/shifts?week=2026-11-02").with(as(manager)))
+                .andExpect(content().string(containsString("Page 1 of 2")))
+                .andExpect(content().string(containsString("week=2026-11-02&amp;page=1")));
+        mvc.perform(get("/shifts?week=2026-11-02&page=1").with(as(manager)))
                 .andExpect(content().string(containsString("Wanda Worker")));
+        mvc.perform(get("/shifts?week=2026-11-02&page=9").with(as(manager)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void aManagerWithNoPeopleSeesAMessageInsteadOfAnEmptyGrid() throws Exception {
+        Long lonely = userWithRole("MGR-M3", "Lone Manager", "MANAGER");
+
+        mvc.perform(get("/shifts").with(as(lonely)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Nobody is on your team yet")))
+                .andExpect(content().string(not(containsString("shift-grid"))));
     }
 
     @Test

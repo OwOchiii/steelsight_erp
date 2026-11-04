@@ -94,3 +94,33 @@ input, select, textarea { width: 100%; padding: 10px 12px; font: inherit; color:
 .setting { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
 .setting input { width: 100px; }
 .setting .btn { margin-top: 0; }
+
+/* Shift grid */
+.page.wide { max-width: 1240px; }
+.week-nav { margin-bottom: 16px; }
+.grid-scroll { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+.shift-grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.shift-grid th, .shift-grid td { padding: 8px; vertical-align: top; text-align: left; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+.shift-grid tbody tr:last-child > * { border-bottom: 0; }
+.shift-grid tr > :last-child { border-right: 0; }
+.shift-grid thead th { font-weight: 600; white-space: nowrap; }
+.shift-grid th span { display: block; }
+.shift-grid .day-number { font-weight: 400; color: var(--quiet); }
+.shift-grid tbody th { width: 150px; font-weight: 600; overflow-wrap: anywhere; }
+.shift-grid th:first-child { position: sticky; left: 0; z-index: 1; background: var(--card); }
+.shift-grid .today { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+.shift-grid .hours { text-align: right; font-variant-numeric: tabular-nums; }
+.shift-grid td:not(.hours) { min-width: 136px; }
+.shift-chip { display: block; padding: 4px 6px; text-decoration: none; border-left: 3px solid var(--accent); border-radius: 4px; background: var(--ground); }
+.shift-chip strong { white-space: nowrap; }
+.shift-chip + .shift-chip { margin-top: 4px; }
+.shift-chip:hover strong { text-decoration: underline; }
+.shift-chip strong, .shift-chip span { display: block; }
+.chip-completed { border-left-color: var(--good); }
+.chip-cancelled { border-left-color: var(--line); color: var(--quiet); }
+.chip-cancelled strong { text-decoration: line-through; }
+.chip-status { font-weight: 600; }
+.add-shift { display: block; min-height: 32px; line-height: 32px; text-align: center; color: var(--quiet); text-decoration: none; border: 1px dashed transparent; border-radius: 4px; }
+.add-shift:hover, .add-shift:focus { color: var(--accent); border-color: var(--accent); }
+.shift-grid tbody th .quiet { white-space: nowrap; }
+@media (max-width: 639px) { .shift-grid tbody th { width: 104px; min-width: 104px; max-width: 104px; } }

@@ -13,12 +13,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import orochi.steelsight.identity.model.AppUser;
+import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.identity.service.UserService;
 import orochi.steelsight.scheduling.model.Shift;
 import orochi.steelsight.scheduling.service.ShiftService;
 import orochi.steelsight.security.AuthenticatedUser;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -27,8 +30,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ShiftController extends PageController {
 
-    public record Day(LocalDate date, List<Shift> shifts) {
-    }
+    private static final LocalTime USUAL_START = LocalTime.of(8, 0);
+    private static final LocalTime USUAL_END = LocalTime.of(17, 0);
 
     private final ShiftService shifts;
     private final UserService users;
@@ -37,25 +40,36 @@ public class ShiftController extends PageController {
     @GetMapping("/shifts")
     public String week(@AuthenticationPrincipal AuthenticatedUser user,
                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week,
-                       Model model) {
+                       @RequestParam(defaultValue = "0") int page, Model model) {
         LocalDate monday = siteTime.mondayOf(week == null ? siteTime.today() : week);
+        List<LocalDate> days = monday.datesUntil(monday.plusWeeks(1)).toList();
         List<Shift> planned = shifts.listManaged(user.getUserId(), siteTime.startOf(monday), siteTime.startOf(monday.plusWeeks(1)));
+        boolean canPlan = user.can(Permissions.SHIFT_UPDATE_TEAM) || user.can(Permissions.SHIFT_UPDATE_ALL);
+        List<AppUser> workers = canPlan ? users.listShiftWorkers(user.getUserId()) : List.of();
+
         model.addAttribute("monday", monday);
         model.addAttribute("sunday", monday.plusDays(6));
         model.addAttribute("previousWeek", monday.minusWeeks(1));
         model.addAttribute("nextWeek", monday.plusWeeks(1));
-        model.addAttribute("days", monday.datesUntil(monday.plusWeeks(1))
-                .map(date -> new Day(date, planned.stream()
-                        .filter(shift -> siteTime.dateOf(shift.getStartAt()).equals(date)).toList()))
-                .toList());
+        model.addAttribute("today", siteTime.today());
+        model.addAttribute("days", days);
+        model.addAttribute("canPlan", canPlan);
+        model.addAttribute("rows", pageOf(ShiftGrid.rows(workers, planned, days, siteTime), page));
         return "shifts/week";
     }
 
+    /** A date comes from an empty cell of the grid, and fills in the usual 08:00 to 17:00 to edit from. */
     @GetMapping("/shifts/new")
     public String newShift(@AuthenticationPrincipal AuthenticatedUser user,
-                           @RequestParam(required = false) Long workerId, Model model) {
+                           @RequestParam(required = false) Long workerId,
+                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                           Model model) {
         ShiftForm form = new ShiftForm();
         form.setWorkerId(workerId);
+        if (date != null) {
+            form.setStartAt(date.atTime(USUAL_START));
+            form.setEndAt(date.atTime(USUAL_END));
+        }
         model.addAttribute("form", form);
         return showForm(user, model);
     }

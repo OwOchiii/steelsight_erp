@@ -18,6 +18,8 @@ import java.util.Locale;
 public class Display {
 
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.ENGLISH);
+    private static final DateTimeFormatter WEEKDAY = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH);
+    private static final DateTimeFormatter DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH);
 
     private final SiteTime siteTime;
@@ -28,6 +30,16 @@ public class Display {
 
     public String date(LocalDate value) {
         return value == null ? "" : DATE.format(value);
+    }
+
+    /** "Mon", for the head of a schedule column. */
+    public String weekday(LocalDate value) {
+        return WEEKDAY.format(value);
+    }
+
+    /** "2 Nov", for the head of a schedule column. */
+    public String dayMonth(LocalDate value) {
+        return DAY_MONTH.format(value);
     }
 
     public String time(OffsetDateTime value) {

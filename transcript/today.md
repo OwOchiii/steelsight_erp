@@ -2,7 +2,7 @@
 
 The conversation between the developer and Claude Code on the Steelsight ERP, across two sessions.
 Only the typed messages and replies are here. Tool calls, command output and automated notices are left out.
-Times are UTC+7. This file ends at the message asking for it to be committed, so that answer is not included.
+Times are UTC+7. This file ends at the latest update, so the newest answer may not be included.
 
 ## 13:57 Developer
 
@@ -824,3 +824,103 @@ Is there no schedule table for the admin and likely for the other role of manage
 ## 22:35 Claude
 
 The sample data is loaded. Now I'll sign in as each role and check the pages show it correctly.
+
+## 22:38 Claude
+
+There is a schedule, but it's a list grouped by day, not a calendar-style table. The sample data and both logs are committed as `0ce8d08`.
+
+## Schedule
+The schedule is stored in the `shift` table, and each role already has a page for it:
+
+| Role | Page | What it shows |
+|---|---|---|
+| Admin | Shifts (`/shifts`) | Everyone's shifts, one week at a time |
+| Manager | Shifts (`/shifts`) | Their own teams' shifts, one week at a time, plus their own on Timetable |
+| Worker and HSE | Timetable (`/timetable`) | Their own upcoming and past shifts |
+
+If by "schedule table" you mean a grid with workers down the side and days across the top, that isn't built. I'd add it, because it's much easier to spot gaps and plan a week that way. It would need no database changes, and I'd make it the view on the Shifts page. Workers could keep their simple list, which suits a phone better.
+
+## Sample data
+It's loaded into your local database. Sign in with these employee codes, using your `ADMIN_PASSWORD` for all of them:
+
+| Code | Role | Try |
+|---|---|---|
+| `ADMIN` | Admin | Every page, across all teams |
+| `HSE01` | HSE officer | Two disputes to decide, 23 violations with no worker (enough to test paging), the safety ticket queue |
+| `MGR01` | Manager, Team A (late after 15 min) | Week of shifts, attendance tags, Shift and Equipment tickets |
+| `MGR02` | Manager, Team B (late after 30 min) | The same pages with a different threshold, including both tags on `WRK04`'s visit |
+| `WRK01` | Worker | Timetable, own violations and tickets |
+
+- **Other accounts:** `HSE02` and `WRK02`–`WRK05` also work. `WRK06` is inactive, so it can't sign in.
+- **Already checked:** every account above signed in and its main pages showed the right data, with no errors in the log. I checked this with scripted requests, so the layout is still unchecked in a browser.
+- **Reloading on a fresh database:** the command is at the top of `scripts/dev-sample-data.sql`. Dates count from the day you load it, so reload on a fresh database to get a current week. It only runs on `steelsight_local` and refuses to run twice.
+
+## Logs
+Both are updated and committed. I kept your filename, `transcript/today.md`. It ends at your last message, because this reply didn't exist when I generated it, and `ai-log.md` has the same cutoff.
+
+## Still open
+- **`application.yaml`:** your password default is still there as an uncommitted change. I left it out of every commit, so run `git restore src/main/resources/application.yaml` to remove it.
+- **Pushing:** nothing from today's commits is on GitHub yet.
+- **Transcript:** it quotes your messages word for word, so read it before sharing.
+
+Should I build the grid view next?
+
+## 22:39 Developer
+
+yeah build the grid view
+
+## 22:39 Claude
+
+I'm starting on the grid: workers down the side, Monday to Sunday across the top. I'll also retry the browser install in the background without the step that failed last time, since a grid is hard to judge without seeing it.
+
+## 22:42 Claude
+
+The browser works this time, so I can finally see the pages, not just the grid. I'm capturing the main pages for each role, on desktop and phone.
+
+## 22:44 Claude
+
+The week I tested is fully booked for that team, so there were no empty cells to click. That's the sample data, not a bug, so I'll use an empty week for that check.
+
+## 22:45 Claude
+
+Seeing it paid off. Desktop and dark mode look good, but on a phone the name column takes up too much width and "Completed" breaks into "Complete d". I'm fixing that and rechecking on a phone.
+
+## 22:46 Claude
+
+The phone layout is much better, but employee codes still wrap ("WRK0 / 1"). I'll fix that once the tests finish, so I'm not changing files while they run.
+
+## 22:50 Claude
+
+The grid view is built and working on the Shifts page for managers and admins, but it isn't committed yet. I last ran the full suite, 149 tests passing, just before one small phone CSS fix, then rechecked that fix with a screenshot. The browser also works now, so I've finally seen the pages.
+
+Your app is still running on port 8080, started about 24 minutes ago, so **restart it to see the grid**. My test runs used a different port and didn't touch it.
+
+## What the grid does
+- **Layout:** people down the side, Monday to Sunday across the top, with today highlighted and previous/next week links.
+- **Shifts:** each cell shows the time, length and zone. Click a shift to edit it. Completed shifts are marked, and cancelled ones are struck through.
+- **Hours:** the last column totals each person's week, leaving out cancelled shifts.
+- **Adding a shift:** the `+` in an empty cell opens the form with that person and date filled in, set to 08:00–17:00, which you can change.
+- **Who appears:**
+  - Managers see their own teams, and admins see everyone, including HSE and managers, who can have shifts too.
+  - Someone deactivated still appears if they have a shift that week, but gets no `+`.
+- **Long lists:** 20 people per page, and changing page keeps the week.
+- **Workers and HSE:** they keep the simple Timetable list, which suits a phone better.
+
+A night shift appears on the day it starts. A cell with a shift has no `+`, so use New shift to add a second shift that day.
+
+## What the screenshots showed
+I checked the main pages for each role on desktop and phone, and the grid in dark mode too. No page scrolled sideways, and the grid scrolls inside its own box on a phone with names staying in view.
+
+They caught two phone bugs the tests couldn't, both fixed: "Completed" splitting into "Complete d", and employee codes wrapping to "WRK0 / 1".
+
+Your sample data fills this whole week for every worker, so to see the `+` cells click **Next week**. Admins also see `+` cells this week, on the HSE and manager rows.
+
+## Uncommitted
+- **Grid and logs:** the grid code, tests, `chatlog/ai-log.md` and `transcript/today.md`.
+- **`application.yaml`:** your password default is still there. I'd keep it out of the commit, and `git restore src/main/resources/application.yaml` removes it.
+
+Should I commit the grid and logs?
+
+## 22:59 Developer
+
+commit it

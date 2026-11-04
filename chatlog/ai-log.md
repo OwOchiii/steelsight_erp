@@ -24,6 +24,7 @@ Times are UTC+7.
 | 22:02 | Decide on DTOs and create these logs | Advice to skip full output DTOs for now, this log and the transcript | Logs commit |
 | 22:07 | Fix the database password error when starting the app | Local `steelsight-db` Docker database on port 55433, and `.env` pointed at it | Not in git |
 | 22:33 | Add sample data, keep the logs up to date, and commit | `scripts/dev-sample-data.sql`, loaded locally and checked for each role | Logs commit |
+| 22:39 | Build a schedule grid | Shifts page shows people by day, with weekly hours and add-shift cells; screenshots checked on desktop and phone | Grid commit |
 
 ## Decisions made by the developer
 
@@ -52,7 +53,8 @@ Times are UTC+7.
 - The full suite last ran on `14e030d` before one database check was fixed: 143 tests passed against a real PostgreSQL with pgvector. That check was then rerun on its own and passed.
 - 39 checks of the HSE and manager flows ran against the running app before commit `9d5f3d2`.
 - Sample accounts for each role signed in, and their pages showed the sample data, including the late and early tags and paging. The inactive account was refused.
-- Nobody has checked the page layout in a browser yet, because the browser install failed.
+- The full suite passed with 149 tests while building the grid; only a CSS change for phones came after it.
+- Main HSE, manager, admin and worker pages were screenshotted in a real browser on desktop and phone, and the grid in dark mode too. No page scrolled sideways. The check found two phone problems in the grid, both fixed.
 
 ## Problems during the work
 
@@ -60,7 +62,7 @@ Times are UTC+7.
 |---|---|
 | Flyway deadlocked while enabling row level security | Moved to `afterMigrate__enable_rls.sql`, with a test that every table has it |
 | Long test runs in the foreground blocked the developer's shell | Later runs went in the background |
-| A headless browser install failed | Replaced with scripted HTTP checks |
+| A headless browser install failed | Used scripted HTTP checks, then a later install without system packages worked |
 | Port 5433 was already taken on Windows, so the database container could not start | Moved to port 55433 |
 | An older database check depended on the time of day after the auto-close change | Fixed before the commit was finalised |
 
@@ -68,7 +70,6 @@ Times are UTC+7.
 
 - Show the camera image once Supabase Storage is added.
 - The detection service must call `close_stale_check_ins()` and set `shift_id` on check-ins.
-- Schedules are lists grouped by day. A calendar grid has not been built.
 - The password default in `application.yaml` is a local change that was left out of every commit.
 - No-shows don't appear on the Attendance page.
 - A worker who leaves and returns mid-shift gets "early" on the first visit and "late" on the second.

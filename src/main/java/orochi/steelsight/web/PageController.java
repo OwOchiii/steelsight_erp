@@ -1,6 +1,8 @@
 package orochi.steelsight.web;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.ui.Model;
@@ -8,6 +10,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import orochi.steelsight.exception.BusinessRuleException;
 
+import java.util.List;
 import java.util.function.Supplier;
 
 /** The two ways a page handles a rule the user broke. Other failures go to PageExceptionHandler. */
@@ -18,6 +21,14 @@ abstract class PageController {
     /** A list page from the page number in the URL, which starts at 0. */
     protected Pageable pageOf(int number) {
         return PageRequest.of(Math.max(number, 0), PAGE_SIZE);
+    }
+
+    /** One page of a list that is already in memory, for rows built by the page itself. */
+    protected <T> Page<T> pageOf(List<T> rows, int number) {
+        Pageable page = pageOf(number);
+        int from = (int) Math.min(page.getOffset(), rows.size());
+        int to = Math.min(from + page.getPageSize(), rows.size());
+        return new PageImpl<>(rows.subList(from, to), page, rows.size());
     }
 
     /** For a button: runs the action, then goes to the target page with a message saying how it went. */
