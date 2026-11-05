@@ -1,0 +1,44 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{safetyShifts.title}, 'safetyShifts', ~{::main})}">
+<main class="page medium">
+    <div class="page-head">
+        <div>
+            <h1 th:text="#{safetyShifts.title}">Safety by shift</h1>
+            <p class="page-sub" th:text="#{safetyShifts.hint}">How to read this page</p>
+        </div>
+    </div>
+    <nav class="week-nav" th:attr="aria-label=#{shifts.week}">
+        <a class="week-link" th:href="@{/safety/shifts(week=${previousWeek})}"><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#chevron-left}"/></svg><span th:text="#{shifts.previousWeek}">Previous week</span></a>
+        <strong th:text="#{shifts.weekRange(${@display.date(monday)}, ${@display.date(sunday)})}">Week</strong>
+        <a class="week-link" th:href="@{/safety/shifts(week=${nextWeek})}"><span th:text="#{shifts.nextWeek}">Next week</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#chevron-right}"/></svg></a>
+    </nav>
+    <section class="panel">
+        <p class="empty" th:if="${slots.isEmpty()}" th:text="#{safetyShifts.none}">No shifts have started in this week.</p>
+        <div class="table-wrap" th:unless="${slots.isEmpty()}">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{safetyShifts.slot}">Time slot</th>
+                    <th scope="col" class="hidden sm:table-cell" th:text="#{safetyShifts.workers}">Workers</th>
+                    <th scope="col" class="hidden md:table-cell" th:text="#{safetyShifts.hours}">Worker-hours</th>
+                    <th scope="col" th:text="#{safetyShifts.violations}">Violations</th>
+                    <th scope="col" th:text="#{safetyShifts.rate}">Per 100 worker-hours</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="slot : ${slots}">
+                    <td>
+                        <span class="row-title" th:text="${@display.date(slot.startAt)}">Date</span>
+                        <span class="row-sub" th:text="#{common.timeRange(${@display.time(slot.startAt)}, ${@display.time(slot.endAt)})}">Time</span>
+                    </td>
+                    <td class="hidden sm:table-cell" th:text="${slot.workers}">3</td>
+                    <td class="hidden md:table-cell" th:text="${@display.hours(slot.workerHours)}">24</td>
+                    <td th:text="${slot.violations}">1</td>
+                    <td th:text="${@display.hours(slot.per100Hours)}">4</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+</html>

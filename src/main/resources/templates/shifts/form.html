@@ -1,63 +1,65 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head(${shift} ? 'Edit shift' : 'New shift')}"></head>
-<body>
-<header th:replace="~{fragments/layout :: nav('shifts')}"></header>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(${shift} ? #{shifts.edit} : #{shifts.new}, 'shifts', ~{::main})}">
 <main class="page narrow">
-    <a class="back" th:href="@{/shifts}">Back to shifts</a>
-    <div class="title-row">
-        <h1 th:text="${shift} ? 'Shift' : 'New shift'">Shift</h1>
+    <nav class="crumbs"><a th:href="@{/shifts}" th:text="#{shifts.title}">Shifts</a></nav>
+    <div class="page-head">
+        <h1 th:text="${shift} ? #{shifts.one} : #{shifts.new}">Shift</h1>
         <span class="badge" th:if="${shift}" th:classappend="${@display.badge(shift.status)}" th:text="${@display.label(shift.status)}">Status</span>
     </div>
     <div th:replace="~{fragments/layout :: messages}"></div>
 
-    <th:block th:if="${shift != null and !shift.scheduled}">
+    <section class="sheet" th:if="${shift != null and !shift.scheduled}">
         <dl class="facts">
-            <dt>Worker</dt><dd th:text="${shift.user.fullName}">Name</dd>
-            <dt>Zone</dt><dd th:text="${shift.zone.name}">Zone</dd>
-            <dt>Time</dt><dd th:text="|${@display.dateTime(shift.startAt)} to ${@display.time(shift.endAt)}|">Time</dd>
+            <dt th:text="#{field.worker}">Worker</dt><dd th:text="${shift.user.fullName}">Name</dd>
+            <dt th:text="#{field.zone}">Zone</dt><dd th:text="${shift.zone.name}">Zone</dd>
+            <dt th:text="#{field.time}">Time</dt><dd th:text="#{common.timeRange(${@display.dateTime(shift.startAt)}, ${@display.time(shift.endAt)})}">Time</dd>
         </dl>
-        <p class="quiet">A finished or cancelled shift can't be changed.</p>
-    </th:block>
+        <p class="quiet divider" th:text="#{shifts.locked}">A finished or cancelled shift can't be changed.</p>
+    </section>
 
     <th:block th:if="${shift == null or shift.scheduled}">
-        <p class="empty" th:if="${workers.isEmpty()}">Nobody is on your team yet. Ask an admin to add people.</p>
-        <form method="post" th:action="${shift} ? @{/shifts/{id}(id=${shift.id})} : @{/shifts}" th:object="${form}">
+        <p class="notice" th:if="${workers.isEmpty()}" th:text="#{team.nobody}">Nobody is on your team yet. Ask an admin to add people.</p>
+        <form class="sheet" method="post" th:action="${shift} ? @{/shifts/{id}(id=${shift.id})} : @{/shifts}" th:object="${form}">
             <input type="hidden" th:field="*{version}">
-            <label for="workerId">Worker</label>
-            <select id="workerId" th:field="*{workerId}" required>
-                <option value="">Choose a worker</option>
-                <option th:each="worker : ${workers}" th:value="${worker.id}" th:text="|${worker.fullName} (${worker.employeeCode})|">Name</option>
-            </select>
-
-            <label for="zoneId">Zone</label>
-            <select id="zoneId" th:field="*{zoneId}" required>
-                <option value="">Choose a zone</option>
-                <option th:each="zone : ${zones}" th:value="${zone.id}" th:text="${zone.name}">Zone</option>
-            </select>
-
-            <label for="startAt">Starts</label>
-            <input id="startAt" type="datetime-local" th:field="*{startAt}" required>
-
-            <label for="endAt">Ends</label>
-            <input id="endAt" type="datetime-local" th:field="*{endAt}" required>
-
-            <button type="submit" class="btn" th:text="${shift} ? 'Save shift' : 'Add shift'">Save</button>
+            <div class="grid gap-x-4 sm:grid-cols-2">
+                <div>
+                    <label class="mt-0!" for="workerId" th:text="#{field.worker}">Worker</label>
+                    <select id="workerId" th:field="*{workerId}" required>
+                        <option value="" th:text="#{common.chooseWorker}">Choose a worker</option>
+                        <option th:each="worker : ${workers}" th:value="${worker.id}" th:text="|${worker.fullName} (${worker.employeeCode})|">Name</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="max-sm:mt-3.5 sm:mt-0!" for="zoneId" th:text="#{field.zone}">Zone</label>
+                    <select id="zoneId" th:field="*{zoneId}" required>
+                        <option value="" th:text="#{common.chooseZone}">Choose a zone</option>
+                        <option th:each="zone : ${zones}" th:value="${zone.id}" th:text="${zone.name}">Zone</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="startAt" th:text="#{shifts.starts}">Starts</label>
+                    <input id="startAt" type="datetime-local" th:field="*{startAt}" required>
+                </div>
+                <div>
+                    <label for="endAt" th:text="#{shifts.ends}">Ends</label>
+                    <input id="endAt" type="datetime-local" th:field="*{endAt}" required>
+                </div>
+            </div>
+            <div class="actions"><button type="submit" class="btn" th:text="${shift} ? #{shifts.save} : #{shifts.add}">Save</button></div>
         </form>
 
-        <section class="panel spaced" th:if="${shift}">
-            <h2>Finish this shift</h2>
-            <p class="quiet">This can't be undone. The worker sees the change on their timetable.</p>
+        <section class="sheet mt-4" th:if="${shift}">
+            <h2 class="mb-1" th:text="#{shifts.finish}">Finish this shift</h2>
+            <p class="quiet" th:text="#{shifts.finishHint}">This can't be undone. The worker sees the change on their timetable.</p>
             <div class="actions">
                 <form method="post" th:if="${started}" th:action="@{/shifts/{id}/complete(id=${shift.id})}">
-                    <button type="submit" class="btn secondary">Mark completed</button>
+                    <button type="submit" class="btn secondary" th:text="#{shifts.markCompleted}">Mark completed</button>
                 </form>
                 <form method="post" th:action="@{/shifts/{id}/cancel(id=${shift.id})}">
-                    <button type="submit" class="btn secondary">Cancel shift</button>
+                    <button type="submit" class="btn danger" th:text="#{shifts.cancel}">Cancel shift</button>
                 </form>
             </div>
         </section>
     </th:block>
 </main>
-</body>
 </html>

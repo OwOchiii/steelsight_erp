@@ -60,11 +60,12 @@ class PagesIntegrationTest extends PageTestSupport {
 
     @Test
     void timetableShowsOnlyYourOwnShifts() throws Exception {
-        shift(worker, "now() + interval '1 day'", "now() + interval '1 day 8 hours'");
-        shift(otherWorker, "now() + interval '2 days'", "now() + interval '2 days 2 hours'");
+        shift(worker, "timestamptz '2026-11-04 08:00+07'", "timestamptz '2026-11-04 16:00+07'");
+        shift(otherWorker, "timestamptz '2026-11-05 08:00+07'", "timestamptz '2026-11-05 10:00+07'");
 
-        mvc.perform(get("/timetable").with(as(worker)))
+        mvc.perform(get("/timetable").param("week", "2026-11-04").with(as(worker)))
                 .andExpect(status().isOk())
+                .andExpect(content().string(containsString("shift-grid personal")))
                 .andExpect(content().string(containsString("(8 h)")))
                 .andExpect(content().string(not(containsString("(2 h)"))));
     }

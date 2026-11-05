@@ -1,19 +1,13 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('Ticket queue')}"></head>
-<body>
-<header th:replace="~{fragments/layout :: nav('queue')}"></header>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{queue.title}, 'queue', ~{::main})}">
 <main class="page">
-    <h1>Ticket queue</h1>
-    <nav class="tabs" aria-label="Ticket status">
-        <a th:href="@{/tickets/queue}" th:attr="aria-current=${resolved} ? null : 'page'">To handle</a>
-        <a th:href="@{/tickets/queue(resolved=true)}" th:attr="aria-current=${resolved} ? 'page' : null">Resolved</a>
+    <div class="page-head"><h1 th:text="#{queue.title}">Ticket queue</h1></div>
+    <nav class="tabs" th:attr="aria-label=#{queue.tabs}">
+        <a th:href="@{/tickets/queue}" th:attr="aria-current=${resolved} ? null : 'page'" th:text="#{queue.toHandle}">To handle</a>
+        <a th:href="@{/tickets/queue(resolved=true)}" th:attr="aria-current=${resolved} ? 'page' : null" th:text="#{queue.resolved}">Resolved</a>
     </nav>
-    <p class="empty" th:if="${tickets.totalElements == 0}" th:text="${resolved} ? 'No resolved tickets yet.' : 'Nothing to handle right now.'">Empty</p>
-    <th:block th:unless="${tickets.isEmpty()}">
-        <ul th:replace="~{fragments/lists :: tickets(${tickets}, true)}"></ul>
-        </th:block>
+    <p class="empty panel-less-empty" th:if="${tickets.totalElements == 0}" th:text="${resolved} ? #{queue.emptyResolved} : #{queue.emptyOpen}">Empty</p>
+    <th:block th:unless="${tickets.isEmpty()}"><div th:replace="~{fragments/lists :: tickets(${tickets}, true)}"></div></th:block>
     <nav th:replace="~{fragments/lists :: pager(${tickets})}"></nav>
 </main>
-</body>
 </html>

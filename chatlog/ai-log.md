@@ -1,6 +1,6 @@
 # AI usage log
 
-How AI was used on the Steelsight ERP. The full conversation is in [transcript/today.md](../transcript/today.md).
+How AI was used on the Steelsight ERP. The full conversation is in [transcript/today.md](../transcript/4-11-2026.md).
 
 | | |
 |---|---|

@@ -75,6 +75,26 @@ public class CheckInService {
         return visits.map(rules::assess);
     }
 
+    /** One worker's latest visits, for anyone who can look at every worker. */
+    @Transactional(readOnly = true)
+    public Page<VisitStatus> listRecentOf(Long actorId, Long workerId, Pageable page) {
+        access.require(actorId, Permissions.USER_READ_ALL);
+        return checkIns.findAllByUserIdOrderByCheckInAtDescIdDesc(workerId, page).map(rules::assess);
+    }
+
+    /** Visits that began in this period, as far as this user may see. */
+    @Transactional(readOnly = true)
+    public List<VisitStatus> listStartedInScope(Long actorId, OffsetDateTime from, OffsetDateTime to) {
+        List<CheckIn> visits;
+        if (access.has(actorId, Permissions.CHECKIN_READ_ALL)) {
+            visits = checkIns.findAllByCheckInAtGreaterThanEqualAndCheckInAtLessThan(from, to);
+        } else {
+            access.require(actorId, Permissions.CHECKIN_READ_TEAM);
+            visits = checkIns.findTeamStartedIn(actorId, from, to);
+        }
+        return visits.stream().map(rules::assess).toList();
+    }
+
     private Page<CheckIn> teamVisits(Long actorId, Supplier<Page<CheckIn>> query) {
         access.require(actorId, Permissions.CHECKIN_READ_TEAM);
         return query.get();

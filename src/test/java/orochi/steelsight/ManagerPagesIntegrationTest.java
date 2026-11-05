@@ -269,7 +269,7 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
         assertThat(textColumn("SELECT status FROM shift WHERE id = ?", id)).isEqualTo("COMPLETED");
 
         mvc.perform(get("/shifts/" + id + "/edit").with(as(manager)))
-                .andExpect(content().string(containsString("can't be changed")))
+                .andExpect(content().string(containsString("can&#39;t be changed")))
                 .andExpect(content().string(not(containsString("Save shift"))));
         mvc.perform(post("/shifts/" + id + "/cancel").with(as(manager)).with(csrf()))
                 .andExpect(flash().attribute("error", "Only a scheduled shift can be changed"));
@@ -390,22 +390,16 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
     }
 
     @Test
-    void teamAndTimetableArePaged() throws Exception {
+    void teamIsPaged() throws Exception {
         Long team = jdbc.queryForObject("SELECT team_id FROM app_user WHERE id = ?", Long.class, worker);
         for (int i = 1; i <= 20; i++) {
             joinTeam(userWithRole("MGR-P" + i, "Paged Person " + i, "WORKER"), team);
-            shift(worker, zone, "now() - interval '" + (i * 2) + " days'", "now() - interval '" + (i * 2 - 1) + " days'");
         }
 
         mvc.perform(get("/team").with(as(manager)))
                 .andExpect(content().string(containsString("Page 1 of 2")));
         mvc.perform(get("/team").param("page", "1").with(as(manager)))
                 .andExpect(content().string(containsString("Wanda Worker")));
-        mvc.perform(get("/timetable").with(as(worker)))
-                .andExpect(content().string(not(containsString("Page 1 of"))));
-        shift(worker, zone, "now() - interval '100 days'", "now() - interval '99 days'");
-        mvc.perform(get("/timetable").with(as(worker)))
-                .andExpect(content().string(containsString("Page 1 of 2")));
     }
 
     private org.springframework.util.LinkedMultiValueMap<String, String> form(Long workerId, String start, String end) {

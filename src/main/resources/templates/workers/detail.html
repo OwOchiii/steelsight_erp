@@ -1,0 +1,79 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{fragments/layout :: app(${worker.fullName}, 'workers', ~{::main})}">
+<main class="page medium">
+    <div class="page-head">
+        <div>
+            <h1 th:text="${worker.fullName}">Name</h1>
+            <p class="page-sub"><a th:href="@{/workers}" th:text="#{workers.back}">All workers</a></p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a class="btn secondary" th:if="${canPlan}" th:href="@{/shifts/new(workerId=${worker.id})}" th:text="#{team.addShift}">Add shift</a>
+            <a class="btn secondary" th:if="${canEdit}" th:href="@{/team/{id}/edit(id=${worker.id})}" th:text="#{common.edit}">Edit</a>
+        </div>
+    </div>
+
+    <section class="panel mb-4">
+        <div class="panel-head">
+            <h2 th:text="#{workers.profile}">Details</h2>
+            <span class="badge" th:classappend="${@display.badge(safety.level)}" th:text="#{safety.scoreLine(${safety.value})}">Safety score</span>
+        </div>
+        <div class="panel-body">
+            <p th:text="${worker.employeeCode}">Code</p>
+            <span class="badge" th:unless="${worker.active}" th:text="#{team.inactive}">Inactive</span>
+            <p th:text="${worker.team != null} ? ${worker.team.name} : #{workers.noTeam}">Team</p>
+            <p th:if="${worker.email}" th:text="${worker.email}">Email</p>
+            <p th:if="${worker.phoneNumber}" th:text="${worker.phoneNumber}">Phone</p>
+        </div>
+    </section>
+
+    <section class="panel mb-4">
+        <div class="panel-head"><h2 th:text="#{workers.thisMonth}">Violations this month</h2></div>
+        <p class="empty" th:if="${violations.isEmpty()}" th:text="#{workers.noViolations}">No violations this month.</p>
+        <div class="table-wrap" th:unless="${violations.isEmpty()}">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{field.violation}">Violation</th>
+                    <th scope="col" th:text="#{field.detected}">Detected</th>
+                    <th scope="col" th:text="#{field.dispute}">Dispute</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="violation : ${violations}">
+                    <td>
+                        <a class="row-title" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/{id}(id=${violation.id})}" th:text="${@display.label(violation.violationType)}">Type</a>
+                        <span class="row-title" sec:authorize="!hasAuthority('VIOLATION_READ_ALL')" th:text="${@display.label(violation.violationType)}">Type</span>
+                    </td>
+                    <td class="whitespace-nowrap" th:text="${@display.dateTime(violation.detectedAt)}">When</td>
+                    <td><span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel mb-4">
+        <div class="panel-head"><h2 th:text="#{workers.upcoming}">Upcoming shifts</h2></div>
+        <p class="empty" th:if="${upcoming.isEmpty()}" th:text="#{workers.noShifts}">No shifts planned.</p>
+        <div class="table-wrap" th:unless="${upcoming.isEmpty()}">
+            <table class="data-table">
+                <thead><tr><th scope="col" th:text="#{field.date}">Date</th><th scope="col" th:text="#{field.time}">Time</th><th scope="col" th:text="#{field.zone}">Zone</th></tr></thead>
+                <tbody>
+                <tr th:each="shift : ${upcoming}">
+                    <td class="row-title" th:text="${@display.date(shift.startAt)}">Date</td>
+                    <td th:text="#{common.timeRange(${@display.time(shift.startAt)}, ${@display.time(shift.endAt)})}">Time</td>
+                    <td th:text="${shift.zone.name}">Zone</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><h2 th:text="#{workers.visits}">Latest check-ins</h2></div>
+        <p class="empty" th:if="${visits.isEmpty()}" th:text="#{workers.noVisits}">No check-ins yet.</p>
+        <th:block th:unless="${visits.isEmpty()}"><div th:replace="~{fragments/lists :: visits(${visits}, false)}"></div></th:block>
+    </section>
+</main>
+</html>

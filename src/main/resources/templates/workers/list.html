@@ -1,0 +1,41 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{workers.title}, 'workers', ~{::main})}">
+<main class="page medium">
+    <div class="page-head"><h1 th:text="#{workers.title}">Workers</h1></div>
+    <form class="setting mb-4" method="get" th:action="@{/workers}">
+        <div>
+            <label for="worker-search" th:text="#{workers.search}">Search by name or code</label>
+            <input id="worker-search" type="search" name="q" maxlength="200" th:value="${q}">
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{workers.searchButton}">Search</button>
+    </form>
+    <section class="panel">
+        <p class="empty" th:if="${workers.totalElements == 0}" th:text="#{workers.none}">No workers match.</p>
+        <div class="table-wrap" th:unless="${workers.isEmpty()}">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{field.person}">Person</th>
+                    <th scope="col" class="hidden sm:table-cell" th:text="#{nav.team}">Team</th>
+                    <th scope="col" th:text="#{safety.score}">Safety score</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${workers}" th:with="worker=${row.worker}">
+                    <td>
+                        <a class="row-title" th:href="@{/workers/{id}(id=${worker.id})}" th:text="|${worker.fullName} (${worker.employeeCode})|">Name</a>
+                        <span class="badge ml-1" th:unless="${worker.active}" th:text="#{team.inactive}">Inactive</span>
+                        <span class="row-sub sm:hidden" th:text="${worker.team != null} ? ${worker.team.name} : #{workers.noTeam}">Team</span>
+                    </td>
+                    <td class="hidden sm:table-cell" th:text="${worker.team != null} ? ${worker.team.name} : #{workers.noTeam}">Team</td>
+                    <td class="whitespace-nowrap">
+                        <span class="badge" th:classappend="${@display.badge(row.score.level)}" th:text="|${row.score.value} · ${@display.label(row.score.level)}|">100</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <nav th:replace="~{fragments/lists :: pager(${workers})}"></nav>
+</main>
+</html>

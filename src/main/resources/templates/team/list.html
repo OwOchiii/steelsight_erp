@@ -1,39 +1,62 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
-<head th:replace="~{fragments/layout :: head('Team')}"></head>
-<body>
-<header th:replace="~{fragments/layout :: nav('team')}"></header>
-<main class="page">
-    <h1>Team</h1>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{fragments/layout :: app(#{team.title}, 'team', ~{::main})}">
+<main class="page medium">
+    <div class="page-head"><h1 th:text="#{team.title}">Team</h1></div>
     <div th:replace="~{fragments/layout :: messages}"></div>
-    <section class="panel" th:unless="${teams.isEmpty()}">
-        <h2>Late check-in rule</h2>
-        <p class="quiet">Checking in up to this long after a shift starts isn't tagged late. Late time is made up at the end of the shift, up to this many minutes.</p>
-        <form class="setting" method="post" th:each="team : ${teams}" th:action="@{/teams/{id}/late-after(id=${team.id})}">
-            <div>
-                <label th:for="|late-${team.id}|" th:text="|${team.name}: minutes|">Minutes</label>
-                <input th:id="|late-${team.id}|" type="number" name="minutes" min="0" max="240" required th:value="${team.lateAfterMinutes}">
-            </div>
-            <button type="submit" class="btn secondary">Save</button>
-        </form>
+
+    <section class="panel mb-4" th:unless="${teams.isEmpty()}">
+        <div class="panel-head"><h2 th:text="#{team.lateRule}">Late check-in rule</h2></div>
+        <div class="panel-body">
+            <p class="quiet" th:text="#{team.lateRuleHint}">Checking in up to this long after a shift starts isn't tagged late. Late time is made up at the end of the shift, up to this many minutes.</p>
+            <form class="setting" method="post" th:each="team : ${teams}" th:action="@{/teams/{id}/late-after(id=${team.id})}">
+                <div>
+                    <label th:for="|late-${team.id}|" th:text="#{team.minutes(${team.name})}">Minutes</label>
+                    <input th:id="|late-${team.id}|" type="number" name="minutes" min="0" max="240" required th:value="${team.lateAfterMinutes}">
+                </div>
+                <button type="submit" class="btn secondary" th:text="#{common.save}">Save</button>
+            </form>
+        </div>
     </section>
 
-    <h2>People</h2>
-    <p class="empty" th:if="${members.totalElements == 0}">Nobody is on your team yet. Ask an admin to add people.</p>
-    <ul class="rows" th:unless="${members.isEmpty()}">
-        <li th:each="member : ${members}">
-            <div class="grow">
-                <strong th:text="|${member.fullName} (${member.employeeCode})|">Name</strong>
-                <span class="quiet" th:text="${member.team != null} ? |${member.team.name}, ${member.role.roleName}| : ${member.role.roleName}">Team</span>
-                <span class="quiet" th:if="${member.email != null or member.phoneNumber != null}"
-                      th:text="${member.email != null and member.phoneNumber != null} ? |${member.email}, ${member.phoneNumber}| : (${member.email} ?: ${member.phoneNumber})">Contact</span>
-            </div>
-            <span class="badge" th:unless="${member.active}">Inactive</span>
-            <a class="row-link" sec:authorize="hasAnyAuthority('SHIFT_UPDATE_TEAM', 'SHIFT_UPDATE_ALL')" th:if="${member.active}" th:href="@{/shifts/new(workerId=${member.id})}">Add shift</a>
-            <a class="row-link" th:href="@{/team/{id}/edit(id=${member.id})}" th:unless="${member.id == #authentication.principal.userId}">Edit</a>
-        </li>
-    </ul>
+    <section class="panel">
+        <div class="panel-head"><h2 th:text="#{team.people}">People</h2></div>
+        <p class="empty" th:if="${members.totalElements == 0}" th:text="#{team.nobody}">Nobody is on your team yet. Ask an admin to add people.</p>
+        <div class="table-wrap" th:unless="${members.isEmpty()}">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{field.person}">Person</th>
+                    <th scope="col" class="hidden md:table-cell" th:text="#{nav.team}">Team</th>
+                    <th scope="col" class="hidden sm:table-cell" th:text="#{field.role}">Role</th>
+                    <th scope="col" class="hidden lg:table-cell" th:text="#{field.contact}">Contact</th>
+                    <th scope="col"><span class="sr-only" th:text="#{common.actions}">Actions</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="member : ${members}">
+                    <td>
+                        <span class="row-title" th:text="|${member.fullName} (${member.employeeCode})|">Name</span>
+                        <span class="badge ml-1" th:unless="${member.active}" th:text="#{team.inactive}">Inactive</span>
+                        <span class="row-sub sm:hidden" th:text="${@display.role(member.role.roleName)}">Role</span>
+                        <span class="row-sub md:hidden" th:if="${member.team != null}" th:text="${member.team.name}">Team</span>
+                        <span class="row-sub lg:hidden" th:if="${member.email != null or member.phoneNumber != null}"
+                              th:text="${member.email != null and member.phoneNumber != null} ? |${member.email}, ${member.phoneNumber}| : (${member.email} ?: ${member.phoneNumber})">Contact</span>
+                    </td>
+                    <td class="hidden md:table-cell" th:text="${member.team != null} ? ${member.team.name}">Team</td>
+                    <td class="hidden sm:table-cell" th:text="${@display.role(member.role.roleName)}">Role</td>
+                    <td class="hidden lg:table-cell" th:text="${member.email != null and member.phoneNumber != null} ? |${member.email}, ${member.phoneNumber}| : (${member.email} ?: ${member.phoneNumber})">Contact</td>
+                    <td class="cell-end">
+                        <div class="flex flex-wrap justify-end gap-x-3">
+                            <a class="row-action" sec:authorize="hasAnyAuthority('SHIFT_UPDATE_TEAM', 'SHIFT_UPDATE_ALL')" th:if="${member.active}" th:href="@{/shifts/new(workerId=${member.id})}" th:text="#{team.addShift}">Add shift</a>
+                            <a class="row-action" th:href="@{/team/{id}/edit(id=${member.id})}" th:unless="${member.id == #authentication.principal.userId}" th:text="#{common.edit}">Edit</a>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
     <nav th:replace="~{fragments/lists :: pager(${members})}"></nav>
 </main>
-</body>
 </html>

@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('Tickets')}"></head>
-<body>
-<header th:replace="~{fragments/layout :: nav('tickets')}"></header>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{tickets.title}, 'tickets', ~{::main})}">
 <main class="page">
-    <div class="title-row">
-        <h1>My tickets</h1>
-        <a class="btn" th:href="@{/tickets/new}">New ticket</a>
+    <div class="page-head">
+        <h1 th:text="#{tickets.mine}">My tickets</h1>
+        <a class="btn" th:href="@{/tickets/new}">
+            <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#plus}"/></svg>
+            <span th:text="#{tickets.new}">New ticket</span>
+        </a>
     </div>
-    <p class="empty" th:if="${tickets.totalElements == 0}">You haven't opened any tickets.</p>
-    <th:block th:unless="${tickets.isEmpty()}"><ul th:replace="~{fragments/lists :: tickets(${tickets}, false)}"></ul></th:block>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <p class="empty panel-less-empty" th:if="${tickets.totalElements == 0}" th:text="#{tickets.none}">You haven't opened any tickets.</p>
+    <th:block th:unless="${tickets.isEmpty()}"><div th:replace="~{fragments/lists :: tickets(${tickets}, false)}"></div></th:block>
     <nav th:replace="~{fragments/lists :: pager(${tickets})}"></nav>
 </main>
-</body>
 </html>

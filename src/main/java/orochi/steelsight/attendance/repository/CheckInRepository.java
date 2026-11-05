@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import orochi.steelsight.attendance.model.CheckIn;
 import orochi.steelsight.repository.BaseRepository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,7 +23,18 @@ public interface CheckInRepository extends BaseRepository<CheckIn, Long> {
     /** Everyone on site right now. */
     List<CheckIn> findAllByCheckOutAtIsNull();
 
+    List<CheckIn> findAllByCheckInAtGreaterThanEqualAndCheckInAtLessThan(OffsetDateTime from, OffsetDateTime to);
+
+    @Query("""
+            SELECT c FROM CheckIn c
+            WHERE c.user.team.manager.id = :managerId AND c.checkInAt >= :from AND c.checkInAt < :to
+            """)
+    List<CheckIn> findTeamStartedIn(@Param("managerId") Long managerId, @Param("from") OffsetDateTime from,
+                                    @Param("to") OffsetDateTime to);
+
     Page<CheckIn> findAllByOrderByCheckInAtDescIdDesc(Pageable page);
+
+    Page<CheckIn> findAllByUserIdOrderByCheckInAtDescIdDesc(Long userId, Pageable page);
 
     Page<CheckIn> findAllByCheckOutAtIsNullOrderByCheckInAtDescIdDesc(Pageable page);
 

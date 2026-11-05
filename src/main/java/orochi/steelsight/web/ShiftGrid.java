@@ -44,14 +44,20 @@ public final class ShiftGrid {
     }
 
     private static Row row(AppUser person, List<Shift> shifts, List<LocalDate> days, SiteTime siteTime) {
-        List<Cell> cells = days.stream()
+        return new Row(person, cells(shifts, days, siteTime), hours(shifts));
+    }
+
+    public static List<Cell> cells(List<Shift> shifts, List<LocalDate> days, SiteTime siteTime) {
+        return days.stream()
                 .map(day -> new Cell(day, shifts.stream()
                         .filter(shift -> siteTime.dateOf(shift.getStartAt()).equals(day)).toList()))
                 .toList();
-        BigDecimal hours = shifts.stream()
+    }
+
+    public static BigDecimal hours(List<Shift> shifts) {
+        return shifts.stream()
                 .filter(shift -> shift.getStatus() != ShiftStatus.CANCELLED)
                 .map(Shift::getDurationHours)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new Row(person, cells, hours);
     }
 }

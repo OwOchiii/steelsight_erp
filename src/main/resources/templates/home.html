@@ -1,53 +1,272 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
-<head th:replace="~{fragments/layout :: head('Home')}"></head>
-<body>
-<header th:replace="~{fragments/layout :: nav('home')}"></header>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{fragments/layout :: app(#{home.title}, 'home', ~{::main})}">
 <main class="page">
-    <h1 th:text="|Welcome, ${user.fullName}|">Welcome</h1>
-    <p class="quiet" th:text="|Signed in as ${user.username} (${user.roleName})|">Signed in</p>
+    <div class="page-head">
+        <div>
+            <h1 th:text="#{home.welcome(${user.fullName})}">Welcome</h1>
+            <p class="page-sub" th:text="|${@display.date(todayDate)} · ${user.username} · ${@display.role(user.roleName)}|">Today</p>
+        </div>
+        <a class="btn" sec:authorize="hasAuthority('TICKET_CREATE')" th:href="@{/tickets/new}">
+            <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#plus}"/></svg>
+            <span th:text="#{home.report}">Report a problem</span>
+        </a>
+    </div>
 
-    <section class="tiles">
-        <a class="tile" sec:authorize="hasAuthority('SHIFT_READ_OWN')" th:href="@{/timetable}">
-            <span class="tile-label">Next shift</span>
+    <th:block th:if="${safety != null and safety.level.name() != 'SAFE'}">
+        <section th:replace="~{fragments/safety :: notice(${safety.level.name()}, ${safety.value}, true)}"></section>
+    </th:block>
+
+    <section class="kpis" th:attr="aria-label=#{home.summary}">
+        <a class="kpi" sec:authorize="hasAnyAuthority('CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')" th:href="@{/attendance(onSite=true)}">
+            <span class="kpi-label"><span th:text="#{home.onSite}">On site now</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#users}"/></svg></span>
+            <strong class="kpi-value" th:text="${onSite}">0</strong>
+            <span class="kpi-note" th:if="${shiftsToday != null}" th:text="#{home.shiftsTodayNote(${shiftsToday})}">Shifts today</span>
+        </a>
+        <a class="kpi" sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL')" th:href="@{/shifts}"
+           th:classappend="${missingToday != null and missingToday > 0} ? 'alert'">
+            <span class="kpi-label"><span th:text="#{home.shiftsToday}">Shifts today</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#calendar-range}"/></svg></span>
+            <strong class="kpi-value" th:text="${shiftsToday}">0</strong>
+            <span class="kpi-note" th:if="${missingToday != null}" th:text="#{home.rosterNote(${missingToday}, ${lateToday})}">Missing, late</span>
+        </a>
+        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review(view='ALL')}">
+            <span class="kpi-label"><span th:text="#{home.violations7}">Violations, last 7 days</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#shield-alert}"/></svg></span>
+            <strong class="kpi-value" th:text="${violationsThisWeek}">0</strong>
+            <span class="kpi-note" th:with="change=${violationsThisWeek - violationsWeekBefore}">
+                <svg class="icon" aria-hidden="true" th:if="${change != 0}"><use th:href="@{/img/icons.svg#{i}(i=${change > 0 ? 'arrow-up' : 'arrow-down'})}"/></svg>
+                <svg class="icon" aria-hidden="true" th:unless="${change != 0}"><use th:href="@{/img/icons.svg#minus}"/></svg>
+                <span th:text="#{home.weekBefore(${violationsWeekBefore})}">Week before</span>
+            </span>
+        </a>
+        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review}" th:classappend="${disputesToDecide > 0} ? 'attention'">
+            <span class="kpi-label"><span th:text="#{home.disputes}">Disputes to decide</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#shield-check}"/></svg></span>
+            <strong class="kpi-value" th:text="${disputesToDecide}">0</strong>
+        </a>
+        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review(view='UNIDENTIFIED')}" th:classappend="${unidentified > 0} ? 'attention'">
+            <span class="kpi-label"><span th:text="#{home.unidentified}">Violations with no worker</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#user-x}"/></svg></span>
+            <strong class="kpi-value" th:text="${unidentified}">0</strong>
+        </a>
+        <a class="kpi" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_TEAM', 'TICKET_READ_ALL')" th:href="@{/tickets/queue}" th:classappend="${queueCount > 0} ? 'attention'">
+            <span class="kpi-label"><span th:text="#{home.queue}">Tickets to handle</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#inbox}"/></svg></span>
+            <strong class="kpi-value" th:text="${queueCount}">0</strong>
+        </a>
+        <a class="kpi" sec:authorize="hasAuthority('SHIFT_READ_OWN')" th:href="@{/timetable}">
+            <span class="kpi-label"><span th:text="#{home.nextShift}">Next shift</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#clock}"/></svg></span>
             <th:block th:if="${nextShift}">
-                <strong th:text="${@display.date(nextShift.startAt)}">Date</strong>
-                <span th:text="|${@display.time(nextShift.startAt)} to ${@display.time(nextShift.endAt)}, ${nextShift.zone.name}|">Time</span>
+                <strong class="kpi-text" th:text="${@display.date(nextShift.startAt)}">Date</strong>
+                <span class="kpi-note" th:text="|${#messages.msg('common.timeRange', @display.time(nextShift.startAt), @display.time(nextShift.endAt))}, ${nextShift.zone.name}|">Time</span>
             </th:block>
-            <strong th:unless="${nextShift}">Nothing planned</strong>
+            <strong class="kpi-text" th:unless="${nextShift}" th:text="#{home.nothingPlanned}">Nothing planned</strong>
         </a>
-        <a class="tile" sec:authorize="hasAuthority('TICKET_READ_OWN')" th:href="@{/tickets}">
-            <span class="tile-label">Open tickets</span>
-            <strong th:text="${openTickets}">0</strong>
+        <a class="kpi" sec:authorize="hasAuthority('TICKET_READ_OWN')" th:href="@{/tickets}">
+            <span class="kpi-label"><span th:text="#{home.openTickets}">Open tickets</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#ticket}"/></svg></span>
+            <strong class="kpi-value" th:text="${openTickets}">0</strong>
         </a>
-        <a class="tile" sec:authorize="hasAuthority('VIOLATION_READ_OWN')" th:href="@{/violations}">
-            <span class="tile-label">PPE violations</span>
-            <strong th:text="${violationCount}">0</strong>
-            <span th:if="${activeDisputes > 0}" th:text="|${activeDisputes} being reviewed|">Reviewing</span>
+        <a class="kpi" th:if="${safety != null}" th:href="@{/violations}" th:classappend="${safety.level.name() == 'DANGER'} ? 'alert' : (${safety.level.name() == 'WARNING'} ? 'attention')">
+            <span class="kpi-label"><span th:text="#{safety.score}">Safety score</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#shield-check}"/></svg></span>
+            <strong class="kpi-value" th:text="${safety.value}">100</strong>
+            <span class="kpi-note" th:text="#{safety.resets}">Back to 100 on the 1st of next month</span>
         </a>
-        <a class="tile" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL')" th:href="@{/tickets/queue}">
-            <span class="tile-label">Tickets to handle</span>
-            <strong th:text="${queueCount}">0</strong>
-        </a>
-        <a class="tile" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review}">
-            <span class="tile-label">Disputes to decide</span>
-            <strong th:text="${disputesToDecide}">0</strong>
-        </a>
-        <a class="tile" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review(view='UNIDENTIFIED')}">
-            <span class="tile-label">Violations with no worker</span>
-            <strong th:text="${unidentified}">0</strong>
-        </a>
-        <a class="tile" sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL')" th:href="@{/shifts}">
-            <span class="tile-label">Shifts today</span>
-            <strong th:text="${shiftsToday}">0</strong>
-        </a>
-        <a class="tile" sec:authorize="hasAnyAuthority('CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')" th:href="@{/attendance(onSite=true)}">
-            <span class="tile-label">On site now</span>
-            <strong th:text="${onSite}">0</strong>
+        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_OWN')" th:href="@{/violations}">
+            <span class="kpi-label"><span th:text="#{home.myViolations}">PPE violations</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#hard-hat}"/></svg></span>
+            <strong class="kpi-value" th:text="${violationCount}">0</strong>
+            <span class="kpi-note" th:if="${activeDisputes > 0}" th:text="#{home.beingReviewed(${activeDisputes})}">Reviewing</span>
         </a>
     </section>
 
-    <a class="btn" sec:authorize="hasAuthority('TICKET_CREATE')" th:href="@{/tickets/new}">Report a problem</a>
+    <div class="grid gap-4">
+        <!-- Who is here today, for people who plan shifts -->
+        <section class="panel" th:if="${roster != null}">
+            <div class="panel-head">
+                <h2 th:text="#{home.attendanceToday}">Attendance today</h2>
+                <a class="panel-link" th:href="@{/attendance}" th:text="#{home.openAttendance}">Open attendance</a>
+            </div>
+            <p class="empty" th:if="${roster.isEmpty()}" th:text="#{home.noShiftsToday}">No shifts are planned today.</p>
+            <th:block th:unless="${roster.isEmpty()}">
+                <div class="panel-body pb-3">
+                    <div class="stack" role="img" th:attr="aria-label=#{home.attendanceToday}">
+                        <span class="stack-part" th:each="part : ${rosterSegments}" th:classappend="|mark-${part.state.name().toLowerCase()}|"
+                              th:style="|flex-grow: ${part.count}|" th:title="|${@display.label(part.state)}: ${part.count}|"></span>
+                    </div>
+                    <div class="legend">
+                        <span th:each="part : ${rosterSegments}"><span class="legend-key" th:classappend="|mark-${part.state.name().toLowerCase()}|"></span><span th:text="|${@display.label(part.state)}: ${part.count} (${part.percent}%)|">On time</span></span>
+                    </div>
+                </div>
+                <div class="table-wrap border-t border-line-soft">
+                    <table class="data-table">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{field.person}">Person</th>
+                            <th scope="col" class="hidden sm:table-cell" th:text="#{field.zone}">Zone</th>
+                            <th scope="col" th:text="#{field.shift}">Shift</th>
+                            <th scope="col" class="hidden sm:table-cell" th:text="#{field.checkedIn}">Checked in</th>
+                            <th scope="col" th:text="#{field.status}">Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="row, i : ${roster}" th:if="${i.index < 8}">
+                            <td>
+                                <span class="row-title" th:text="${row.shift.user.fullName}">Name</span>
+                                <span class="row-sub sm:hidden" th:text="${row.shift.zone.name}">Zone</span>
+                            </td>
+                            <td class="hidden sm:table-cell" th:text="${row.shift.zone.name}">Zone</td>
+                            <td class="whitespace-nowrap" th:text="#{common.timeRange(${@display.time(row.shift.startAt)}, ${@display.time(row.shift.endAt)})}">Time</td>
+                            <td class="hidden sm:table-cell" th:text="${row.visit != null} ? ${@display.time(row.visit.visit.checkInAt)}">In</td>
+                            <td><span class="badge" th:classappend="${@display.badge(row.state)}" th:text="${@display.label(row.state)}">State</span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="quiet small px-4 py-2 border-t border-line-soft" th:if="${roster.size() > 8}" th:text="#{home.moreRows(${roster.size() - 8})}">More</p>
+            </th:block>
+        </section>
+
+        <!-- Safety trends, for HSE -->
+        <div class="grid gap-4 xl:grid-cols-3" th:if="${violationTrend != null}">
+            <section class="panel xl:col-span-2">
+                <div class="panel-head">
+                    <h2 th:text="#{home.trendTitle}">PPE violations, last 14 days</h2>
+                    <span class="quiet small" th:text="#{home.total(${violationTotal})}">Total</span>
+                </div>
+                <div class="panel-body">
+                    <p class="empty" th:if="${violationTotal == 0}" th:text="#{home.noViolations}">No violations in the last 14 days.</p>
+                    <th:block th:unless="${violationTotal == 0}">
+                        <div class="columns">
+                            <div class="column" tabindex="0" th:each="bar : ${violationTrend}"
+                                 th:attr="aria-label=|${@display.date(bar.key)}: ${bar.value}|">
+                                <div class="column-bar" th:style="|height: ${bar.percent}%|"></div>
+                                <span class="column-tip"><span th:text="${@display.date(bar.key)}">Date</span>: <strong th:text="${bar.value}">0</strong></span>
+                            </div>
+                        </div>
+                        <div class="column-axis" aria-hidden="true"><span th:each="bar : ${violationTrend}" th:text="${@display.dayMonth(bar.key)}">2 Nov</span></div>
+                    </th:block>
+                </div>
+            </section>
+            <section class="panel">
+                <div class="panel-head"><h2 th:text="#{home.byType}">By type</h2></div>
+                <div class="panel-body">
+                    <p class="empty" th:if="${violationsByType.isEmpty()}" th:text="#{home.noViolations}">None.</p>
+                    <div class="hbar" th:each="bar : ${violationsByType}">
+                        <span th:text="${@display.label(bar.key)}">No vest</span><strong th:text="${bar.value}">0</strong>
+                        <div class="hbar-track"><div class="hbar-fill" th:style="|width: ${bar.percent}%|"></div></div>
+                    </div>
+                    <th:block th:unless="${violationsByZone.isEmpty()}">
+                        <h2 class="divider mb-3" th:text="#{home.byZone}">By zone</h2>
+                        <div class="hbar" th:each="bar : ${violationsByZone}">
+                            <span th:text="${bar.key}">Zone</span><strong th:text="${bar.value}">0</strong>
+                            <div class="hbar-track"><div class="hbar-fill" th:style="|width: ${bar.percent}%|"></div></div>
+                        </div>
+                    </th:block>
+                </div>
+            </section>
+        </div>
+
+        <!-- What has waited longest -->
+        <div class="grid gap-4 xl:grid-cols-2" th:if="${oldestDisputes != null or oldestTickets != null}">
+            <section class="panel" th:if="${oldestDisputes != null}">
+                <div class="panel-head">
+                    <h2 th:text="#{home.waitingDisputes}">Disputes waiting longest</h2>
+                    <a class="panel-link" th:href="@{/violations/review}" th:text="#{home.openReview}">Open PPE review</a>
+                </div>
+                <p class="empty" th:if="${oldestDisputes.isEmpty()}" th:text="#{home.noDisputes}">Nothing waiting.</p>
+                <div class="table-wrap" th:unless="${oldestDisputes.isEmpty()}">
+                    <table class="data-table">
+                        <tbody>
+                        <tr th:each="violation : ${oldestDisputes}">
+                            <td>
+                                <a class="row-title" th:href="@{/violations/{id}(id=${violation.id})}" th:text="${@display.label(violation.violationType)}">Type</a>
+                                <span class="row-sub" th:text="|${violation.identified ? violation.user.fullName : #messages.msg('violations.workerUnknown')}, ${violation.camera.zone.name}|">Worker</span>
+                            </td>
+                            <td class="cell-end whitespace-nowrap quiet" th:text="${@display.waiting(violation.detectedAt)}">3 d</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="panel" th:if="${oldestTickets != null}">
+                <div class="panel-head">
+                    <h2 th:text="#{home.waitingTickets}">Tickets waiting longest</h2>
+                    <a class="panel-link" th:href="@{/tickets/queue}" th:text="#{home.openQueue}">Open the queue</a>
+                </div>
+                <p class="empty" th:if="${oldestTickets.isEmpty()}" th:text="#{queue.emptyOpen}">Nothing to handle right now.</p>
+                <div class="table-wrap" th:unless="${oldestTickets.isEmpty()}">
+                    <table class="data-table">
+                        <tbody>
+                        <tr th:each="ticket : ${oldestTickets}">
+                            <td>
+                                <a class="row-title" th:href="@{/tickets/{id}(id=${ticket.id})}" th:text="${ticket.subject}">Subject</a>
+                                <span class="row-sub" th:text="|${@display.category(ticket.category.categoryName)}, ${ticket.createdBy.fullName}|">Category</span>
+                            </td>
+                            <td><span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span></td>
+                            <td class="cell-end whitespace-nowrap quiet" th:text="${@display.waiting(ticket.createdAt)}">3 d</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- The signed-in person's own week and records -->
+        <section class="panel" th:if="${myWeek != null}">
+            <div class="panel-head">
+                <h2 th:text="#{home.myWeek}">My week</h2>
+                <span class="quiet small" th:text="#{home.plannedHours(${@display.hours(myWeekHours)})}">Hours</span>
+            </div>
+            <div class="panel-body">
+                <div class="week">
+                    <div class="week-day" th:each="day : ${myWeek}" th:classappend="${day.today} ? 'today'" th:attr="aria-current=${day.today} ? 'date'">
+                        <span class="week-name" th:text="|${@display.weekday(day.date)} ${@display.dayMonth(day.date)}|">Mon</span>
+                        <span class="week-shift" th:each="shift : ${day.shifts}">
+                            <strong th:text="#{common.timeRange(${@display.time(shift.startAt)}, ${@display.time(shift.endAt)})}">Time</strong><br>
+                            <span class="quiet" th:text="${shift.zone.name}">Zone</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid gap-4 xl:grid-cols-2" th:if="${myTickets != null or myViolations != null}">
+            <section class="panel" th:if="${myTickets != null}">
+                <div class="panel-head">
+                    <h2 th:text="#{home.myOpenTickets}">My open tickets</h2>
+                    <a class="panel-link" th:href="@{/tickets}" th:text="#{home.seeAll}">See all</a>
+                </div>
+                <p class="empty" th:if="${myTickets.isEmpty()}" th:text="#{home.noOpenTickets}">You have no open tickets.</p>
+                <div class="table-wrap" th:unless="${myTickets.isEmpty()}">
+                    <table class="data-table">
+                        <tbody>
+                        <tr th:each="ticket : ${myTickets}">
+                            <td>
+                                <a class="row-title" th:href="@{/tickets/{id}(id=${ticket.id})}" th:text="${ticket.subject}">Subject</a>
+                                <span class="row-sub" th:text="|${@display.category(ticket.category.categoryName)}, ${@display.date(ticket.createdAt)}|">Category</span>
+                            </td>
+                            <td class="cell-end"><span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="panel" th:if="${myViolations != null}">
+                <div class="panel-head">
+                    <h2 th:text="#{home.myRecentViolations}">My latest violations</h2>
+                    <a class="panel-link" th:href="@{/violations}" th:text="#{home.seeAll}">See all</a>
+                </div>
+                <p class="empty" th:if="${myViolations.isEmpty()}" th:text="#{violations.none}">You have no recorded violations.</p>
+                <div class="table-wrap" th:unless="${myViolations.isEmpty()}">
+                    <table class="data-table">
+                        <tbody>
+                        <tr th:each="violation : ${myViolations}">
+                            <td>
+                                <a class="row-title" th:href="@{/violations/{id}(id=${violation.id})}" th:text="${@display.label(violation.violationType)}">Type</a>
+                                <span class="row-sub" th:text="|${@display.dateTime(violation.detectedAt)}, ${violation.camera.zone.name}|">When</span>
+                            </td>
+                            <td class="cell-end"><span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
 </main>
-</body>
 </html>

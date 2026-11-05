@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 public class UserService {
 
     private static final String MANAGER_ROLE = "MANAGER";
+    private static final String WORKER_ROLE = "WORKER";
     private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+");
     private static final int PHONE_LENGTH = 30;
 
@@ -86,6 +87,27 @@ public class UserService {
     public AppUser getForEdit(Long actorId, Long userId) {
         access.requireCanUpdateUser(actorId, userId);
         return users.require(userId);
+    }
+
+    /** Anyone with USER_READ_ALL can look at any worker, whichever team they are on. */
+    @Transactional(readOnly = true)
+    public AppUser getWorker(Long actorId, Long workerId) {
+        access.require(actorId, Permissions.USER_READ_ALL);
+        AppUser worker = users.require(workerId);
+        if (worker.getDeletedAt() != null || !WORKER_ROLE.equals(worker.getRole().getRoleName())) {
+            throw new NotFoundException("Worker", workerId);
+        }
+        return worker;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canEdit(Long actorId, Long userId) {
+        return access.canUpdateUser(actorId, userId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canPlanShiftFor(Long actorId, Long workerId) {
+        return access.canAssignShift(actorId, workerId);
     }
 
     /** Who this user can give a shift to. */

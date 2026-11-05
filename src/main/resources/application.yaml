@@ -6,7 +6,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/steelsight_local}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD:An15092005}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -28,6 +28,14 @@ spring:
       max-file-size: 5MB
       max-request-size: 6MB
 
+logging:
+  pattern:
+    # Puts the request id on every line, so one request can be followed through the log.
+    correlation: "[%X{requestId:-}] "
+  level:
+    orochi.steelsight: ${LOG_LEVEL:INFO}       # DEBUG also logs when each request starts
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}   # DEBUG prints every SQL statement, without values
+
 server:
   port: 8080
   forward-headers-strategy: framework   # Render's proxy handles HTTPS and forwards to this port
@@ -38,6 +46,9 @@ server:
         secure: ${SESSION_COOKIE_SECURE:false}   # set to true on Render
 
 steelsight:
+  detection:
+    # The key the detection software sends as X-Api-Key. Left empty, the API refuses every call.
+    api-key: ${STEELSIGHT_DETECTION_API_KEY:}
   bootstrap:
     # Creates the first admin when there is none. Leave the password empty to skip this.
     admin-employee-code: ${ADMIN_EMPLOYEE_CODE:ADMIN}

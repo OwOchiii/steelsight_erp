@@ -141,11 +141,15 @@ public class TicketService {
         return tickets.findAllByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(actorId, page);
     }
 
-    /** Tickets in the categories the actor's role handles. */
+    /** Tickets in the categories the actor's role handles. For a manager, only those from their teams. */
     @Transactional(readOnly = true)
     public List<Ticket> listHandled(Long actorId) {
-        access.require(actorId, Permissions.TICKET_READ_HANDLED);
-        return tickets.findAllByHandlerRoleId(users.require(actorId).getRole().getId());
+        Long roleId = users.require(actorId).getRole().getId();
+        if (access.has(actorId, Permissions.TICKET_READ_HANDLED)) {
+            return tickets.findAllByHandlerRoleId(roleId);
+        }
+        access.require(actorId, Permissions.TICKET_READ_TEAM);
+        return tickets.findAllByCategoryHandlerRoleIdAndCreatedByTeamManagerIdAndDeletedAtIsNull(roleId, actorId);
     }
 
     @Transactional(readOnly = true)
@@ -155,30 +159,39 @@ public class TicketService {
     }
 
     /**
-     * The tickets this user works on: their role's categories, or every ticket with TICKET_READ_ALL.
+     * The tickets this user works on: their role's categories, narrowed to their teams for a manager,
+     * or every ticket with TICKET_READ_ALL.
      * Unresolved tickets come oldest first, because they have waited longest; resolved ones newest first.
      */
     @Transactional(readOnly = true)
     public Page<Ticket> listQueue(Long actorId, boolean resolved, Pageable page) {
-        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_ALL);
+        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_TEAM, Permissions.TICKET_READ_ALL);
         Set<TicketStatus> statuses = resolved ? EnumSet.of(TicketStatus.RESOLVED) : UNRESOLVED;
         Sort sort = resolved ? Sort.by("resolvedAt", "id").descending() : Sort.by("createdAt", "id");
         Pageable sorted = PageRequest.of(page.getPageNumber(), page.getPageSize(), sort);
         if (access.has(actorId, Permissions.TICKET_READ_ALL)) {
             return tickets.findAllByStatusInAndDeletedAtIsNull(statuses, sorted);
         }
-        return tickets.findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(
-                users.require(actorId).getRole().getId(), statuses, sorted);
+        Long roleId = users.require(actorId).getRole().getId();
+        if (access.has(actorId, Permissions.TICKET_READ_HANDLED)) {
+            return tickets.findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(roleId, statuses, sorted);
+        }
+        return tickets.findAllByCategoryHandlerRoleIdAndCreatedByTeamManagerIdAndStatusInAndDeletedAtIsNull(
+                roleId, actorId, statuses, sorted);
     }
 
     @Transactional(readOnly = true)
     public long countUnresolvedInQueue(Long actorId) {
-        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_ALL);
+        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_TEAM, Permissions.TICKET_READ_ALL);
         if (access.has(actorId, Permissions.TICKET_READ_ALL)) {
             return tickets.countByStatusInAndDeletedAtIsNull(UNRESOLVED);
         }
-        return tickets.countByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(
-                users.require(actorId).getRole().getId(), UNRESOLVED);
+        Long roleId = users.require(actorId).getRole().getId();
+        if (access.has(actorId, Permissions.TICKET_READ_HANDLED)) {
+            return tickets.countByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(roleId, UNRESOLVED);
+        }
+        return tickets.countByCategoryHandlerRoleIdAndCreatedByTeamManagerIdAndStatusInAndDeletedAtIsNull(
+                roleId, actorId, UNRESOLVED);
     }
 
     @Transactional(readOnly = true)
@@ -186,11 +199,13 @@ public class TicketService {
         return access.canUpdateTicket(actorId, ticketId);
     }
 
-    /** Active people in the role that handles this ticket's category. */
+    /** Active people in the role that handles this ticket's category, who can also work on this ticket. */
     @Transactional(readOnly = true)
     public List<AppUser> listPossibleAssignees(Long actorId, Long ticketId) {
         access.requireCanUpdateTicket(actorId, ticketId);
-        return users.findActiveByRole(tickets.require(ticketId).getCategory().getHandlerRole().getId());
+        return users.findActiveByRole(tickets.require(ticketId).getCategory().getHandlerRole().getId()).stream()
+                .filter(candidate -> access.canUpdateTicket(candidate.getId(), ticketId))
+                .toList();
     }
 
     /** The assignee must also be able to work on this ticket. */

@@ -58,6 +58,13 @@ public class ViolationService {
         return violations.findAllByUserIdOrderByDetectedAtDescIdDesc(actorId, page);
     }
 
+    /** One worker's violations since a date, for anyone who can look at every worker. */
+    @Transactional(readOnly = true)
+    public List<Violation> listOfWorkerSince(Long actorId, Long workerId, OffsetDateTime from) {
+        access.require(actorId, Permissions.USER_READ_ALL);
+        return violations.findAllByUserIdAndDetectedAtGreaterThanEqualOrderByDetectedAtDescIdDesc(workerId, from);
+    }
+
     @Transactional(readOnly = true)
     public Page<Violation> listAll(Long actorId, Pageable page) {
         access.require(actorId, Permissions.VIOLATION_READ_ALL);
@@ -68,6 +75,12 @@ public class ViolationService {
     public Page<Violation> listDisputed(Long actorId, Pageable page) {
         access.require(actorId, Permissions.VIOLATION_READ_ALL);
         return violations.findAllByDisputeStatusOrderByDetectedAtAscIdAsc(DisputeStatus.DISPUTED, page);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Violation> listSince(Long actorId, OffsetDateTime from) {
+        access.require(actorId, Permissions.VIOLATION_READ_ALL);
+        return violations.findDetectedSince(from);
     }
 
     /** The HSE queue of violations with no known worker. */

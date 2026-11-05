@@ -1,0 +1,14 @@
+{
+  "name": "steelsight-frontend",
+  "private": true,
+  "description": "Builds the stylesheet. The output is committed, so building the app needs no Node.",
+  "scripts": {
+    "build:css": "tailwindcss -i src/main/frontend/app.css -o src/main/resources/static/css/app.css --minify",
+    "watch:css": "tailwindcss -i src/main/frontend/app.css -o src/main/resources/static/css/app.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.1.13",
+    "lucide-static": "0.544.0",
+    "tailwindcss": "4.1.13"
+  }
+}

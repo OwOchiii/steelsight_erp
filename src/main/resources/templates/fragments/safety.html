@@ -1,0 +1,20 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- The reminder a worker gets at each level. level is WARNING or DANGER. -->
+<section class="safety-notice" th:fragment="notice(level, score, withLink)" th:classappend="${level == 'DANGER'} ? 'danger' : 'warning'" role="status">
+    <h2>
+        <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#triangle-alert}"/></svg>
+        <span th:text="#{${'safety.' + level + '.title'}}">Safety warning</span>
+    </h2>
+    <p th:text="#{${'safety.' + level + '.body'}(${score})}">Your safety score is low.</p>
+    <p th:text="#{safety.ppe.required}">You need these to enter the construction site:</p>
+    <ul>
+        <li th:text="#{safety.ppe.hardHat}">Hard hat</li>
+        <li th:text="#{safety.ppe.vest}">PPE vest</li>
+    </ul>
+    <p th:text="#{safety.dispute}">If a violation is wrong, dispute it.</p>
+    <p th:if="${withLink}"><a th:href="@{/violations}" th:text="#{safety.seeViolations}">See my violations</a></p>
+</section>
+</body>
+</html>

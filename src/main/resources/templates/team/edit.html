@@ -1,25 +1,25 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('Edit details')}"></head>
-<body>
-<header th:replace="~{fragments/layout :: nav('team')}"></header>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{team.editDetails}, 'team', ~{::main})}">
 <main class="page narrow">
-    <a class="back" th:href="@{/team}">Back to team</a>
-    <h1 th:text="${member.employeeCode}">Code</h1>
+    <nav class="crumbs"><a th:href="@{/team}" th:text="#{team.title}">Team</a></nav>
+    <div class="page-head"><h1 th:text="${member.employeeCode}">Code</h1></div>
     <div th:replace="~{fragments/layout :: messages}"></div>
-    <form method="post" th:action="@{/team/{id}(id=${member.id})}" th:object="${form}">
+    <form class="sheet" method="post" th:action="@{/team/{id}(id=${member.id})}" th:object="${form}">
         <input type="hidden" th:field="*{version}">
-        <label for="fullName">Full name</label>
+        <label for="fullName" th:text="#{field.fullName}">Full name</label>
         <input id="fullName" th:field="*{fullName}" maxlength="200" required>
 
-        <label for="email">Email <span class="optional">optional</span></label>
-        <input id="email" type="email" th:field="*{email}" maxlength="200">
-
-        <label for="phoneNumber">Phone number <span class="optional">optional</span></label>
-        <input id="phoneNumber" type="tel" th:field="*{phoneNumber}" maxlength="30">
-
-        <button type="submit" class="btn">Save details</button>
+        <div class="grid gap-x-4 sm:grid-cols-2">
+            <div>
+                <label for="email"><span th:text="#{field.email}">Email</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                <input id="email" type="email" th:field="*{email}" maxlength="200">
+            </div>
+            <div>
+                <label for="phoneNumber"><span th:text="#{field.phone}">Phone number</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                <input id="phoneNumber" type="tel" th:field="*{phoneNumber}" maxlength="30">
+            </div>
+        </div>
+        <div class="actions"><button type="submit" class="btn" th:text="#{team.saveDetails}">Save details</button></div>
     </form>
 </main>
-</body>
 </html>

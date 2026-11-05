@@ -1,0 +1,35 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{notifications.title}, 'notifications', ~{::main})}">
+<main class="page medium">
+    <div class="page-head">
+        <h1 th:text="#{notifications.title}">Notifications</h1>
+        <form method="post" th:if="${unread > 0}" th:action="@{/notifications/read-all}">
+            <button type="submit" class="btn secondary" th:text="#{notifications.markAllRead}">Mark all as read</button>
+        </form>
+    </div>
+    <p class="empty panel-less-empty" th:if="${notifications.totalElements == 0}" th:text="#{notifications.none}">You have no notifications.</p>
+    <section class="panel" th:unless="${notifications.isEmpty()}">
+        <article class="notification" th:each="note : ${notifications}" th:classappend="${note.read} ? '' : 'unread'">
+            <div class="notification-body">
+                <span class="quiet small" th:text="${@display.dateTime(note.createdAt)}">When</span>
+                <th:block th:if="${note.kind.name() == 'SAFETY_WARNING'}">
+                    <section th:replace="~{fragments/safety :: notice('WARNING', ${note.score}, true)}"></section>
+                </th:block>
+                <th:block th:if="${note.kind.name() == 'SAFETY_DANGER'}">
+                    <section th:replace="~{fragments/safety :: notice('DANGER', ${note.score}, true)}"></section>
+                </th:block>
+                <th:block th:if="${note.kind.name() == 'HSE_VIOLATION_ALERT'}" th:with="alert=${note.safetyAlert}">
+                    <strong class="block" th:text="#{notifications.alert.title}">Too many PPE violations</strong>
+                    <span class="block" th:text="#{notifications.alert.body(${alert.violationCount}, ${alert.windowSeconds}, ${@display.dateTime(alert.detectedAt)})}">Details</span>
+                    <span class="block" th:if="${alert.cameraCode}" th:text="#{notifications.alert.camera(${alert.cameraCode})}">Camera</span>
+                    <a th:href="@{/violations/review(view='ALL')}" th:text="#{notifications.alert.review}">Review violations</a>
+                </th:block>
+            </div>
+            <form method="post" th:unless="${note.read}" th:action="@{/notifications/{id}/read(id=${note.id})}">
+                <button type="submit" class="btn secondary" th:text="#{notifications.markRead}">Mark as read</button>
+            </form>
+        </article>
+    </section>
+    <nav th:replace="~{fragments/lists :: pager(${notifications})}"></nav>
+</main>
+</html>

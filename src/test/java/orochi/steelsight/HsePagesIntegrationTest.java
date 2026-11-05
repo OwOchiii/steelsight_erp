@@ -175,6 +175,7 @@ class HsePagesIntegrationTest extends PageTestSupport {
 
     @Test
     void queueShowsOnlyTheCategoriesYourRoleHandles() throws Exception {
+        joinTeam(worker, team("Queue team", manager));
         ticket(category("Safety concern"), worker, "Loose guard rail");
         ticket(category("Equipment request"), worker, "New boots");
 

@@ -41,8 +41,12 @@ public class AccessPolicy {
         allow(ask("SELECT can_edit_shift(?, ?)", actorId, shiftId));
     }
 
+    public boolean canAssignShift(Long actorId, Long workerId) {
+        return ask("SELECT can_assign_shift(?, ?)", actorId, workerId);
+    }
+
     public void requireCanAssignShift(Long actorId, Long workerId) {
-        allow(ask("SELECT can_assign_shift(?, ?)", actorId, workerId));
+        allow(canAssignShift(actorId, workerId));
     }
 
     public boolean canUpdateTicket(Long userId, Long ticketId) {

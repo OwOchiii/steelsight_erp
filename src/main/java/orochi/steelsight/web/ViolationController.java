@@ -15,6 +15,7 @@ import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.identity.service.UserService;
 import orochi.steelsight.ppe.model.DisputeStatus;
 import orochi.steelsight.ppe.model.Violation;
+import orochi.steelsight.ppe.service.SafetyScoreService;
 import orochi.steelsight.ppe.service.ViolationService;
 import orochi.steelsight.security.AuthenticatedUser;
 import orochi.steelsight.ticketing.model.Ticket;
@@ -27,6 +28,7 @@ public class ViolationController extends PageController {
     public enum ReviewView { DISPUTED, UNIDENTIFIED, ALL }
 
     private final ViolationService violations;
+    private final SafetyScoreService safety;
     private final TicketService tickets;
     private final UserService users;
     private final Display display;
@@ -35,6 +37,7 @@ public class ViolationController extends PageController {
     public String list(@AuthenticationPrincipal AuthenticatedUser user,
                        @RequestParam(defaultValue = "0") int page, Model model) {
         model.addAttribute("violations", violations.listOwn(user.getUserId(), pageOf(page)));
+        model.addAttribute("safety", safety.own(user.getUserId()));
         return "violations/list";
     }
 
