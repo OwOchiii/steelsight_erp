@@ -52,7 +52,7 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("href=\"/shifts\"")))
                 .andExpect(content().string(containsString("href=\"/team\"")))
-                .andExpect(content().string(containsString("href=\"/tickets/queue\"")))
+                .andExpect(content().string(not(containsString("href=\"/tickets/queue\""))))
                 .andExpect(content().string(not(containsString("href=\"/violations/review\""))));
     }
 
@@ -285,13 +285,26 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
     }
 
     @Test
-    void aManagerCanEditATeamMembersDetails() throws Exception {
-        mvc.perform(get("/team/" + worker + "/edit").with(as(manager)))
+    void aManagerCannotEditEvenTheirOwnTeam() throws Exception {
+        mvc.perform(get("/team").with(as(manager)))
+                .andExpect(content().string(containsString("Add shift")))
+                .andExpect(content().string(not(containsString("/team/" + worker + "/edit"))))
+                .andExpect(content().string(not(containsString("/team/new"))));
+        mvc.perform(get("/team/" + worker + "/edit").with(as(manager))).andExpect(status().isForbidden());
+        mvc.perform(post("/team/" + worker).param("fullName", "Changed").param("version", "0").with(as(manager)).with(csrf()))
+                .andExpect(status().isForbidden());
+
+        assertThat(textColumn("SELECT full_name FROM app_user WHERE id = ?", worker)).isEqualTo("Wanda Worker");
+    }
+
+    @Test
+    void anAdminCanEditSomeonesDetails() throws Exception {
+        mvc.perform(get("/team/" + worker + "/edit").with(as(admin)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Wanda Worker")));
 
         mvc.perform(post("/team/" + worker).param("fullName", " Wanda W ").param("email", "wanda@example.com")
-                        .param("phoneNumber", "").param("version", "0").with(as(manager)).with(csrf()))
+                        .param("phoneNumber", "").param("version", "0").with(as(admin)).with(csrf()))
                 .andExpect(header().string("Location", startsWith("/team")));
 
         assertThat(textColumn("SELECT full_name FROM app_user WHERE id = ?", worker)).isEqualTo("Wanda W");
@@ -301,13 +314,13 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
 
     @Test
     void badProfileEditsAreRefused() throws Exception {
-        mvc.perform(post("/team/" + worker).param("fullName", " ").param("version", "0").with(as(manager)).with(csrf()))
+        mvc.perform(post("/team/" + worker).param("fullName", " ").param("version", "0").with(as(admin)).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(containsString("A name is required")));
-        mvc.perform(post("/team/" + worker).param("fullName", "W").param("email", "not-an-email").param("version", "0").with(as(manager)).with(csrf()))
+        mvc.perform(post("/team/" + worker).param("fullName", "W").param("email", "not-an-email").param("version", "0").with(as(admin)).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(containsString("doesn&#39;t look right")));
-        mvc.perform(post("/team/" + worker).param("fullName", "W").param("version", "7").with(as(manager)).with(csrf()))
+        mvc.perform(post("/team/" + worker).param("fullName", "W").param("version", "7").with(as(admin)).with(csrf()))
                 .andExpect(status().isConflict());
     }
 

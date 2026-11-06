@@ -17,6 +17,12 @@ abstract class PageTestSupport {
     @Autowired JdbcTemplate jdbc;
     @Autowired AppUserRepository users;
     @Autowired TransactionTemplate transaction;
+    @Autowired jakarta.persistence.EntityManager em;
+
+    /** Writes out what the pages changed, so plain SQL in the test can see it. */
+    void flush() {
+        em.flush();
+    }
 
     RequestPostProcessor as(Long userId) {
         return transaction.execute(status -> user(new AuthenticatedUser(users.findById(userId).orElseThrow())));

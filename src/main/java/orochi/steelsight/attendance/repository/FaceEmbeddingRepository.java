@@ -7,6 +7,7 @@ import orochi.steelsight.attendance.model.EmbeddingStatus;
 import orochi.steelsight.attendance.model.FaceEmbedding;
 import orochi.steelsight.repository.BaseRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +16,8 @@ public interface FaceEmbeddingRepository extends BaseRepository<FaceEmbedding, L
     Optional<FaceEmbedding> findByUserId(Long userId);
 
     List<FaceEmbedding> findAllByStatus(EmbeddingStatus status);
+
+    List<FaceEmbedding> findAllByUserIdIn(Collection<Long> userIds);
 
     /**
      * Queues a worker's photo for enrolment as one atomic statement. A new photo clears the old

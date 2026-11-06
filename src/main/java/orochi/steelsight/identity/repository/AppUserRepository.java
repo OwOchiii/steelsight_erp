@@ -29,6 +29,17 @@ public interface AppUserRepository extends SoftDeletableRepository<AppUser, Long
     @Query("SELECT u FROM AppUser u WHERE u.role.id = :roleId AND u.isActive = true AND u.deletedAt IS NULL ORDER BY u.fullName")
     List<AppUser> findActiveByRole(@Param("roleId") Long roleId);
 
+    /** Active managers who don't lead a team yet, so each team leader leads one team. */
+    @Query("""
+            SELECT u FROM AppUser u
+            WHERE u.role.roleName = 'MANAGER' AND u.isActive = true AND u.deletedAt IS NULL
+              AND NOT EXISTS (SELECT t FROM Team t WHERE t.manager = u)
+            ORDER BY u.fullName, u.id
+            """)
+    List<AppUser> findManagersWithoutATeam();
+
+    List<AppUser> findAllByTeamId(Long teamId);
+
     /** People on the teams this manager runs, without the manager, who can't manage their own account. */
     @Query("""
             SELECT u FROM AppUser u

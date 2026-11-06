@@ -35,14 +35,6 @@ public interface TicketRepository extends SoftDeletableRepository<Ticket, Long> 
 
     long countByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(Long roleId, Collection<TicketStatus> statuses);
 
-    Page<Ticket> findAllByCategoryHandlerRoleIdAndCreatedByTeamManagerIdAndStatusInAndDeletedAtIsNull(
-            Long roleId, Long managerId, Collection<TicketStatus> statuses, Pageable page);
-
-    long countByCategoryHandlerRoleIdAndCreatedByTeamManagerIdAndStatusInAndDeletedAtIsNull(
-            Long roleId, Long managerId, Collection<TicketStatus> statuses);
-
-    List<Ticket> findAllByCategoryHandlerRoleIdAndCreatedByTeamManagerIdAndDeletedAtIsNull(Long roleId, Long managerId);
-
     @Query("""
             SELECT t FROM Ticket t
             JOIN t.category c

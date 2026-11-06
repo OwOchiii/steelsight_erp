@@ -1,0 +1,60 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{team.newAccount}, 'team', ~{::main})}">
+<main class="page narrow">
+    <nav class="crumbs"><a th:href="@{/team}" th:text="#{team.title}">Team</a></nav>
+    <div class="page-head"><h1 th:text="#{team.newAccount}">New account</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <form class="sheet" method="post" enctype="multipart/form-data" th:action="@{/team/new}" th:object="${form}">
+        <div class="grid gap-x-4 sm:grid-cols-2">
+            <div>
+                <label for="employeeCode" th:text="#{field.employeeCode}">Employee code</label>
+                <input id="employeeCode" th:field="*{employeeCode}" maxlength="50" required autocomplete="off"
+                       pattern="[A-Za-z0-9._\-]{1,50}">
+                <p class="hint" th:text="#{team.codeHint}">Used to sign in. It can't be changed later.</p>
+            </div>
+            <div>
+                <label for="fullName" th:text="#{field.fullName}">Full name</label>
+                <input id="fullName" th:field="*{fullName}" maxlength="200" required>
+            </div>
+        </div>
+
+        <div class="grid gap-x-4 sm:grid-cols-2">
+            <div>
+                <label for="roleName" th:text="#{field.role}">Role</label>
+                <select id="roleName" th:field="*{roleName}" required>
+                    <option value="" th:text="#{team.chooseRole}">Choose a role</option>
+                    <option th:each="role : ${roles}" th:value="${role.roleName}" th:text="${@display.role(role.roleName)}">Worker</option>
+                </select>
+            </div>
+            <div>
+                <label for="teamId"><span th:text="#{nav.team}">Team</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                <select id="teamId" th:field="*{teamId}">
+                    <option value="" th:text="#{team.noTeam}">No team</option>
+                    <option th:each="team : ${teams}" th:value="${team.id}" th:text="${team.name}">Team A</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid gap-x-4 sm:grid-cols-2">
+            <div>
+                <label for="email"><span th:text="#{field.email}">Email</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                <input id="email" type="email" th:field="*{email}" maxlength="200">
+            </div>
+            <div>
+                <label for="phoneNumber"><span th:text="#{field.phone}">Phone number</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                <input id="phoneNumber" type="tel" th:field="*{phoneNumber}" maxlength="30">
+            </div>
+        </div>
+
+        <label for="password" th:text="#{team.startingPassword}">Starting password</label>
+        <input id="password" type="password" name="password" minlength="8" required autocomplete="new-password">
+        <p class="hint" th:text="#{team.startingPasswordHint}">At least 8 characters. They must choose their own the first time they sign in.</p>
+
+        <label for="photo"><span th:text="#{team.facePhoto}">Face photo</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+        <p class="hint" th:text="#{team.facePhotoHint}">A clear photo of their face, looking at the camera. Used for check-in at the gate. JPEG, PNG or WebP, up to 5 MB.</p>
+
+        <div class="actions"><button type="submit" class="btn" th:text="#{team.createAccount}">Create account</button></div>
+    </form>
+</main>
+</html>

@@ -119,19 +119,21 @@ class ServiceIntegrationTest {
 
     @Test
     void duplicateEmployeeCodeIsARuleError() {
-        NewUser details = new NewUser("W1", "Copy", null, null, "pw", "WORKER", null);
+        NewUser details = new NewUser("W1", "Copy", null, null, "long-enough-pw", "WORKER", null);
 
         assertThatThrownBy(() -> userService.create(admin, details)).isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
-    void managerEditsOnlyTheirOwnTeamAndCannotChangeRoles() {
+    void onlyAnAdminEditsDetailsAndAManagerCannotEvenEditTheirOwnTeam() {
         long version = users.findById(worker).orElseThrow().getVersion();
         Profile profile = new Profile("Renamed", null, "0123");
 
-        assertThat(userService.updateProfile(manager, worker, profile, version).getFullName()).isEqualTo("Renamed");
+        assertThatThrownBy(() -> userService.updateProfile(manager, worker, profile, version))
+                .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> userService.updateProfile(manager, otherWorker, profile, 0))
                 .isInstanceOf(AccessDeniedException.class);
+        assertThat(userService.updateProfile(admin, worker, profile, version).getFullName()).isEqualTo("Renamed");
         assertThatThrownBy(() -> userService.changeRole(manager, worker, "ADMIN"))
                 .isInstanceOf(AccessDeniedException.class);
     }
@@ -141,21 +143,77 @@ class ServiceIntegrationTest {
         long stale = users.findById(worker).orElseThrow().getVersion() + 1;
         Profile profile = new Profile("Renamed", null, null);
 
-        assertThatThrownBy(() -> userService.updateProfile(manager, worker, profile, stale))
+        assertThatThrownBy(() -> userService.updateProfile(admin, worker, profile, stale))
                 .isInstanceOf(StaleEditException.class);
     }
 
     @Test
     void newPhotoIsSavedAndQueuedTogether() {
-        AppUser updated = userService.changeFacePhoto(manager, worker, "faces/w1.jpg");
+        AppUser updated = userService.changeFacePhoto(admin, worker, "w1.jpg");
 
-        assertThat(updated.getFaceFilePath()).isEqualTo("faces/w1.jpg");
+        assertThat(updated.getFaceFilePath()).isEqualTo("w1.jpg");
         assertThat(embeddings.findByUserId(worker).orElseThrow().getStatus()).isEqualTo(EmbeddingStatus.PENDING);
+        assertThat(userService.faceStatuses(admin, java.util.List.of(worker, otherWorker)))
+                .containsExactly(java.util.Map.entry(worker, EmbeddingStatus.PENDING));
+    }
+
+    @Test
+    void onlyAnAdminHandlesFacePhotos() {
+        assertThatThrownBy(() -> userService.changeFacePhoto(manager, worker, "w1.jpg"))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> userService.faceEnrolment(manager, worker)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> userService.facePhotoPath(manager, worker)).isInstanceOf(AccessDeniedException.class);
+        assertThat(embeddings.findByUserId(worker)).isEmpty();
+    }
+
+    @Test
+    void createChecksWhatTheAdminTyped() {
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("has space", "N", null, null, "long-enough-pw", "WORKER", null)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("employee code");
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", "N", null, null, "short", "WORKER", null)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("at least 8");
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", " ", null, null, "long-enough-pw", "WORKER", null)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("name");
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", "N", "nope", null, "long-enough-pw", "WORKER", null)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("email");
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", "N", null, null, "long-enough-pw", "", null)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("role");
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", "N", null, null, "é".repeat(40), "WORKER", null)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("too long");
+    }
+
+    @Test
+    void createQueuesTheFacePhotoAndTheStartingPasswordMustBeChanged() {
+        AppUser created = userService.create(admin,
+                new NewUser(" W8 ", "New Face", null, null, "long-enough-pw", "WORKER", null), "w8.jpg");
+
+        assertThat(created.getEmployeeCode()).isEqualTo("W8");
+        assertThat(created.getFaceFilePath()).isEqualTo("w8.jpg");
+        assertThat(created.isMustChangePassword()).isTrue();
+        assertThat(embeddings.findByUserId(created.getId()).orElseThrow().getStatus()).isEqualTo(EmbeddingStatus.PENDING);
+    }
+
+    @Test
+    void aResetPasswordMustBeChangedAndTheNewOneMustDiffer() {
+        userService.resetPassword(admin, worker, "first-pw");
+        assertThat(users.findById(worker).orElseThrow().isMustChangePassword()).isTrue();
+
+        assertThatThrownBy(() -> userService.changeOwnPassword(worker, "first-pw", "first-pw"))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> userService.changeOwnPassword(worker, "first-pw", "short"))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> userService.resetPassword(admin, worker, "short"))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> userService.resetPassword(manager, worker, "long-enough-pw"))
+                .isInstanceOf(AccessDeniedException.class);
+
+        userService.changeOwnPassword(worker, "first-pw", "second-pw");
+        assertThat(users.findById(worker).orElseThrow().isMustChangePassword()).isFalse();
     }
 
     @Test
     void softDeleteErasesTheEmbedding() {
-        userService.changeFacePhoto(admin, worker, "faces/w1.jpg");
+        userService.changeFacePhoto(admin, worker, "w1.jpg");
 
         userService.softDelete(admin, worker);
         em.flush();
@@ -186,7 +244,10 @@ class ServiceIntegrationTest {
     void teamManagerMustBeAManager() {
         assertThatThrownBy(() -> teamService.create(admin, "Team three", worker))
                 .isInstanceOf(BusinessRuleException.class);
-        assertThat(teamService.create(admin, "Team three", manager).getManager().getId()).isEqualTo(manager);
+        Long free = user("M9", "MANAGER", null);
+        assertThat(teamService.create(admin, "Team three", free).getManager().getId()).isEqualTo(free);
+        assertThatThrownBy(() -> teamService.create(admin, "Team four", manager))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("already leads");
     }
 
     // --- shifts ----------------------------------------------------------------------------
@@ -260,7 +321,7 @@ class ServiceIntegrationTest {
 
         assertThat(ticketService.listOwn(worker)).containsExactly(ticket);
         assertThat(ticketService.listHandled(hse)).containsExactly(ticket);
-        assertThat(ticketService.listHandled(manager)).isEmpty();
+        assertThatThrownBy(() -> ticketService.listHandled(manager)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> ticketService.resolve(manager, ticket.getId())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> ticketService.resolve(worker, ticket.getId())).isInstanceOf(AccessDeniedException.class);
 
@@ -294,7 +355,9 @@ class ServiceIntegrationTest {
         Ticket ticket = ticketService.create(worker, category("Equipment request"), "Gloves", "Need new gloves");
         em.flush();
 
-        assertThat(ticketService.get(manager, ticket.getId())).isEqualTo(ticket);
+        assertThat(ticketService.get(worker, ticket.getId())).isEqualTo(ticket);
+        assertThat(ticketService.get(admin, ticket.getId())).isEqualTo(ticket);
+        assertThatThrownBy(() -> ticketService.get(manager, ticket.getId())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> ticketService.get(otherWorker, ticket.getId())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> ticketService.get(hse, ticket.getId())).isInstanceOf(AccessDeniedException.class);
     }

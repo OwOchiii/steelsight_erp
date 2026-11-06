@@ -44,4 +44,8 @@ public class AppUser extends SoftDeletableModel implements Versioned {
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
+
+    /** Set when an admin chose the password; the person must pick their own at the next sign-in. */
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
 }

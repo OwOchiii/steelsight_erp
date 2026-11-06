@@ -38,7 +38,7 @@ class SupabasePhotoStorageTest {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         storage = new SupabasePhotoStorage(
-                SupabasePhotoStorage.configured(builder, "https://example.supabase.co/", "secret-key"), "ticket-photos");
+                SupabasePhotoStorage.configured(builder, "https://example.supabase.co/", "secret-key"), "ticket-photos", "face-photos");
     }
 
     @Test
@@ -51,7 +51,7 @@ class SupabasePhotoStorageTest {
                 .andExpect(content().bytes(PNG))
                 .andRespond(withSuccess());
 
-        String stored = storage.store(new MockMultipartFile("photo", "evil.exe", "text/html", PNG));
+        String stored = storage.store(PhotoAlbum.TICKET, new MockMultipartFile("photo", "evil.exe", "text/html", PNG));
 
         assertThat(stored).endsWith(".png");
         server.verify();
@@ -59,8 +59,8 @@ class SupabasePhotoStorageTest {
 
     @Test
     void noPhotoMeansNoUpload() {
-        assertThat(storage.store(null)).isNull();
-        assertThat(storage.store(new MockMultipartFile("photo", new byte[0]))).isNull();
+        assertThat(storage.store(PhotoAlbum.TICKET, null)).isNull();
+        assertThat(storage.store(PhotoAlbum.TICKET, new MockMultipartFile("photo", new byte[0]))).isNull();
         server.verify();
     }
 
@@ -68,7 +68,7 @@ class SupabasePhotoStorageTest {
     void refusesAFileThatIsNotAnImageWithoutUploadingIt() {
         server.expect(never(), requestTo(matchesPattern(".*")));
 
-        assertThatThrownBy(() -> storage.store(new MockMultipartFile("photo", "a.png", "image/png", "<html>".getBytes())))
+        assertThatThrownBy(() -> storage.store(PhotoAlbum.TICKET, new MockMultipartFile("photo", "a.png", "image/png", "<html>".getBytes())))
                 .isInstanceOf(BusinessRuleException.class);
         server.verify();
     }
@@ -77,7 +77,7 @@ class SupabasePhotoStorageTest {
     void aFailedUploadIsReportedRatherThanLosingThePhotoSilently() {
         server.expect(requestTo(matchesPattern(BASE + ".*"))).andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
-        assertThatThrownBy(() -> storage.store(new MockMultipartFile("photo", PNG)))
+        assertThatThrownBy(() -> storage.store(PhotoAlbum.TICKET, new MockMultipartFile("photo", PNG)))
                 .isInstanceOf(RestClientResponseException.class);
     }
 
@@ -86,7 +86,7 @@ class SupabasePhotoStorageTest {
         server.expect(requestTo(BASE + "a.png")).andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess(PNG, MediaType.IMAGE_PNG));
 
-        Resource photo = storage.load("a.png");
+        Resource photo = storage.load(PhotoAlbum.TICKET, "a.png");
 
         assertThat(photo.getContentAsByteArray()).isEqualTo(PNG);
     }
@@ -94,26 +94,48 @@ class SupabasePhotoStorageTest {
     @Test
     void aMissingPhotoIsNotFoundWhicheverStatusSupabaseUses() {
         server.expect(requestTo(BASE + "gone.png")).andRespond(withStatus(HttpStatus.BAD_REQUEST));
-        assertThatThrownBy(() -> storage.load("gone.png")).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> storage.load(PhotoAlbum.TICKET, "gone.png")).isInstanceOf(NotFoundException.class);
 
         server.reset();
         server.expect(requestTo(BASE + "gone.png")).andRespond(withStatus(HttpStatus.NOT_FOUND));
-        assertThatThrownBy(() -> storage.load("gone.png")).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> storage.load(PhotoAlbum.TICKET, "gone.png")).isInstanceOf(NotFoundException.class);
     }
 
     @Test
     void anOutageIsNotReportedAsAMissingPhoto() {
         server.expect(requestTo(BASE + "a.png")).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
-        assertThatThrownBy(() -> storage.load("a.png")).isInstanceOf(RestClientResponseException.class);
+        assertThatThrownBy(() -> storage.load(PhotoAlbum.TICKET, "a.png")).isInstanceOf(RestClientResponseException.class);
     }
 
     @Test
-    void aNameCannotEscapeTheBucketPath() {
-        server.expect(requestTo(BASE + "..%2F..%2Fsecret")).andRespond(withStatus(HttpStatus.NOT_FOUND));
+    void aNameThatIsNotAStoredNameIsRefusedWithoutAskingSupabase() {
+        server.expect(never(), requestTo(matchesPattern(".*")));
 
-        assertThatThrownBy(() -> storage.load("../../secret")).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> storage.load(PhotoAlbum.TICKET, "../../secret")).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> storage.load(PhotoAlbum.TICKET, "faces/a.png")).isInstanceOf(NotFoundException.class);
+        assertThatCode(() -> storage.delete(PhotoAlbum.FACE, "../a.png")).doesNotThrowAnyException();
         server.verify();
+    }
+
+    @Test
+    void facePhotosGoToTheirOwnBucket() {
+        server.expect(requestTo(matchesPattern("https://example.supabase.co/storage/v1/object/face-photos/[0-9a-f-]{36}\\.png")))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess());
+        server.expect(requestTo("https://example.supabase.co/storage/v1/object/face-photos/b.png"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(PNG, MediaType.IMAGE_PNG));
+
+        storage.store(PhotoAlbum.FACE, new MockMultipartFile("photo", PNG));
+        storage.load(PhotoAlbum.FACE, "b.png");
+        server.verify();
+    }
+
+    @Test
+    void refusesToShareOneBucketBetweenFacesAndTickets() {
+        assertThatThrownBy(() -> new SupabasePhotoStorage(RestClient.builder().build(), "photos", "photos"))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -121,8 +143,8 @@ class SupabasePhotoStorageTest {
         server.expect(requestTo(BASE + "a.png")).andExpect(method(HttpMethod.DELETE))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
-        assertThatCode(() -> storage.delete("a.png")).doesNotThrowAnyException();
-        assertThatCode(() -> storage.delete(null)).doesNotThrowAnyException();
+        assertThatCode(() -> storage.delete(PhotoAlbum.TICKET, "a.png")).doesNotThrowAnyException();
+        assertThatCode(() -> storage.delete(PhotoAlbum.TICKET, null)).doesNotThrowAnyException();
         server.verify();
     }
 }

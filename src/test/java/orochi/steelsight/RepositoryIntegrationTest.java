@@ -319,20 +319,20 @@ class RepositoryIntegrationTest {
     @Test
     void ticketsAreEditedByTheHandlingRoleAndAdmin() {
         Long hseTicket = tickets.saveAndFlush(ticket("Safety concern", null)).getId();
-        Long managerTicket = tickets.saveAndFlush(ticket("Equipment request", null)).getId();
+        Long adminTicket = tickets.saveAndFlush(ticket("Equipment request", null)).getId();
 
         assertThat(call("can_update_ticket", hse, hseTicket)).isTrue();
-        assertThat(call("can_update_ticket", hse, managerTicket)).isFalse();
-        assertThat(call("can_update_ticket", manager, managerTicket)).isTrue();
+        assertThat(call("can_update_ticket", hse, adminTicket)).isFalse();
+        assertThat(call("can_update_ticket", manager, adminTicket)).isFalse();
         assertThat(call("can_update_ticket", manager, hseTicket)).isFalse();
         assertThat(call("can_update_ticket", worker, hseTicket)).isFalse();
         assertThat(call("can_update_ticket", admin, hseTicket)).isTrue();
-        assertThat(call("can_update_ticket", admin, managerTicket)).isTrue();
+        assertThat(call("can_update_ticket", admin, adminTicket)).isTrue();
     }
 
     @Test
-    void managerEditsOnlyWorkersOnTheirTeam() {
-        assertThat(call("can_update_user", manager, worker.getId())).isTrue();
+    void onlyAnAdminEditsPeople() {
+        assertThat(call("can_update_user", manager, worker.getId())).isFalse();
         assertThat(call("can_update_user", manager, otherWorker.getId())).isFalse();
         assertThat(call("can_update_user", manager, manager.getId())).isFalse();
         assertThat(call("can_update_user", hse, worker.getId())).isFalse();

@@ -72,3 +72,4 @@ steelsight:
     supabase-url: ${SUPABASE_URL:}
     supabase-key: ${SUPABASE_SERVICE_KEY:}
     supabase-bucket: ${SUPABASE_STORAGE_BUCKET:ticket-photos}
+    supabase-face-bucket: ${SUPABASE_FACE_BUCKET:face-photos}

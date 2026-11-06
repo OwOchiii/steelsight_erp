@@ -89,10 +89,11 @@ class WorkerAccessPagesTest extends PageTestSupport {
     }
 
     @Test
-    void managerGetsChangeLinksForTheirOwnWorker() throws Exception {
+    void managerCanPlanTheirOwnWorkersShiftsButNotEditThem() throws Exception {
         mvc.perform(get("/workers/" + mine).with(as(manager)))
-                .andExpect(content().string(containsString("/team/" + mine + "/edit")))
+                .andExpect(content().string(not(containsString("/team/" + mine + "/edit"))))
                 .andExpect(content().string(containsString("/shifts/new?workerId=" + mine)));
+        mvc.perform(get("/team/" + mine + "/edit").with(as(manager))).andExpect(status().isForbidden());
     }
 
     @Test
@@ -107,33 +108,20 @@ class WorkerAccessPagesTest extends PageTestSupport {
     }
 
     @Test
-    void managerHandlesTicketsFromTheirOwnTeamOnly() throws Exception {
-        Long category = category("Equipment request");
-        Long fromMine = ticket(category, mine, "Boots from mine");
-        Long fromTheirs = ticket(category, theirs, "Boots from theirs");
-
-        mvc.perform(get("/tickets/queue").with(as(manager)))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Boots from mine")))
-                .andExpect(content().string(not(containsString("Boots from theirs"))));
-        mvc.perform(get("/tickets/" + fromMine).with(as(manager))).andExpect(status().isOk());
-        mvc.perform(get("/tickets/" + fromTheirs).with(as(manager))).andExpect(status().isForbidden());
-
-        mvc.perform(post("/tickets/" + fromTheirs + "/resolve").with(as(manager)).with(csrf())).andExpect(status().isForbidden());
-        assertThat(textColumn("SELECT status FROM ticket WHERE id = ?", fromTheirs)).isEqualTo("OPEN");
-
-        mvc.perform(post("/tickets/" + fromMine + "/resolve").with(as(manager)).with(csrf())).andExpect(status().is3xxRedirection());
-        assertThat(textColumn("SELECT status FROM ticket WHERE id = ?", fromMine)).isEqualTo("RESOLVED");
-    }
-
-    @Test
-    void aTicketFromSomeoneWithNoTeamReachesOnlyAnAdmin() throws Exception {
+    void nonSafetyTicketsGoToAdminWhicheverTeamTheyComeFrom() throws Exception {
+        Long fromMine = ticket(category("Equipment request"), mine, "Boots from mine");
         Long loner = userWithRole("WA-W3", "Lone Worker", "WORKER");
-        Long ticket = ticket(category("Equipment request"), loner, "Boots from nobody");
+        Long fromNobody = ticket(category("Equipment request"), loner, "Boots from nobody");
 
-        mvc.perform(get("/tickets/" + ticket).with(as(manager))).andExpect(status().isForbidden());
-        mvc.perform(get("/tickets/" + ticket).with(as(otherManager))).andExpect(status().isForbidden());
-        mvc.perform(get("/tickets/" + ticket).with(as(admin))).andExpect(status().isOk());
+        mvc.perform(get("/tickets/queue").with(as(manager))).andExpect(status().isForbidden());
+        for (Long ticket : new Long[]{fromMine, fromNobody}) {
+            mvc.perform(get("/tickets/" + ticket).with(as(manager))).andExpect(status().isForbidden());
+            mvc.perform(get("/tickets/" + ticket).with(as(admin))).andExpect(status().isOk());
+        }
+        mvc.perform(post("/tickets/" + fromMine + "/resolve").with(as(manager)).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(get("/tickets/queue").with(as(admin)))
+                .andExpect(content().string(containsString("Boots from mine")))
+                .andExpect(content().string(containsString("Boots from nobody")));
     }
 
     @Test

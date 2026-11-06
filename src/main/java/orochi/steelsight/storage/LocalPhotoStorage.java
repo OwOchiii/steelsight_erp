@@ -16,7 +16,8 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 /**
- * Keeps ticket photos on local disk, for development and tests. Stored names are random.
+ * Keeps photos on local disk, for development and tests. Ticket photos stay at the top of the folder,
+ * where earlier versions put them, and face photos go in faces/. Stored names are random.
  */
 @Component
 @ConditionalOnProperty(name = "steelsight.storage.type", havingValue = "local", matchIfMissing = true)
@@ -29,16 +30,16 @@ public class LocalPhotoStorage implements PhotoStorage {
     }
 
     @Override
-    public String store(MultipartFile photo) {
+    public String store(PhotoAlbum album, MultipartFile photo) {
         if (photo == null || photo.isEmpty()) {
             return null;
         }
         try {
-            String extension = PhotoFormat.extensionOf(photo);
-            String name = UUID.randomUUID() + extension;
-            Files.createDirectories(root);
+            String name = UUID.randomUUID() + PhotoFormat.extensionOf(photo);
+            Path folder = folder(album);
+            Files.createDirectories(folder);
             try (InputStream in = photo.getInputStream()) {
-                Files.copy(in, root.resolve(name));
+                Files.copy(in, folder.resolve(name));
             }
             return name;
         } catch (IOException e) {
@@ -47,30 +48,38 @@ public class LocalPhotoStorage implements PhotoStorage {
     }
 
     @Override
-    public Resource load(String storedPath) {
-        Path file = resolve(storedPath);
+    public Resource load(PhotoAlbum album, String storedName) {
+        Path file = resolve(album, storedName);
         if (!Files.isRegularFile(file)) {
-            throw new NotFoundException("Photo", storedPath);
+            throw new NotFoundException("Photo", storedName);
         }
         return new PathResource(file);
     }
 
     @Override
-    public void delete(String storedPath) {
-        if (storedPath == null) {
+    public void delete(PhotoAlbum album, String storedName) {
+        if (!PhotoFormat.isStoredName(storedName)) {
             return;
         }
         try {
-            Files.deleteIfExists(resolve(storedPath));
+            Files.deleteIfExists(resolve(album, storedName));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    private Path resolve(String storedPath) {
-        Path file = root.resolve(storedPath).normalize();
-        if (!file.startsWith(root)) {
-            throw new NotFoundException("Photo", storedPath);
+    private Path folder(PhotoAlbum album) {
+        return album == PhotoAlbum.FACE ? root.resolve("faces") : root;
+    }
+
+    private Path resolve(PhotoAlbum album, String storedName) {
+        if (!PhotoFormat.isStoredName(storedName)) {
+            throw new NotFoundException("Photo", storedName);
+        }
+        Path folder = folder(album);
+        Path file = folder.resolve(storedName).normalize();
+        if (!file.getParent().equals(folder)) {
+            throw new NotFoundException("Photo", storedName);
         }
         return file;
     }

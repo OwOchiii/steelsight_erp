@@ -13,8 +13,11 @@ import orochi.steelsight.identity.service.AccessPolicy;
 import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.scheduling.model.Team;
 import orochi.steelsight.scheduling.repository.TeamRepository;
+import orochi.steelsight.validation.Text;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -27,11 +30,12 @@ public class TeamService {
     private final TeamRepository teams;
     private final AppUserRepository users;
 
+    /** Each team has one leader, and a leader leads one team. */
     public Team create(Long actorId, String name, Long managerId) {
         access.require(actorId, Permissions.USER_MANAGE);
         Team team = new Team();
-        team.setName(name);
-        team.setManager(manager(managerId));
+        team.setName(Text.required("A team name", name, Text.SHORT));
+        team.setManager(freeLeader(managerId, null));
         try {
             return teams.saveAndFlush(team);
         } catch (DataIntegrityViolationException e) {
@@ -42,17 +46,44 @@ public class TeamService {
     public Team changeManager(Long actorId, Long teamId, Long managerId) {
         access.require(actorId, Permissions.USER_MANAGE);
         Team team = teams.require(teamId);
-        team.setManager(manager(managerId));
-        return team;
+        team.setManager(freeLeader(managerId, teamId));
+        return teams.saveAndFlush(team);
     }
 
-    /** The teams this user runs, or every team with USER_MANAGE. */
+    /** Only an empty team, so nobody is left without a leader by accident. */
+    public void delete(Long actorId, Long teamId) {
+        access.require(actorId, Permissions.USER_MANAGE);
+        Team team = teams.require(teamId);
+        if (!users.findAllByTeamIdAndDeletedAtIsNull(teamId).isEmpty()) {
+            throw new BusinessRuleException("Move this team's people to another team first");
+        }
+        // Deleted accounts keep their history but needn't keep the team.
+        users.findAllByTeamId(teamId).forEach(gone -> gone.setTeam(null));
+        users.flush();
+        teams.delete(team);
+    }
+
+    /** Managers who can be given a team, because they don't lead one yet. */
+    @Transactional(readOnly = true)
+    public List<AppUser> listLeaderCandidates(Long actorId) {
+        access.require(actorId, Permissions.USER_MANAGE);
+        return users.findManagersWithoutATeam();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Long> countMembers(Long actorId) {
+        access.require(actorId, Permissions.USER_MANAGE);
+        return teams.countMembers().stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+    }
+
+    /** The teams this user runs shifts for, or every team with USER_MANAGE. */
     @Transactional(readOnly = true)
     public List<Team> listManaged(Long actorId) {
         if (access.has(actorId, Permissions.USER_MANAGE)) {
             return teams.findAll(Sort.by("name"));
         }
-        access.require(actorId, Permissions.USER_UPDATE_TEAM);
+        access.require(actorId, Permissions.SHIFT_UPDATE_TEAM);
         return teams.findAllByManagerId(actorId);
     }
 
@@ -60,7 +91,7 @@ public class TeamService {
     public Team setLateAfterMinutes(Long actorId, Long teamId, Integer minutes) {
         Team team = teams.require(teamId);
         if (!access.has(actorId, Permissions.USER_MANAGE)) {
-            access.require(actorId, Permissions.USER_UPDATE_TEAM);
+            access.require(actorId, Permissions.SHIFT_UPDATE_TEAM);
             if (!team.isManagedBy(actorId)) {
                 throw new AccessDeniedException("This is another manager's team");
             }
@@ -70,6 +101,18 @@ public class TeamService {
         }
         team.setLateAfterMinutes(minutes);
         return teams.saveAndFlush(team);
+    }
+
+    private AppUser freeLeader(Long managerId, Long teamId) {
+        if (managerId == null) {
+            throw new BusinessRuleException("Choose a leader for the team");
+        }
+        AppUser leader = manager(managerId);
+        boolean leadsAnother = teams.findAllByManagerId(managerId).stream().anyMatch(t -> !t.getId().equals(teamId));
+        if (leadsAnother) {
+            throw new BusinessRuleException("This manager already leads another team");
+        }
+        return leader;
     }
 
     private AppUser manager(Long id) {

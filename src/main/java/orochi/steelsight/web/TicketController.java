@@ -18,7 +18,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import orochi.steelsight.exception.NotFoundException;
+import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.security.AuthenticatedUser;
+import orochi.steelsight.storage.PhotoAlbum;
 import orochi.steelsight.storage.PhotoStorage;
 import orochi.steelsight.ticketing.model.Ticket;
 import orochi.steelsight.ticketing.service.TicketService;
@@ -41,9 +43,12 @@ public class TicketController extends PageController {
     @GetMapping("/tickets/queue")
     public String queue(@AuthenticationPrincipal AuthenticatedUser user,
                         @RequestParam(defaultValue = "false") boolean resolved,
+                        @RequestParam(defaultValue = "false") boolean all,
                         @RequestParam(defaultValue = "0") int page, Model model) {
-        model.addAttribute("tickets", tickets.listQueue(user.getUserId(), resolved, pageOf(page)));
+        boolean everyCategory = all && user.can(Permissions.TICKET_READ_ALL);
+        model.addAttribute("tickets", tickets.listQueue(user.getUserId(), resolved, everyCategory, pageOf(page)));
         model.addAttribute("resolved", resolved);
+        model.addAttribute("all", everyCategory);
         return "tickets/queue";
     }
 
@@ -59,14 +64,14 @@ public class TicketController extends PageController {
                          @RequestParam(required = false) MultipartFile photo,
                          Model model, HttpServletResponse response, RedirectAttributes redirect) {
         return submit(binding, model, response, () -> {
-            String storedPhoto = photos.store(photo);
+            String storedPhoto = photos.store(PhotoAlbum.TICKET, photo);
             try {
                 Ticket ticket = tickets.create(user.getUserId(), new TicketService.NewTicket(
                         form.getCategoryId(), form.getSubject(), form.getDescription(), form.getZoneId(), storedPhoto));
                 redirect.addFlashAttribute("success", "Your ticket was sent.");
                 return "redirect:/tickets/" + ticket.getId();
             } catch (RuntimeException e) {
-                photos.delete(storedPhoto);
+                photos.delete(PhotoAlbum.TICKET, storedPhoto);
                 throw e;
             }
         }, () -> showForm(user, model));
@@ -117,7 +122,7 @@ public class TicketController extends PageController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(photos.contentType(ticket.getPhotoPath())))
                 .cacheControl(CacheControl.noStore())
-                .body(photos.load(ticket.getPhotoPath()));
+                .body(photos.load(PhotoAlbum.TICKET, ticket.getPhotoPath()));
     }
 
     private String showForm(AuthenticatedUser user, Model model) {

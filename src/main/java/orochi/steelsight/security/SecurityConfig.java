@@ -11,6 +11,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
+import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.web.RequestLogFilter;
 
 @Configuration(proxyBeanMethods = false)
@@ -35,11 +36,13 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
-    SecurityFilterChain securityFilterChain(HttpSecurity http, SignInLimiter signInLimiter) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, SignInLimiter signInLimiter,
+                                           AppUserRepository users) throws Exception {
         return http
                 // Just inside the security context, so it sees the user and also logs refused requests.
                 .addFilterAfter(new RequestLogFilter(), SecurityContextHolderFilter.class)
                 .addFilterBefore(new SignInLimitFilter(signInLimiter), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new PasswordChangeRequiredFilter(), AuthorizationFilter.class)
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/login", "/language", "/css/**", "/js/**", "/img/**", "/error").permitAll()
@@ -47,7 +50,7 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .usernameParameter("employeeCode")
-                        .defaultSuccessUrl("/", true)
+                        .successHandler(new FirstSignInHandler(users))
                         .permitAll())
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?signedOut")

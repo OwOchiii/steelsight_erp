@@ -14,6 +14,14 @@ final class PhotoFormat {
     private PhotoFormat() {
     }
 
+    /**
+     * Stored names are generated, so they never hold a folder. Refusing anything else means a bad value
+     * in the database can't reach into another album or outside the storage folder.
+     */
+    static boolean isStoredName(String name) {
+        return name != null && name.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,99}") && !name.contains("..");
+    }
+
     static String extensionOf(MultipartFile photo) throws IOException {
         byte[] head;
         try (InputStream in = photo.getInputStream()) {

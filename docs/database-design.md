@@ -60,7 +60,7 @@ In the entity tables, Field Size gives bytes for fixed-size types and precision,
 
 ### 1.1 Identity and Access Management
 
-This domain stores user accounts and decides what each one may do. Each user has one role, and a role holds many permissions, with one row per action. The seeded roles are WORKER, HSE_OFFICER, MANAGER and ADMIN, and Admin holds every permission. Users sign in with their employee code.
+This domain stores user accounts and decides what each one may do. Each user has one role, and a role holds many permissions, with one row per action. The seeded roles are WORKER, HSE_OFFICER, MANAGER and ADMIN, and Admin holds every permission. Only Admin creates or changes accounts, including face photos. Managers can see every worker, but only plan shifts for the teams they run. Users sign in with their employee code.
 
 ```mermaid
 erDiagram
@@ -98,6 +98,7 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         timestamptz deleted_at
+        boolean must_change_password
     }
 ```
 
@@ -118,7 +119,7 @@ One action in the system, such as TICKET_CREATE.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | id | bigint | 8 bytes | PK | No | Yes | Generated permission ID |
 | 2 | code | text | Variable |  | No | Yes | Code loaded by Spring Security as an authority |
-| 3 | module | text | Variable |  | No | No | Area the action belongs to: TICKET, SHIFT, VIOLATION, USER or CHECKIN |
+| 3 | module | text | Variable |  | No | No | Area the action belongs to: TICKET, SHIFT, VIOLATION, USER, CHECKIN or REPORT |
 | 4 | action | text | Variable |  | No | No | Type of action: READ, CREATE, UPDATE, DELETE, REVIEW or MANAGE |
 | 5 | description | text | Variable |  | Yes | No | Plain-language explanation of the permission |
 
@@ -145,16 +146,17 @@ Every person who uses the system.
 | 6 | email | text | Variable |  | Yes | Yes | User's email address |
 | 7 | phone_number | text | Variable |  | Yes | No | User's phone number |
 | 8 | password_hash | text | Variable |  | No | No | BCrypt hash of the password; never the password itself |
-| 9 | face_file_path | text | Variable |  | Yes | No | Path of the enrolment photo in storage |
+| 9 | face_file_path | text | Variable |  | Yes | No | Name of the enrolment photo in the private face photo bucket; only an admin sets it |
 | 10 | is_active | boolean | 1 byte |  | No | No | False blocks sign-in; defaults to true |
 | 11 | version | bigint | 8 bytes |  | No | No | Optimistic lock counter; defaults to 0 |
 | 12 | created_at | timestamptz | 8 bytes |  | No | No | When the row was created |
 | 13 | updated_at | timestamptz | 8 bytes |  | No | No | When the row last changed; set by a trigger |
 | 14 | deleted_at | timestamptz | 8 bytes |  | Yes | No | When the user was soft-deleted; a trigger then erases their face embedding |
+| 15 | must_change_password | boolean | 1 byte |  | No | No | True when an admin chose the password, on a new account or a reset; they must pick their own at the next sign-in. Defaults to false |
 
 ### 1.2 Worker Management
 
-This domain groups workers into teams and records when they are on site. Each team has one manager, whose scope covers that team's workers. A check-in row is one site visit, created by face match at the gate or entered by hand by HSE. Enrolment runs through face_embedding: the ERP queues a photo, and the detection service computes the vector. The account fields for each worker are in app_user, under Identity and Access Management.
+This domain groups workers into teams and records when they are on site. Admin puts each worker in a team. Each team has one leader, a manager, and a manager leads at most one team. The leader plans shifts only for that team's workers, and exports its monthly report for accounting. A check-in row is one site visit, created by face match at the gate or entered by hand by HSE. Enrolment runs through face_embedding: the ERP queues a photo, and the detection service computes the vector. The account fields for each worker are in app_user, under Identity and Access Management.
 
 ```mermaid
 erDiagram
@@ -213,7 +215,7 @@ A group of workers under one manager.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | id | bigint | 8 bytes | PK | No | Yes | Generated team ID |
 | 2 | name | text | Variable |  | No | Yes | Team name |
-| 3 | manager_id | bigint | 8 bytes | FK → app_user(id) | Yes | No | The team's manager |
+| 3 | manager_id | bigint | 8 bytes | FK → app_user(id) | Yes | Partial | The team's leader; unique when set, so a manager leads one team |
 | 4 | late_after_minutes | integer | 4 bytes |  | No | No | Minutes after a shift starts before a check-in is tagged late, 0 to 240; defaults to 15 |
 
 #### 1.2.2 check_in
@@ -428,7 +430,7 @@ One PPE violation detected by a camera.
 
 ### 1.5 Ticket Management
 
-This domain handles requests and reports raised by users. Each category names the role that handles it, and that link sets who can see and resolve its tickets. HSE officers handle every ticket in their categories. Managers handle only tickets opened by people on a team they run, so a ticket from someone with no team goes to an admin. Admin can work on any ticket. A PPE dispute ticket links to one violation and closes only when that dispute is decided, in the same transaction.
+This domain handles requests and reports raised by users. Each category names the role that handles it, and that link sets who can see and resolve its tickets. HSE officers handle PPE disputes and safety concerns, and see no other tickets. Admin handles every other category, such as leave requests, and can also open HSE's tickets. Managers only open and read their own tickets. A PPE dispute ticket links to one violation and closes only when that dispute is decided, in the same transaction.
 
 ```mermaid
 erDiagram
@@ -475,7 +477,7 @@ erDiagram
 
 #### 1.5.1 ticket_category
 
-A type of ticket and the role that handles it. The seeded categories are PPE dispute and Safety concern (HSE_OFFICER), Shift or timetable issue and Equipment request (MANAGER), and Account or access (ADMIN).
+A type of ticket and the role that handles it. The categories are PPE dispute and Safety concern (HSE_OFFICER), and Shift or timetable issue, Equipment request, Leave request and Account or access (ADMIN).
 
 | No. | Field Name | Data Type | Field Size | P/F Key | Nullable | Unique | Description |
 | --- | --- | --- | --- | --- | --- | --- | --- |

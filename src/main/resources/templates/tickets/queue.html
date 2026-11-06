@@ -1,10 +1,14 @@
 <!doctype html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{queue.title}, 'queue', ~{::main})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: app(#{queue.title}, 'queue', ~{::main})}">
 <main class="page">
     <div class="page-head"><h1 th:text="#{queue.title}">Ticket queue</h1></div>
     <nav class="tabs" th:attr="aria-label=#{queue.tabs}">
-        <a th:href="@{/tickets/queue}" th:attr="aria-current=${resolved} ? null : 'page'" th:text="#{queue.toHandle}">To handle</a>
-        <a th:href="@{/tickets/queue(resolved=true)}" th:attr="aria-current=${resolved} ? 'page' : null" th:text="#{queue.resolved}">Resolved</a>
+        <a th:href="@{/tickets/queue(all=${all} ? true : null)}" th:attr="aria-current=${resolved} ? null : 'page'" th:text="#{queue.toHandle}">To handle</a>
+        <a th:href="@{/tickets/queue(resolved=true, all=${all} ? true : null)}" th:attr="aria-current=${resolved} ? 'page' : null" th:text="#{queue.resolved}">Resolved</a>
+    </nav>
+    <nav class="tabs" sec:authorize="hasAuthority('TICKET_READ_ALL')" th:attr="aria-label=#{queue.scope}">
+        <a th:href="@{/tickets/queue(resolved=${resolved} ? true : null)}" th:attr="aria-current=${all} ? null : 'page'" th:text="#{queue.mine}">My categories</a>
+        <a th:href="@{/tickets/queue(resolved=${resolved} ? true : null, all=true)}" th:attr="aria-current=${all} ? 'page' : null" th:text="#{queue.all}">All tickets</a>
     </nav>
     <p class="empty panel-less-empty" th:if="${tickets.totalElements == 0}" th:text="${resolved} ? #{queue.emptyResolved} : #{queue.emptyOpen}">Empty</p>
     <th:block th:unless="${tickets.isEmpty()}"><div th:replace="~{fragments/lists :: tickets(${tickets}, true)}"></div></th:block>

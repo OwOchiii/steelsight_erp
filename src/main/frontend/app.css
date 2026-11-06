@@ -307,6 +307,13 @@
     .setting { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin-top: 12px; }
     .setting input { width: 110px; }
     .setting label { margin-top: 0; }
+    .setting .grow { flex: 1 1 220px; }
+    .setting .grow input { width: 100%; }
+    /* Account pages: the face photo beside its enrolment status */
+    .face-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 16px; margin-bottom: 4px; }
+    .face-photo { width: 96px; height: 96px; object-fit: cover; border: 1px solid var(--line); border-radius: 4px; background: var(--raised); }
+    .check { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+    .check input { width: auto; }
 
     /* Shift grid */
     .week-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 12px; }

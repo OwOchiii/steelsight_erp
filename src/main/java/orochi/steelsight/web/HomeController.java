@@ -61,7 +61,7 @@ public class HomeController {
             model.addAttribute("myViolations", own.stream().limit(SHORT_LIST).toList());
             model.addAttribute("safety", safety.own(user.getUserId()));
         }
-        if (user.can(Permissions.TICKET_READ_HANDLED) || user.can(Permissions.TICKET_READ_TEAM) || user.can(Permissions.TICKET_READ_ALL)) {
+        if (user.can(Permissions.TICKET_READ_HANDLED) || user.can(Permissions.TICKET_READ_ALL)) {
             model.addAttribute("queueCount", tickets.countUnresolvedInQueue(user.getUserId()));
             model.addAttribute("oldestTickets",
                     tickets.listQueue(user.getUserId(), false, PageRequest.of(0, SHORT_LIST)).getContent());

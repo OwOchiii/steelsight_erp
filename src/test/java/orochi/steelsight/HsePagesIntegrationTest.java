@@ -183,9 +183,7 @@ class HsePagesIntegrationTest extends PageTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Loose guard rail")))
                 .andExpect(content().string(not(containsString("New boots"))));
-        mvc.perform(get("/tickets/queue").with(as(manager)))
-                .andExpect(content().string(containsString("New boots")))
-                .andExpect(content().string(not(containsString("Loose guard rail"))));
+        mvc.perform(get("/tickets/queue").with(as(manager))).andExpect(status().isForbidden());
     }
 
     @Test

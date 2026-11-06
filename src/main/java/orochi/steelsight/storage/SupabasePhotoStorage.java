@@ -22,8 +22,8 @@ import java.time.Duration;
 import java.util.UUID;
 
 /**
- * Keeps ticket photos in a private Supabase Storage bucket. The server key stays on the server and
- * browsers only ever get photos through the ticket page, so its permission checks still apply.
+ * Keeps photos in private Supabase Storage buckets, one per album. The server key stays on the server
+ * and browsers only ever get photos through the ERP's pages, so their permission checks still apply.
  */
 @Component
 @ConditionalOnProperty(name = "steelsight.storage.type", havingValue = "supabase")
@@ -33,19 +33,25 @@ public class SupabasePhotoStorage implements PhotoStorage {
     private static final String OBJECT = "/storage/v1/object/{bucket}/{name}";
 
     private final RestClient client;
-    private final String bucket;
+    private final String ticketBucket;
+    private final String faceBucket;
 
     @Autowired
     public SupabasePhotoStorage(RestClient.Builder builder,
                                 @Value("${steelsight.storage.supabase-url:}") String url,
                                 @Value("${steelsight.storage.supabase-key:}") String key,
-                                @Value("${steelsight.storage.supabase-bucket:ticket-photos}") String bucket) {
-        this(configured(builder.requestFactory(timeouts()), url, key), bucket);
+                                @Value("${steelsight.storage.supabase-bucket:ticket-photos}") String ticketBucket,
+                                @Value("${steelsight.storage.supabase-face-bucket:face-photos}") String faceBucket) {
+        this(configured(builder.requestFactory(timeouts()), url, key), ticketBucket, faceBucket);
     }
 
-    SupabasePhotoStorage(RestClient client, String bucket) {
+    SupabasePhotoStorage(RestClient client, String ticketBucket, String faceBucket) {
+        if (ticketBucket.equals(faceBucket)) {
+            throw new IllegalStateException("Face photos need their own bucket, apart from ticket photos");
+        }
         this.client = client;
-        this.bucket = bucket;
+        this.ticketBucket = ticketBucket;
+        this.faceBucket = faceBucket;
     }
 
     /** Also used by tests, so they exercise the same URL and headers as the real thing. */
@@ -68,13 +74,13 @@ public class SupabasePhotoStorage implements PhotoStorage {
     }
 
     @Override
-    public String store(MultipartFile photo) {
+    public String store(PhotoAlbum album, MultipartFile photo) {
         if (photo == null || photo.isEmpty()) {
             return null;
         }
         try {
             String name = UUID.randomUUID() + PhotoFormat.extensionOf(photo);
-            client.post().uri(OBJECT, bucket, name)
+            client.post().uri(OBJECT, bucket(album), name)
                     .contentType(MediaType.parseMediaType(contentType(name)))
                     .body(photo.getBytes())
                     .retrieve()
@@ -86,9 +92,12 @@ public class SupabasePhotoStorage implements PhotoStorage {
     }
 
     @Override
-    public Resource load(String storedPath) {
+    public Resource load(PhotoAlbum album, String storedPath) {
+        if (!PhotoFormat.isStoredName(storedPath)) {
+            throw new NotFoundException("Photo", storedPath);
+        }
         try {
-            byte[] bytes = client.get().uri(OBJECT, bucket, storedPath).retrieve().body(byte[].class);
+            byte[] bytes = client.get().uri(OBJECT, bucket(album), storedPath).retrieve().body(byte[].class);
             if (bytes == null) {
                 throw new NotFoundException("Photo", storedPath);
             }
@@ -102,16 +111,20 @@ public class SupabasePhotoStorage implements PhotoStorage {
         }
     }
 
-    /** Only a cleanup after a failed save, so a failure here must not hide the original error. */
+    /** A cleanup, so a failure here must not hide the original error or undo a saved change. */
     @Override
-    public void delete(String storedPath) {
-        if (storedPath == null) {
+    public void delete(PhotoAlbum album, String storedPath) {
+        if (!PhotoFormat.isStoredName(storedPath)) {
             return;
         }
         try {
-            client.delete().uri(OBJECT, bucket, storedPath).retrieve().toBodilessEntity();
+            client.delete().uri(OBJECT, bucket(album), storedPath).retrieve().toBodilessEntity();
         } catch (RestClientException e) {
             log.warn("Could not remove photo {}: {}", storedPath, e.getClass().getSimpleName());
         }
+    }
+
+    private String bucket(PhotoAlbum album) {
+        return album == PhotoAlbum.FACE ? faceBucket : ticketBucket;
     }
 }

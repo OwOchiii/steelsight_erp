@@ -46,7 +46,7 @@
             <span class="kpi-label"><span th:text="#{home.unidentified}">Violations with no worker</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#user-x}"/></svg></span>
             <strong class="kpi-value" th:text="${unidentified}">0</strong>
         </a>
-        <a class="kpi" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_TEAM', 'TICKET_READ_ALL')" th:href="@{/tickets/queue}" th:classappend="${queueCount > 0} ? 'attention'">
+        <a class="kpi" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL')" th:href="@{/tickets/queue}" th:classappend="${queueCount > 0} ? 'attention'">
             <span class="kpi-label"><span th:text="#{home.queue}">Tickets to handle</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#inbox}"/></svg></span>
             <strong class="kpi-value" th:text="${queueCount}">0</strong>
         </a>

@@ -4,11 +4,13 @@
 <head th:replace="~{fragments/layout :: pageHead(${title})}"></head>
 <body hx-boost="true" hx-indicator="#progress">
 <div id="progress" class="progress" aria-hidden="true"></div>
+<th:block th:unless="${forcedPasswordChange}">
 <aside class="sidebar" id="sidebar" th:replace="~{fragments/layout :: sidebar(${active})}"></aside>
 <div class="nav-backdrop" data-nav-toggle></div>
+</th:block>
 <div class="app-body">
     <header class="topbar">
-        <button type="button" class="icon-btn lg:hidden" data-nav-toggle th:attr="aria-label=#{nav.open}">
+        <button type="button" class="icon-btn lg:hidden" data-nav-toggle th:unless="${forcedPasswordChange}" th:attr="aria-label=#{nav.open}">
             <svg class="icon icon-lg" aria-hidden="true"><use th:href="@{/img/icons.svg#menu}"/></svg>
         </button>
         <div class="ml-auto flex items-center gap-2">
@@ -27,6 +29,10 @@
                 <div class="menu-panel" th:with="me=${#authentication.principal}">
                     <strong class="block" th:text="${me.fullName}">Name</strong>
                     <span class="quiet small block" th:text="|${me.username} · ${@display.role(me.roleName)}|">Code</span>
+                    <a class="divider flex items-center gap-2" th:href="@{/account/password}">
+                        <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#pencil}"/></svg>
+                        <span th:text="#{nav.changePassword}">Change password</span>
+                    </a>
                     <form class="divider" th:action="@{/logout}" method="post" hx-boost="false">
                         <button type="submit" class="flex w-full items-center gap-2 text-left">
                             <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#log-out}"/></svg>
@@ -67,17 +73,17 @@
             <th:block sec:authorize="hasAuthority('VIOLATION_READ_OWN')"><a th:replace="~{fragments/layout :: navItem(@{/violations}, 'shield-alert', #{nav.violations}, ${active == 'violations'}, null)}"></a></th:block>
             <th:block sec:authorize="hasAuthority('TICKET_READ_OWN')"><a th:replace="~{fragments/layout :: navItem(@{/tickets}, 'ticket', #{nav.tickets}, ${active == 'tickets'}, null)}"></a></th:block>
         </div>
-        <div class="nav-group" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_TEAM', 'TICKET_READ_ALL', 'VIOLATION_READ_ALL')">
+        <div class="nav-group" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL', 'VIOLATION_READ_ALL')">
             <div class="nav-group-title" th:text="#{nav.group.safety}">Safety and support</div>
-            <th:block sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_TEAM', 'TICKET_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/tickets/queue}, 'inbox', #{nav.queue}, ${active == 'queue'}, ${@navCounts.queue(me)})}"></a></th:block>
+            <th:block sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/tickets/queue}, 'inbox', #{nav.queue}, ${active == 'queue'}, ${@navCounts.queue(me)})}"></a></th:block>
             <th:block sec:authorize="hasAuthority('VIOLATION_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/violations/review}, 'shield-check', #{nav.review}, ${active == 'review'}, ${@navCounts.disputes(me)})}"></a></th:block>
             <th:block sec:authorize="hasAuthority('VIOLATION_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/safety/shifts}, 'activity', #{nav.safetyShifts}, ${active == 'safetyShifts'}, null)}"></a></th:block>
         </div>
-        <div class="nav-group" sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL', 'USER_READ_ALL', 'USER_UPDATE_TEAM', 'USER_MANAGE', 'CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')">
+        <div class="nav-group" sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL', 'USER_READ_ALL', 'SHIFT_UPDATE_TEAM', 'USER_MANAGE', 'CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')">
             <div class="nav-group-title" th:text="#{nav.group.workforce}">Workforce</div>
             <th:block sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/shifts}, 'calendar-range', #{nav.shifts}, ${active == 'shifts'}, null)}"></a></th:block>
             <th:block sec:authorize="hasAnyAuthority('CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/attendance}, 'clipboard-check', #{nav.attendance}, ${active == 'attendance'}, null)}"></a></th:block>
-            <th:block sec:authorize="hasAnyAuthority('USER_UPDATE_TEAM', 'USER_MANAGE')"><a th:replace="~{fragments/layout :: navItem(@{/team}, 'users', #{nav.team}, ${active == 'team'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAnyAuthority('SHIFT_UPDATE_TEAM', 'USER_MANAGE')"><a th:replace="~{fragments/layout :: navItem(@{/team}, 'users', #{nav.team}, ${active == 'team'}, null)}"></a></th:block>
             <th:block sec:authorize="hasAuthority('USER_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/workers}, 'user-round', #{nav.workers}, ${active == 'workers'}, null)}"></a></th:block>
         </div>
     </nav>

@@ -141,15 +141,11 @@ public class TicketService {
         return tickets.findAllByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(actorId, page);
     }
 
-    /** Tickets in the categories the actor's role handles. For a manager, only those from their teams. */
+    /** Tickets in the categories the actor's role handles. */
     @Transactional(readOnly = true)
     public List<Ticket> listHandled(Long actorId) {
-        Long roleId = users.require(actorId).getRole().getId();
-        if (access.has(actorId, Permissions.TICKET_READ_HANDLED)) {
-            return tickets.findAllByHandlerRoleId(roleId);
-        }
-        access.require(actorId, Permissions.TICKET_READ_TEAM);
-        return tickets.findAllByCategoryHandlerRoleIdAndCreatedByTeamManagerIdAndDeletedAtIsNull(roleId, actorId);
+        access.require(actorId, Permissions.TICKET_READ_HANDLED);
+        return tickets.findAllByHandlerRoleId(users.require(actorId).getRole().getId());
     }
 
     @Transactional(readOnly = true)
@@ -158,40 +154,35 @@ public class TicketService {
         return tickets.findAllByDeletedAtIsNull();
     }
 
+    public Page<Ticket> listQueue(Long actorId, boolean resolved, Pageable page) {
+        return listQueue(actorId, resolved, false, page);
+    }
+
     /**
-     * The tickets this user works on: their role's categories, narrowed to their teams for a manager,
-     * or every ticket with TICKET_READ_ALL.
-     * Unresolved tickets come oldest first, because they have waited longest; resolved ones newest first.
+     * The tickets this user works on: the categories their role handles. HSE gets safety and disputes,
+     * admin everything else. With TICKET_READ_ALL and everyCategory, every ticket, so an admin can also
+     * look at HSE's. Unresolved tickets come oldest first, because they have waited longest; resolved
+     * ones newest first.
      */
     @Transactional(readOnly = true)
-    public Page<Ticket> listQueue(Long actorId, boolean resolved, Pageable page) {
-        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_TEAM, Permissions.TICKET_READ_ALL);
+    public Page<Ticket> listQueue(Long actorId, boolean resolved, boolean everyCategory, Pageable page) {
+        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_ALL);
         Set<TicketStatus> statuses = resolved ? EnumSet.of(TicketStatus.RESOLVED) : UNRESOLVED;
         Sort sort = resolved ? Sort.by("resolvedAt", "id").descending() : Sort.by("createdAt", "id");
         Pageable sorted = PageRequest.of(page.getPageNumber(), page.getPageSize(), sort);
-        if (access.has(actorId, Permissions.TICKET_READ_ALL)) {
+        if (everyCategory && access.has(actorId, Permissions.TICKET_READ_ALL)) {
             return tickets.findAllByStatusInAndDeletedAtIsNull(statuses, sorted);
         }
         Long roleId = users.require(actorId).getRole().getId();
-        if (access.has(actorId, Permissions.TICKET_READ_HANDLED)) {
-            return tickets.findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(roleId, statuses, sorted);
-        }
-        return tickets.findAllByCategoryHandlerRoleIdAndCreatedByTeamManagerIdAndStatusInAndDeletedAtIsNull(
-                roleId, actorId, statuses, sorted);
+        return tickets.findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(roleId, statuses, sorted);
     }
 
+    /** Unresolved tickets in the categories the actor's role handles. */
     @Transactional(readOnly = true)
     public long countUnresolvedInQueue(Long actorId) {
-        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_TEAM, Permissions.TICKET_READ_ALL);
-        if (access.has(actorId, Permissions.TICKET_READ_ALL)) {
-            return tickets.countByStatusInAndDeletedAtIsNull(UNRESOLVED);
-        }
+        access.requireAny(actorId, Permissions.TICKET_READ_HANDLED, Permissions.TICKET_READ_ALL);
         Long roleId = users.require(actorId).getRole().getId();
-        if (access.has(actorId, Permissions.TICKET_READ_HANDLED)) {
-            return tickets.countByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(roleId, UNRESOLVED);
-        }
-        return tickets.countByCategoryHandlerRoleIdAndCreatedByTeamManagerIdAndStatusInAndDeletedAtIsNull(
-                roleId, actorId, UNRESOLVED);
+        return tickets.countByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(roleId, UNRESOLVED);
     }
 
     @Transactional(readOnly = true)

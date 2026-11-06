@@ -2,7 +2,7 @@
 
 Versions are the ones the build uses today, from `pom.xml`, `package.json` and the committed files. A dash means the version isn't recorded in this repository, because that part lives in the detection service or is a hosted service. Items marked **planned** are in the architecture diagram but not built yet.
 
-GitLab CI/CD is the project's pipeline. While the code is still on GitHub, GitHub Actions runs the tests instead. The GitLab stages are set up when the repository moves.
+GitLab CI/CD is the project's pipeline. While the code is still on GitHub, GitHub Actions runs the tests, builds the image into GitHub's container registry and deploys it. The GitLab stages are set up when the repository moves.
 
 ## 1. Matrix
 
@@ -28,7 +28,8 @@ GitLab CI/CD is the project's pipeline. While the code is still on GitHub, GitHu
 | Backend | JSON | Jackson 3.0.2 | Reads and writes JSON | Request and response bodies for the alert API |
 | Backend | Health check | Spring Boot Actuator 4.0.0 | Only `/actuator/health` is public | Render checks that a new release started before switching to it |
 | Backend | Logging | SLF4J with Logback 1.5.21 | Request, error and sign-in logs, all sharing a request ID | Find what broke and for whom |
-| Backend | Photo storage | Local disk or Supabase Storage REST API | `PhotoStorage` with a local version for development and a Supabase version for production | Ticket photos survive restarts on Render |
+| Backend | Photo storage | Local disk or Supabase Storage REST API | `PhotoStorage` with a local version for development and a Supabase version for production, keeping ticket and face photos apart | Photos survive restarts on Render |
+| Backend | Excel export | fastexcel 0.18.4 | Writes the monthly report as an `.xlsx` file by streaming, with sheets for the summary, violations, attendance and no-shows | Team leaders send safety and attendance figures to accounting for pay and bonuses |
 | Backend | Boilerplate | Lombok 1.18.42 | Generates getters, setters and constructors at compile time | Shorter entity and service code |
 | Backend | API docs | springdoc-openapi 3.0.3 | In `pom.xml` but not used yet | Reserved for documenting the REST API |
 | Database | Relational database | PostgreSQL 17 | 19 tables in 6 domains, with triggers and `can_*` permission functions | The shared record for the ERP and the detection service |
@@ -46,7 +47,7 @@ GitLab CI/CD is the project's pipeline. While the code is still on GitHub, GitHu
 | Hosting | Container image | Docker, multi-stage `Dockerfile` | Builds with the JDK and runs on the JRE as a non-root user, sized for 512 MB | The same image runs on Render and the laptop |
 | Hosting | Production settings | `application-prod.yaml` | Secure cookie, template cache, small connection pool, Supabase Storage | Turned on by the Dockerfile, so production can't miss them |
 | Hosting | Database hosting | Supabase, session pooler | Managed PostgreSQL over TLS and IPv4 | Reachable from both Render and the laptop |
-| Hosting | File hosting | Supabase Storage, private buckets | Ticket photos now, with face photos and snapshots planned | Durable file storage that Render's disk can't provide |
+| Hosting | File hosting | Supabase Storage, private buckets | Ticket photos and face photos in separate buckets, with snapshots planned | Durable file storage that Render's disk can't provide |
 | Hosting | Detection hosting | Demo laptop, Docker Desktop on WSL2 with the NVIDIA driver | Started by hand before a demo | The only machine with a GPU |
 | Hosting | Demo backup | Cloudflare Tunnel (`cloudflared`) | Exposes the ERP running on the laptop | Fallback if Render is too slow on demo day |
 | CI/CD | Pipeline | GitLab CI/CD with a shared runner | Test, scan, build and deploy stages; merge requests stop after the scan | Only tested and scanned code reaches the live site |
@@ -54,9 +55,11 @@ GitLab CI/CD is the project's pipeline. While the code is still on GitHub, GitHu
 | CI/CD | Dependency scan | Trivy, in GitLab CI/CD | Checks dependencies and the image for known vulnerabilities | Blocks known vulnerable libraries |
 | CI/CD | Image registry | GitLab Container Registry | Stores the ERP image tagged by commit | Render pulls the exact image that was tested |
 | CI/CD | Deploy | Render deploy hook, called by GitLab CI/CD from `main` | Tells Render which image to run | Releases happen only from the main branch |
-| CI/CD | Testing, for now | GitHub Actions | Runs `mvn verify` on pushes and pull requests while the code is on GitHub | Keeps the tests running until the move to GitLab |
+| CI/CD | Testing and images, for now | GitHub Actions | Runs `mvn verify` on pushes and pull requests. From `master`, or by hand, it also builds the image and calls Render's deploy hook with that commit's tag | Keeps tests and releases running until the move to GitLab |
+| CI/CD | Image registry, for now | GitHub Container Registry (`ghcr.io/owochiii/steelsight_erp`) | Holds the ERP image, tagged by commit, by branch, and `latest` for `master` | Render pulls the exact image that passed the tests |
 | Testing | Test framework | JUnit 6.0.1, AssertJ 3.27.6, Hamcrest 3.0, Mockito 5.20.0 | Unit and integration tests | Check behaviour before every release |
 | Testing | Real database in tests | Testcontainers 2.0.2 with `pgvector/pgvector:pg17` | Starts a real PostgreSQL for the tests | Tests the triggers, constraints and functions that an in-memory database can't run |
+| Testing | Excel checks | fastexcel-reader 0.18.4 | Reads the exported report back in tests | Checks the figures accounting will see |
 | Testing | Web tests | Spring MockMvc, Spring Security Test | Calls pages and the API as each role | Checks permissions and pages without a browser |
 | Build | Java build | Maven 3.10.0 through the Maven Wrapper | Compiles, tests and packages the ERP | Same build on every machine and in CI |
 | Build | Frontend build | Node.js with the Tailwind CLI | Builds the stylesheet and icon sprite, whose output is committed | Only needed when styles change, not to build the app |
@@ -70,14 +73,14 @@ GitLab CI/CD is the project's pipeline. While the code is still on GitHub, GitHu
 | HTTP | Render's `PORT` (8080 locally) | Render proxy -> ERP | Render ends TLS and forwards the request to the container; the app listens on whatever port Render gives it |
 | PostgreSQL over TLS (JDBC) | 5432 | ERP -> Supabase session pooler | The ERP's database connection, as the table owner |
 | PostgreSQL over TLS (psycopg) | 5432 | Detection service -> Supabase session pooler | Writes check-ins, vest links and violations, as the limited detection role |
-| HTTPS (REST) | 443 | ERP -> Supabase Storage | Uploads, reads and deletes ticket photos with the server key |
+| HTTPS (REST) | 443 | ERP -> Supabase Storage | Uploads, reads and deletes ticket photos and face photos with the server key |
 | HTTPS (REST) | 443 | Detection service -> ERP | `POST /api/v1/detection/alerts` with an `X-Api-Key` header, through Render's proxy |
 | HTTPS (REST) | 443 | Detection service -> Supabase Storage | Uploads violation and check-in snapshots, downloads enrolment photos |
 | RTSP | 554 (camera default) | Cameras -> Detection service | Video from the gate camera and the 3 zone cameras, on the site network |
 | HTTPS | 443 | Browser -> ERP -> Supabase Storage | Photos go through the ERP, which checks permission before fetching them |
 | HTTP | Render's `PORT` | Render -> ERP `/actuator/health` | Render checks inside its network that a new release started, before switching traffic to it |
 | HTTPS | 443 | GitLab CI/CD -> Render deploy hook | Starts a deploy after the pipeline passes on `main` |
-| HTTPS | 443 | Render -> GitLab Container Registry | Render pulls the ERP image tagged by commit |
+| HTTPS | 443 | Render -> GitHub Container Registry | Render pulls the ERP image tagged by commit; GitLab Container Registry after the move |
 | HTTPS | 443 | Developer or laptop -> GitLab | `git pull` and `git push`; the laptop only connects outwards, with no open ports |
 | HTTPS | 443 | GitHub Actions runner -> GitHub | Runs the tests on each push and pull request while the code is on GitHub |
 | HTTPS | 443 | ERP -> Email API | **Planned:** password reset and notices; Render blocks SMTP ports |

@@ -2,8 +2,81 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       th:replace="~{fragments/layout :: app(#{team.title}, 'team', ~{::main})}">
 <main class="page medium">
-    <div class="page-head"><h1 th:text="#{team.title}">Team</h1></div>
+    <div class="page-head">
+        <h1 th:text="#{team.title}">Team</h1>
+        <a class="btn" sec:authorize="hasAuthority('USER_MANAGE')" th:href="@{/team/new}" th:text="#{team.newAccount}">New account</a>
+    </div>
     <div th:replace="~{fragments/layout :: messages}"></div>
+
+    <section class="panel mb-4" th:if="${canExport}">
+        <div class="panel-head"><h2 th:text="#{report.panel}">Monthly report for accounting</h2></div>
+        <div class="panel-body">
+            <p class="quiet mt-0" sec:authorize="hasAuthority('REPORT_EXPORT_ALL')" th:text="#{report.hintAll}">Every worker's safety score, violations and attendance for one month, as an Excel file.</p>
+            <p class="quiet mt-0" sec:authorize="!hasAuthority('REPORT_EXPORT_ALL')" th:text="#{report.hintTeam}">Your team's safety score, violations and attendance for one month, as an Excel file.</p>
+            <form class="setting" method="get" th:action="@{/team/report}" hx-boost="false">
+                <div>
+                    <label for="month" th:text="#{report.month}">Month</label>
+                    <input id="month" type="month" name="month" required th:value="${reportMonth}" th:max="${latestMonth}">
+                </div>
+                <button type="submit" class="btn" th:text="#{report.download}">Download Excel</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="panel mb-4" th:if="${leaderCandidates != null}">
+        <div class="panel-head"><h2 th:text="#{teams.title}">Teams</h2></div>
+        <p class="empty" th:if="${teams.isEmpty()}" th:text="#{teams.none}">There are no teams yet.</p>
+        <div class="table-wrap" th:unless="${teams.isEmpty()}">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{nav.team}">Team</th>
+                    <th scope="col" th:text="#{teams.leader}">Leader</th>
+                    <th scope="col" class="hidden sm:table-cell" th:text="#{teams.members}">People</th>
+                    <th scope="col"><span class="sr-only" th:text="#{common.actions}">Actions</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="team : ${teams}" th:with="count=${memberCounts.getOrDefault(team.id, 0L)}">
+                    <td><span class="row-title" th:text="${team.name}">Team A</span>
+                        <span class="row-sub sm:hidden" th:text="#{teams.memberCount(${count})}">3 people</span></td>
+                    <td>
+                        <form class="flex flex-wrap items-center gap-2" method="post" th:action="@{/teams/{id}/leader(id=${team.id})}">
+                            <label class="sr-only" th:for="|leader-${team.id}|" th:text="#{teams.leader}">Leader</label>
+                            <select th:id="|leader-${team.id}|" name="managerId" class="w-auto">
+                                <option th:if="${team.manager != null}" th:value="${team.manager.id}" selected th:text="${team.manager.fullName}">Mo</option>
+                                <option th:if="${team.manager == null}" value="" th:text="#{teams.noLeader}">No leader</option>
+                                <option th:each="candidate : ${leaderCandidates}" th:value="${candidate.id}" th:text="${candidate.fullName}">Max</option>
+                            </select>
+                            <button type="submit" class="btn secondary" th:text="#{teams.changeLeader}">Change</button>
+                        </form>
+                    </td>
+                    <td class="hidden sm:table-cell" th:text="${count}">3</td>
+                    <td class="cell-end">
+                        <form method="post" th:if="${count == 0}" th:action="@{/teams/{id}/delete(id=${team.id})}">
+                            <button type="submit" class="btn danger" th:text="#{teams.delete}">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <form class="panel-body setting divider mt-0" method="post" th:action="@{/teams}">
+            <div class="grow">
+                <label for="newTeamName" th:text="#{teams.newName}">New team</label>
+                <input id="newTeamName" name="name" maxlength="200" required>
+            </div>
+            <div>
+                <label for="newTeamLeader" th:text="#{teams.leader}">Leader</label>
+                <select id="newTeamLeader" name="managerId" required>
+                    <option value="" th:text="#{teams.chooseLeader}">Choose a leader</option>
+                    <option th:each="candidate : ${leaderCandidates}" th:value="${candidate.id}" th:text="${candidate.fullName}">Max</option>
+                </select>
+            </div>
+            <button type="submit" class="btn" th:text="#{teams.create}">Create team</button>
+        </form>
+        <p class="hint panel-body pt-0" th:if="${leaderCandidates.isEmpty()}" th:text="#{teams.noCandidates}">Every manager already leads a team. Create a manager account first.</p>
+    </section>
 
     <section class="panel mb-4" th:unless="${teams.isEmpty()}">
         <div class="panel-head"><h2 th:text="#{team.lateRule}">Late check-in rule</h2></div>
@@ -38,6 +111,11 @@
                     <td>
                         <span class="row-title" th:text="|${member.fullName} (${member.employeeCode})|">Name</span>
                         <span class="badge ml-1" th:unless="${member.active}" th:text="#{team.inactive}">Inactive</span>
+                        <th:block th:if="${faceStatuses != null}" th:with="face=${faceStatuses.get(member.id)}">
+                            <span class="badge ml-1" th:if="${face == null}" th:text="#{face.none}">No face photo</span>
+                            <span class="badge ml-1" th:if="${face != null and face.name() == 'PENDING'}" th:text="#{face.pending}">Waiting for enrolment</span>
+                            <span class="badge badge-late ml-1" th:if="${face != null and face.name() == 'FAILED'}" th:text="#{face.failed}">Enrolment failed</span>
+                        </th:block>
                         <span class="row-sub sm:hidden" th:text="${@display.role(member.role.roleName)}">Role</span>
                         <span class="row-sub md:hidden" th:if="${member.team != null}" th:text="${member.team.name}">Team</span>
                         <span class="row-sub lg:hidden" th:if="${member.email != null or member.phoneNumber != null}"
@@ -49,7 +127,7 @@
                     <td class="cell-end">
                         <div class="flex flex-wrap justify-end gap-x-3">
                             <a class="row-action" sec:authorize="hasAnyAuthority('SHIFT_UPDATE_TEAM', 'SHIFT_UPDATE_ALL')" th:if="${member.active}" th:href="@{/shifts/new(workerId=${member.id})}" th:text="#{team.addShift}">Add shift</a>
-                            <a class="row-action" th:href="@{/team/{id}/edit(id=${member.id})}" th:unless="${member.id == #authentication.principal.userId}" th:text="#{common.edit}">Edit</a>
+                            <a class="row-action" sec:authorize="hasAuthority('USER_MANAGE')" th:href="@{/team/{id}/edit(id=${member.id})}" th:text="#{common.edit}">Edit</a>
                         </div>
                     </td>
                 </tr>
