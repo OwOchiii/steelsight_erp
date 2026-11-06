@@ -1,11 +1,11 @@
 # AI usage log
 
-How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md) and [5 November](../transcript/5-11-2026.md).
+How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md) and [5 November, including the session that ran past midnight](../transcript/5-11-2026.md).
 
 | | |
 |---|---|
 | Tool | Claude Code (Opus 5.5) |
-| Dates | 2026-11-04 and 2026-11-05 |
+| Dates | 2026-11-04 to 2026-11-06 (one session ran past midnight) |
 | Branch | `feature/erp-backend` |
 
 ## Summary by request
@@ -38,8 +38,11 @@ The developer committed all of this day's work together at 23:47.
 | 13:50 | Consider moving to Next.js, React and Tailwind on Vercel | Advice against it for now, with the costs and when it would be worth doing | None |
 | 14:05 | Make the pages less basic, using Odoo as the reference: sidebar, informative dashboard, dark and light mode, Vietnamese and English | Sidebar layout, new dashboard, both themes, both languages, Tailwind styles, pages that update without a full reload through `htmx` | `0f3611f` |
 | 15:47 | Worker timetable grid, safety scores with notifications, wider manager and HSE access, and a REST API for detection alerts | Weekly worker grid, calculated safety score, warning, danger and HSE notifications, `/workers`, `/safety/shifts`, own-team ticket limits for managers, `POST /api/v1/detection/alerts` | `0f3611f` |
-| 00:09 (6 Nov) | Update this log and write the transcript | This update and `transcript/5-11-2026.md` | The log commit |
-| Next message (6 Nov) | Remove the password default and commit the logs; asked whether to deploy, build CI/CD and move to Supabase | Password default removed, and an approved plan: fix deployment gaps, move to Supabase, add a small GitHub to Render pipeline | The log commit |
+| 00:09 (6 Nov) | Update this log and write the transcript | This log update and `transcript/5-11-2026.md` | `bc53de5` |
+| 00:19 (6 Nov) | Remove the password default and commit the logs; asked whether to deploy, build CI/CD and move to Supabase | Password default removed, and an approved plan: fix deployment gaps, move to Supabase, add a small GitHub to Render pipeline | `bc53de5` for the password and logs |
+| 00:21 (6 Nov) | Carry out the deployment plan | `Dockerfile`, `prod` profile, health check, sign-in limit, Supabase photo storage, GitHub Actions pipeline, `docs/deployment.md` | Not committed |
+| 00:31 (6 Nov) | Update the log and transcript for the night | This update | Not committed |
+| 09:29 (6 Nov) | Update the database design document, check for a notification dropdown and the diagram, and write a tech stack matrix | `docs/database-design.md` section 1.6 for the 3 new tables; no dropdown found, since the bell links to a page; diagram updated; `docs/tech-stack.md` | Not committed |
 
 ## Decisions made by the developer
 
@@ -64,6 +67,8 @@ The developer committed all of this day's work together at 23:47.
 - HSE can see every worker's safety score.
 - A "shift" in the HSE view is a time slot across the site, because one overview camera covers the working area.
 - The detection software counts violations per minute, decides when it's critical, and calls the ERP. This avoids repeatedly querying the database.
+- Remove the password default from `application.yaml` and commit the logs.
+- Move to Supabase and build a GitHub to Render pipeline, after asking Claude whether to do either.
 
 ## Decisions suggested by Claude and accepted by the developer
 
@@ -88,6 +93,13 @@ The rest of this list was in the plan the developer approved:
 - HSE gets at most one alert notification per 15 minutes.
 - Tickets from people with no team go to admin only. Managers lose access to other teams' tickets.
 
+From the deployment plan the developer approved on 6 November:
+
+- Treat the site as ready for a capstone demo with sample people only, not real workers' data.
+- Run the tests in GitHub Actions and deploy through a Render deploy hook, leaving scanning and the image registry until the move to GitLab.
+- Keep ticket photos in a private Supabase bucket, served through the ticket page so its permission checks apply.
+- Lock sign-in for 15 minutes after 5 failures from one address on one employee code.
+
 ## Decisions made by Claude and reported to the developer
 
 ### 2026-11-04
@@ -100,6 +112,9 @@ The rest of this list was in the plan the developer approved:
 
 - No log lines inside each service, because the request line already shows who did what.
 - Passwords, form contents and query strings stay out of the logs.
+- Added a limit of 20 failed sign-ins per employee code across all addresses, beyond the plan, because a client can fake its address. The trade-off is that a stranger can lock a worker out for 15 minutes.
+- In the diagram, removed the arrow for browsers loading photos straight from Supabase through signed URLs, because the ERP now serves photos itself so its permission checks apply.
+- Commits use the developer's name and email from the repository's history, because no git identity is set in WSL.
 
 ## How the work was checked
 
@@ -117,6 +132,12 @@ The rest of this list was in the plan the developer approved:
 - The logging was also checked in the real app, on a separate port. The error reference page and stack trace were only covered by tests.
 - **Not checked in a browser by Claude:** both sessions ended before the screenshots were taken. That covers the redesign, dark mode, Vietnamese, phone layouts, the worker grid, and the new worker, safety and notification pages. These have automated page tests only.
 - The detection API was covered by automated tests. The planned manual check against the running app wasn't recorded as finished.
+
+### 2026-11-06
+
+- The deployment code compiles, and 21 tests that need no Docker pass: the sign-in limit, Supabase storage against a mock server, storage selection and translations.
+- The config files parse, and the old password isn't in any tracked or new file.
+- **Not run:** the full test suite with the new sign-in and health tests, `docker build`, migrations on a real Supabase project, a real photo upload, and the browser check. Docker Desktop wasn't running.
 
 ## Problems during the work
 
@@ -142,9 +163,18 @@ The rest of this list was in the plan the developer approved:
 | The first full run of the safety work had 2 failures and 1 error out of 192 | Fixed the tests and code, including tests whose manager didn't run the worker's team, which the new rule requires |
 | The headless browser wasn't ready in either session | The sessions ended first, so the browser check wasn't done |
 
+### 2026-11-06
+
+| Problem | Outcome |
+|---|---|
+| `0f3611f` had put the local database password in `application.yaml` and on GitHub | Removed from the file in `bc53de5`. It's still in git history, and history wasn't rewritten |
+| Docker Desktop wasn't running | Wrote the Docker-dependent tests and the image without running them; they're listed as open items |
+
 ## Open items
 
 - The database password default was removed from `application.yaml`, but it stays in git history on GitHub through `0f3611f` and older commits. Change it anywhere it's used, and don't reuse it for Supabase.
+- The deployment work isn't fully tested. The new tests that need no Docker pass (21, including translations), but the full suite and `docker build` need Docker Desktop running. Nothing has run against a real Supabase project or Render yet.
+- Create the Supabase, Render and GitHub settings in `docs/deployment.md`, and merge to `master` to deploy.
 - Check the redesign and new pages in a browser, on desktop and phone, in both themes and both languages.
 - The detection software needs its own change to count violations and call the alert API, and it needs `STEELSIGHT_DETECTION_API_KEY` set on both sides.
 - Show the camera image once Supabase Storage is added. A worker warned about their pay can't currently see the photo when disputing a violation.

@@ -1,0 +1,13 @@
+.env
+.git
+.idea
+.vscode
+node_modules
+target
+uploads
+chatlog
+transcript
+docs
+scripts
+*.drawio
+*.sql

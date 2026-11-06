@@ -9,6 +9,7 @@
             <h1>Steelsight</h1>
         </div>
         <p class="notice error" th:if="${param.error}" th:text="#{login.wrong}">The employee code or password is wrong.</p>
+        <p class="notice error" th:if="${param.locked}" th:text="#{login.locked}">Too many failed sign-ins. Try again in 15 minutes.</p>
         <p class="notice" th:if="${param.signedOut}" th:text="#{login.signedOut}">You have signed out.</p>
         <form th:action="@{/login}" method="post">
             <label for="employeeCode" th:text="#{login.code}">Employee code</label>

@@ -28,6 +28,12 @@ spring:
       max-file-size: 5MB
       max-request-size: 6MB
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health   # Only what Render's health check needs
+
 logging:
   pattern:
     # Puts the request id on every line, so one request can be followed through the log.
@@ -37,7 +43,7 @@ logging:
     org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}   # DEBUG prints every SQL statement, without values
 
 server:
-  port: 8080
+  port: ${PORT:8080}   # Render supplies PORT
   forward-headers-strategy: framework   # Render's proxy handles HTTPS and forwards to this port
   servlet:
     session:
@@ -59,5 +65,10 @@ steelsight:
   # Times are stored in UTC and shown in this zone.
   time-zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
   storage:
-    # Ticket photos. Render's disk is wiped on deploy, so production needs Supabase Storage instead.
+    # Ticket photos: "local" keeps them on disk, "supabase" in a private bucket. Render's disk is
+    # wiped on every redeploy, restart or spin-down, so the prod profile uses Supabase.
+    type: ${STORAGE_TYPE:local}
     dir: ${STORAGE_DIR:./uploads}
+    supabase-url: ${SUPABASE_URL:}
+    supabase-key: ${SUPABASE_SERVICE_KEY:}
+    supabase-bucket: ${SUPABASE_STORAGE_BUCKET:ticket-photos}

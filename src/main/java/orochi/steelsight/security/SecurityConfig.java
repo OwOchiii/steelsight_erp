@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import orochi.steelsight.web.RequestLogFilter;
 
@@ -34,11 +35,13 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, SignInLimiter signInLimiter) throws Exception {
         return http
                 // Just inside the security context, so it sees the user and also logs refused requests.
                 .addFilterAfter(new RequestLogFilter(), SecurityContextHolderFilter.class)
+                .addFilterBefore(new SignInLimitFilter(signInLimiter), UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(requests -> requests
+                        .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/login", "/language", "/css/**", "/js/**", "/img/**", "/error").permitAll()
                         .anyRequest().authenticated())
                 .formLogin(form -> form

@@ -2,7 +2,7 @@
 
 ## 1. Overall
 
-The Steelsight database has 16 tables in 5 logical domains, stored in PostgreSQL 17 with the pgvector extension. It is the shared record for the ERP web app and the Python detection service.
+The Steelsight database has 19 tables in 6 logical domains, stored in PostgreSQL 17 with the pgvector extension. It is the shared record for the ERP web app and the Python detection service.
 
 ```mermaid
 erDiagram
@@ -38,9 +38,14 @@ erDiagram
     zone |o--o{ ticket : "zone_id"
     ticket ||--o{ ticket_comment : "ticket_id"
     app_user ||--o{ ticket_comment : "author_id"
+    app_user ||--o{ notification : "user_id"
+    safety_alert |o--o{ notification : "safety_alert_id"
+    safety_policy {
+        boolean id PK
+    }
 ```
 
-The schema is grouped into 5 logical domains:
+The schema is grouped into 6 logical domains:
 
 | No. | Domain | Tables | Description |
 | --- | --- | --- | --- |
@@ -49,6 +54,7 @@ The schema is grouped into 5 logical domains:
 | 1.3 | Shift Management | zone, shift | Holds the timetable: which worker is in which site zone, and when. |
 | 1.4 | PPE and Safety Monitoring | ppe_vest, ppe_linking, camera, violation | Records vests, cameras and the PPE violations the detection service finds, including dispute decisions. |
 | 1.5 | Ticket Management | ticket_category, ticket, ticket_comment | Handles requests, hazard reports and PPE disputes, each routed to the role that handles its category. |
+| 1.6 | Safety Score and Notifications | safety_policy, safety_alert, notification | Sets the rules of each worker's monthly safety score, records detection alerts, and holds in-app notifications. |
 
 In the entity tables, Field Size gives bytes for fixed-size types and precision,scale for numeric, and Variable means no declared limit. Unique says Partial when uniqueness applies only to some rows, and the description gives the condition.
 
@@ -422,7 +428,7 @@ One PPE violation detected by a camera.
 
 ### 1.5 Ticket Management
 
-This domain handles requests and reports raised by users. Each category names the role that handles it, and that link sets who can see and resolve its tickets. Admin can work on any ticket. A PPE dispute ticket links to one violation and closes only when that dispute is decided, in the same transaction.
+This domain handles requests and reports raised by users. Each category names the role that handles it, and that link sets who can see and resolve its tickets. HSE officers handle every ticket in their categories. Managers handle only tickets opened by people on a team they run, so a ticket from someone with no team goes to an admin. Admin can work on any ticket. A PPE dispute ticket links to one violation and closes only when that dispute is decided, in the same transaction.
 
 ```mermaid
 erDiagram
@@ -511,3 +517,90 @@ A message on a ticket.
 | 3 | author_id | bigint | 8 bytes | FK → app_user(id) | No | No | Who wrote the comment |
 | 4 | body | text | Variable |  | No | No | Comment text |
 | 5 | created_at | timestamptz | 8 bytes |  | No | No | When it was written |
+
+### 1.6 Safety Score and Notifications
+
+This domain turns violations into consequences. Each worker starts the month on 100 and loses points for each counted violation, with a warning and then a danger level. The score is never stored: the `safety_scores()` function works it out from the violation rows. That way it returns to 100 on the 1st with no scheduled job, and an overturned violation gives its points back. Only users with the WORKER role have a score.
+
+The same worker and violation type counts once per `repeat_limit` block, because a camera can report someone standing in view over and over. A violation with no worker loses no points until HSE assigns one.
+
+A trigger on `violation` sends the warning or danger notification. It's a trigger because the detection service writes violations straight to the database, and the ERP may be asleep. It runs as the table owner, because the detection role can't write notifications.
+
+The detection service reports a burst of violations through the ERP's alert API, which stores a `safety_alert` and notifies every active HSE officer. `safety_time_slots()` ranks shift time slots by violations per 100 worker-hours for the HSE view.
+
+```mermaid
+erDiagram
+    app_user ||--o{ notification : "user_id"
+    safety_alert |o--o{ notification : "safety_alert_id"
+    safety_policy {
+        boolean id PK
+        integer points_per_violation
+        integer warning_at
+        integer danger_at
+        interval repeat_limit
+        text time_zone
+    }
+    safety_alert {
+        bigint id PK
+        uuid event_id UK
+        integer violation_count
+        integer window_seconds
+        timestamptz detected_at
+        text camera_code
+        boolean notified
+        timestamptz received_at
+    }
+    notification {
+        bigint id PK
+        bigint user_id FK
+        text kind
+        integer score
+        date period
+        bigint safety_alert_id FK
+        timestamptz read_at
+        timestamptz created_at
+    }
+```
+
+#### 1.6.1 safety_policy
+
+The rules of the safety score, in a single row.
+
+| No. | Field Name | Data Type | Field Size | P/F Key | Nullable | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | id | boolean | 1 byte | PK | No | Yes | Always true, so the table can hold only one row |
+| 2 | points_per_violation | integer | 4 bytes |  | No | No | Points lost per counted violation; defaults to 10 and must be above 0 |
+| 3 | warning_at | integer | 4 bytes |  | No | No | A score at or below this is WARNING; defaults to 70 |
+| 4 | danger_at | integer | 4 bytes |  | No | No | A score at or below this is DANGER; defaults to 40, and must be below warning_at |
+| 5 | repeat_limit | interval | 16 bytes |  | No | No | The same worker and type counts once per block of this length; defaults to 30 minutes |
+| 6 | time_zone | text | Variable |  | No | No | Decides when a month starts; defaults to Asia/Ho_Chi_Minh and should match the app's time zone |
+
+#### 1.6.2 safety_alert
+
+A report from the detection service that too many violations are happening.
+
+| No. | Field Name | Data Type | Field Size | P/F Key | Nullable | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | id | bigint | 8 bytes | PK | No | Yes | Generated alert ID |
+| 2 | event_id | uuid | 16 bytes |  | No | Yes | Event ID from the detection service; makes retries safe |
+| 3 | violation_count | integer | 4 bytes |  | No | No | Violations the detection service counted; above 0 |
+| 4 | window_seconds | integer | 4 bytes |  | No | No | Length of the time window they were counted in; above 0 |
+| 5 | detected_at | timestamptz | 8 bytes |  | No | No | When the detection service raised the alert |
+| 6 | camera_code | text | Variable |  | Yes | No | Camera code as sent; not a foreign key, so a mistyped code can't lose an alert |
+| 7 | notified | boolean | 1 byte |  | No | No | False when HSE had been alerted within the last 15 minutes, so no new notification was sent |
+| 8 | received_at | timestamptz | 8 bytes |  | No | No | When the ERP received it; defaults to now |
+
+#### 1.6.3 notification
+
+One in-app notification. Its words aren't stored, so each reader sees it in their own language.
+
+| No. | Field Name | Data Type | Field Size | P/F Key | Nullable | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | id | bigint | 8 bytes | PK | No | Yes | Generated notification ID |
+| 2 | user_id | bigint | 8 bytes | FK → app_user(id) | No | Partial | Who it's for; unique with kind and period when period is set, so each level reaches a worker once a month |
+| 3 | kind | text | Variable |  | No | Partial | SAFETY_WARNING, SAFETY_DANGER or HSE_VIOLATION_ALERT |
+| 4 | score | integer | 4 bytes |  | Yes | No | The worker's score when it was sent; set exactly for safety notices |
+| 5 | period | date | 4 bytes |  | Yes | Partial | The 1st of the month it belongs to; set exactly for safety notices |
+| 6 | safety_alert_id | bigint | 8 bytes | FK → safety_alert(id) | Yes | No | The alert behind an HSE notice; set exactly for HSE_VIOLATION_ALERT |
+| 7 | read_at | timestamptz | 8 bytes |  | Yes | No | When the reader marked it as read; empty means unread |
+| 8 | created_at | timestamptz | 8 bytes |  | No | No | When it was sent |
