@@ -4,7 +4,7 @@ The ERP runs on Render from a Docker image, with its database and photos on Supa
 
 The image is `ghcr.io/owochiii/steelsight_erp`. Each build is tagged with its full commit ID, and the newest build from `master` is also tagged `latest`.
 
-Never put these values in the repository. They belong in Render's environment, GitHub's secrets and your local `.env`.
+Never put these values in the repository. They belong in Render's environment, GitHub's secrets and your local `.env`. To start a local `.env`, copy `.env.example`, which lists every setting with notes.
 
 ## 1. Supabase
 
@@ -47,6 +47,14 @@ Create a web service from an **existing image** with:
 | `STEELSIGHT_DETECTION_API_KEY` | A long random value, for example from `openssl rand -hex 32`. The detection software sends the same one. |
 | `ADMIN_EMPLOYEE_CODE` | The first admin's code, or leave unset for `ADMIN` |
 | `ADMIN_PASSWORD` | A strong password for the first admin |
+
+**Database URL format:** Supabase's **Connect** panel shows a URI such as `postgresql://postgres.<ref>:[YOUR-PASSWORD]@<host>:5432/postgres`. Don't paste it into `DB_URL` as it is. The JDBC driver refuses a username and password inside the URL, and the app fails to start with `Driver org.postgresql.Driver claims to not accept jdbcUrl`. Split it into three settings:
+
+```properties
+DB_URL=jdbc:postgresql://<host>:5432/postgres?sslmode=require
+DB_USERNAME=postgres.<ref>
+DB_PASSWORD=<the database password, never the [YOUR-PASSWORD] placeholder>
+```
 
 The Dockerfile already turns on the `prod` profile, which sets the secure session cookie, template caching, a small connection pool and Supabase Storage. The app won't start if the Supabase settings are missing.
 
