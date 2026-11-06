@@ -1,19 +1,18 @@
 package orochi.steelsight.ticketing.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import orochi.steelsight.model.IdentifiedModel;
 import orochi.steelsight.identity.model.AppUser;
 
 import java.time.OffsetDateTime;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "ticket_comment")
-public class TicketComment {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class TicketComment extends IdentifiedModel {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "ticket_id", nullable = false)
@@ -28,6 +27,14 @@ public class TicketComment {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
+
+    public static TicketComment on(Ticket ticket, AppUser author, String body) {
+        TicketComment comment = new TicketComment();
+        comment.ticket = ticket;
+        comment.author = author;
+        comment.body = body;
+        return comment;
+    }
 
     @PrePersist
     protected void onCreate() {

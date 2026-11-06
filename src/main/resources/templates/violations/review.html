@@ -1,0 +1,15 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{review.title}, 'review', ~{::main})}">
+<main class="page">
+    <div class="page-head"><h1 th:text="#{review.title}">PPE review</h1></div>
+    <nav class="tabs" th:attr="aria-label=#{review.tabs}">
+        <a th:href="@{/violations/review}" th:attr="aria-current=${view == 'DISPUTED'} ? 'page' : null" th:text="#{review.disputed}">Disputed</a>
+        <a th:href="@{/violations/review(view='UNIDENTIFIED')}" th:attr="aria-current=${view == 'UNIDENTIFIED'} ? 'page' : null" th:text="#{review.noWorker}">No worker</a>
+        <a th:href="@{/violations/review(view='ALL')}" th:attr="aria-current=${view == 'ALL'} ? 'page' : null" th:text="#{review.all}">All</a>
+    </nav>
+    <p class="empty panel-less-empty" th:if="${violations.totalElements == 0}"
+       th:text="${view == 'DISPUTED'} ? #{review.emptyDisputed} : (${view == 'UNIDENTIFIED'} ? #{review.emptyNoWorker} : #{review.emptyAll})">Empty</p>
+    <th:block th:unless="${violations.isEmpty()}"><div th:replace="~{fragments/lists :: violations(${violations}, true)}"></div></th:block>
+    <nav th:replace="~{fragments/lists :: pager(${violations})}"></nav>
+</main>
+</html>

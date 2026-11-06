@@ -1,0 +1,65 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{violations.one}, ${reviewList} ? 'review' : 'violations', ~{::main})}">
+<main class="page narrow">
+    <nav class="crumbs">
+        <a th:if="${reviewList}" th:href="@{/violations/review}" th:text="#{review.title}">PPE review</a>
+        <a th:unless="${reviewList}" th:href="@{/violations}" th:text="#{violations.heading}">PPE violations</a>
+    </nav>
+    <div class="page-head"><h1 th:text="${@display.label(violation.violationType)}">Type</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+
+    <section class="sheet mb-4">
+        <dl class="facts">
+            <th:block th:if="${canReview}">
+                <dt th:text="#{field.worker}">Worker</dt>
+                <dd th:text="${violation.identified} ? |${violation.user.fullName} (${violation.user.employeeCode})| : #{violations.notKnown}">Worker</dd>
+            </th:block>
+            <dt th:text="#{field.detected}">Detected</dt><dd th:text="${@display.dateTime(violation.detectedAt)}">When</dd>
+            <dt th:text="#{field.zone}">Zone</dt><dd th:text="${violation.camera.zone.name}">Zone</dd>
+            <dt th:text="#{field.camera}">Camera</dt><dd th:text="${violation.camera.cameraCode}">Camera</dd>
+            <th:block th:if="${violation.confidence}"><dt th:text="#{field.confidence}">Confidence</dt><dd th:text="|${violation.confidence}%|">90%</dd></th:block>
+            <dt th:text="#{field.dispute}">Dispute</dt>
+            <dd>
+                <span th:if="${violation.disputeStatus.name() == 'NONE'}" th:text="#{violations.notDisputed}">Not disputed</span>
+                <span class="badge" th:unless="${violation.disputeStatus.name() == 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span>
+            </dd>
+            <th:block th:if="${violation.reviewedAt}"><dt th:text="#{field.decided}">Decided</dt><dd th:text="#{common.atBy(${@display.dateTime(violation.reviewedAt)}, ${violation.reviewedBy.fullName})}">When</dd></th:block>
+        </dl>
+        <div class="divider" th:if="${disputeTicket}">
+            <h2 class="mb-1" th:text="#{violations.workerReason}">The worker's reason</h2>
+            <p class="body-text mb-2" th:text="${disputeTicket.description}">Reason</p>
+            <a th:href="@{/tickets/{id}(id=${disputeTicket.id})}" th:text="#{violations.openDisputeTicket}">Open the dispute ticket</a>
+        </div>
+    </section>
+
+    <form class="sheet mb-4" method="post" th:if="${canDispute}" th:action="@{/violations/{id}/dispute(id=${violation.id})}">
+        <h2 th:text="#{violations.thinkWrong}">Think this is wrong?</h2>
+        <p class="quiet" th:text="#{violations.thinkWrongHint}">The HSE team will review your dispute and decide.</p>
+        <label for="reason" th:text="#{violations.whyDisagree}">Why do you disagree?</label>
+        <textarea id="reason" name="reason" rows="4" maxlength="4000" required></textarea>
+        <div class="actions"><button type="submit" class="btn" th:text="#{violations.sendDispute}">Send dispute</button></div>
+    </form>
+
+    <form class="sheet mb-4" method="post" th:if="${canDecide}" th:action="@{/violations/{id}/decision(id=${violation.id})}">
+        <h2 th:text="#{violations.decide}">Decide this dispute</h2>
+        <p class="quiet" th:text="#{violations.noImage}">The camera image can't be shown here yet.</p>
+        <label for="note"><span th:text="#{violations.noteToWorker}">Note to the worker</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+        <textarea id="note" name="note" rows="3" maxlength="4000"></textarea>
+        <div class="actions">
+            <button type="submit" class="btn secondary" name="decision" value="UPHELD" th:text="#{violations.uphold}">Uphold: the violation stands</button>
+            <button type="submit" class="btn secondary" name="decision" value="OVERTURNED" th:text="#{violations.overturn}">Overturn: the detection was wrong</button>
+        </div>
+    </form>
+
+    <form class="sheet" method="post" th:if="${workers}" th:action="@{/violations/{id}/worker(id=${violation.id})}">
+        <h2 th:text="#{violations.whoIsThis}">Who is this?</h2>
+        <p class="quiet" th:text="#{violations.whoIsThisHint}">The camera couldn't identify the worker. Once named, they can see this violation and dispute it.</p>
+        <label for="workerId" th:text="#{field.worker}">Worker</label>
+        <select id="workerId" name="workerId" required>
+            <option value="" th:text="#{common.chooseWorker}">Choose a worker</option>
+            <option th:each="worker : ${workers}" th:value="${worker.id}" th:text="|${worker.fullName} (${worker.employeeCode})|">Name</option>
+        </select>
+        <div class="actions"><button type="submit" class="btn" th:text="#{violations.saveWorker}">Save worker</button></div>
+    </form>
+</main>
+</html>

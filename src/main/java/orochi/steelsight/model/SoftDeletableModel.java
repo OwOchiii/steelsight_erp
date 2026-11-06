@@ -2,13 +2,13 @@ package orochi.steelsight.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 @MappedSuperclass
 public abstract class SoftDeletableModel extends BaseModel {
 

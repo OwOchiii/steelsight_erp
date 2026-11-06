@@ -1,0 +1,38 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{timetable.title}, 'timetable', ~{::main})}">
+<main class="page">
+    <div class="page-head">
+        <h1 th:text="#{timetable.title}">Timetable</h1>
+        <span class="quiet" th:text="#{home.plannedHours(${@display.hours(hours)})}">40 h planned</span>
+    </div>
+    <nav class="week-nav" th:attr="aria-label=#{shifts.week}">
+        <a class="week-link" th:href="@{/timetable(week=${previousWeek})}"><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#chevron-left}"/></svg><span th:text="#{shifts.previousWeek}">Previous week</span></a>
+        <strong th:text="#{shifts.weekRange(${@display.date(monday)}, ${@display.date(sunday)})}">Week</strong>
+        <a class="week-link" th:href="@{/timetable(week=${nextWeek})}"><span th:text="#{shifts.nextWeek}">Next week</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#chevron-right}"/></svg></a>
+    </nav>
+    <div class="grid-scroll" tabindex="0" role="region" th:attr="aria-label=#{timetable.gridLabel}">
+        <table class="shift-grid personal">
+            <thead>
+            <tr>
+                <th scope="col" th:each="day : ${days}" th:classappend="${day == today} ? 'today'" th:attr="aria-current=${day == today} ? 'date' : null">
+                    <span th:text="${@display.weekday(day)}">Mon</span>
+                    <span class="day-number" th:text="${@display.dayMonth(day)}">2 Nov</span>
+                </th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td th:each="cell : ${cells}" th:classappend="${cell.date == today} ? 'today'">
+                    <div class="shift-chip" th:each="shift : ${cell.shifts}" th:classappend="|chip-${shift.status.name().toLowerCase()}|">
+                        <strong th:text="#{common.timeRange(${@display.time(shift.startAt)}, ${@display.time(shift.endAt)})}">Time</strong>
+                        <span th:text="|(${@display.hours(shift.durationHours)} h) ${shift.zone.name}|">Zone</span>
+                        <span class="chip-status" th:unless="${shift.scheduled}" th:text="${@display.label(shift.status)}">Status</span>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="empty" th:if="${empty}" th:text="#{timetable.none}">You have no shifts planned this week.</p>
+</main>
+</html>

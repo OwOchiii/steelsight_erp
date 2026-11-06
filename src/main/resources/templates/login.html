@@ -1,0 +1,28 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments/layout :: pageHead(#{login.title})}"></head>
+<body>
+<div class="center-screen">
+    <main class="auth-card">
+        <div class="auth-logo">
+            <svg class="icon icon-lg" aria-hidden="true"><use th:href="@{/img/icons.svg#hard-hat}"/></svg>
+            <h1>Steelsight</h1>
+        </div>
+        <p class="notice error" th:if="${param.error}" th:text="#{login.wrong}">The employee code or password is wrong.</p>
+        <p class="notice error" th:if="${param.locked}" th:text="#{login.locked}">Too many failed sign-ins. Try again in 15 minutes.</p>
+        <p class="notice" th:if="${param.signedOut}" th:text="#{login.signedOut}">You have signed out.</p>
+        <form th:action="@{/login}" method="post">
+            <label for="employeeCode" th:text="#{login.code}">Employee code</label>
+            <input id="employeeCode" name="employeeCode" autocomplete="username" required autofocus>
+            <label for="password" th:text="#{login.password}">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+            <button type="submit" class="btn mt-5 w-full" th:text="#{login.submit}">Sign in</button>
+        </form>
+        <div class="auth-tools">
+            <form th:replace="~{fragments/layout :: language}"></form>
+            <button th:replace="~{fragments/layout :: themeToggle}"></button>
+        </div>
+    </main>
+</div>
+</body>
+</html>

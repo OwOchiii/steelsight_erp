@@ -1,22 +1,31 @@
 package orochi.steelsight.ppe.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.model.BaseModel;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 @Entity
 @Table(name = "violation")
 public class Violation extends BaseModel {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "ppe_linking_id", nullable = false)
+    @Version
+    private Long version;
+
+    /** The worker. Null until identified: filled from the vest link by a trigger, or assigned by HSE. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private AppUser user;
+
+    /** The vest read by OCR. Null when there is no vest or it could not be read. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ppe_linking_id")
     private PpeLinking ppeLinking;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -58,4 +67,26 @@ public class Violation extends BaseModel {
 
     @Column(name = "reviewed_at")
     private OffsetDateTime reviewedAt;
+
+    public boolean isIdentified() {
+        return user != null;
+    }
+
+    public boolean belongsTo(Long userId) {
+        return user != null && user.getId().equals(userId);
+    }
+
+    public boolean isDisputed() {
+        return disputeStatus == DisputeStatus.DISPUTED;
+    }
+
+    public boolean canBeDisputedBy(Long userId) {
+        return disputeStatus == DisputeStatus.NONE && belongsTo(userId);
+    }
+
+    public void recordDecision(DisputeStatus decision, AppUser reviewer, OffsetDateTime at) {
+        disputeStatus = decision;
+        reviewedBy = reviewer;
+        reviewedAt = at;
+    }
 }

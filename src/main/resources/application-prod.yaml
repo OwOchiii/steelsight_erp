@@ -1,0 +1,19 @@
+# Settings for the internet-facing deployment. The Dockerfile turns this profile on.
+spring:
+  thymeleaf:
+    cache: true
+  datasource:
+    hikari:
+      # Supabase's free session pooler allows few connections, and the detection service needs some too.
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+
+steelsight:
+  storage:
+    type: supabase

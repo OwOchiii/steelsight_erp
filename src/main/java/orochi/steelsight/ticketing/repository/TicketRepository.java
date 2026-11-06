@@ -3,18 +3,37 @@ package orochi.steelsight.ticketing.repository;
 import orochi.steelsight.repository.SoftDeletableRepository;
 import orochi.steelsight.ticketing.model.Ticket;
 import orochi.steelsight.ticketing.model.TicketStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface TicketRepository extends SoftDeletableRepository<Ticket, Long> {
 
     List<Ticket> findAllByCreatedByIdAndDeletedAtIsNull(Long userId);
 
+    List<Ticket> findAllByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long userId);
+
     List<Ticket> findAllByCreatedByIdAndStatusAndDeletedAtIsNull(Long userId, TicketStatus status);
 
     List<Ticket> findAllByAssigneeIdAndDeletedAtIsNull(Long assigneeId);
+
+    Optional<Ticket> findByViolationIdAndDeletedAtIsNull(Long violationId);
+
+    Page<Ticket> findAllByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(Long userId, Pageable page);
+
+    Page<Ticket> findAllByStatusInAndDeletedAtIsNull(Collection<TicketStatus> statuses, Pageable page);
+
+    Page<Ticket> findAllByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(
+            Long roleId, Collection<TicketStatus> statuses, Pageable page);
+
+    long countByStatusInAndDeletedAtIsNull(Collection<TicketStatus> statuses);
+
+    long countByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(Long roleId, Collection<TicketStatus> statuses);
 
     @Query("""
             SELECT t FROM Ticket t

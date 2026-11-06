@@ -1,0 +1,15 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{violations.title}, 'violations', ~{::main})}">
+<main class="page">
+    <div class="page-head">
+        <h1 th:text="#{violations.heading}">PPE violations</h1>
+        <span class="badge" th:if="${safety != null}" th:classappend="${@display.badge(safety.level)}" th:text="#{safety.scoreLine(${safety.value})}">Safety score</span>
+    </div>
+    <th:block th:if="${safety != null and safety.level.name() != 'SAFE'}">
+        <section th:replace="~{fragments/safety :: notice(${safety.level.name()}, ${safety.value}, false)}"></section>
+    </th:block>
+    <p class="empty panel-less-empty" th:if="${violations.totalElements == 0}" th:text="#{violations.none}">You have no recorded violations.</p>
+    <th:block th:unless="${violations.isEmpty()}"><div th:replace="~{fragments/lists :: violations(${violations}, false)}"></div></th:block>
+    <nav th:replace="~{fragments/lists :: pager(${violations})}"></nav>
+</main>
+</html>

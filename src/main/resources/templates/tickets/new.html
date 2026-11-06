@@ -1,0 +1,38 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{tickets.new}, 'tickets', ~{::main})}">
+<main class="page narrow">
+    <nav class="crumbs"><a th:href="@{/tickets}" th:text="#{tickets.mine}">My tickets</a></nav>
+    <div class="page-head"><h1 th:text="#{tickets.new}">New ticket</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <form class="sheet" method="post" enctype="multipart/form-data" th:action="@{/tickets}" th:object="${form}">
+        <p class="notice" th:text="#{tickets.disputeHint}">To contest a PPE violation, open it from your violations and choose dispute.</p>
+        <label for="categoryId" th:text="#{field.category}">Category</label>
+        <select id="categoryId" th:field="*{categoryId}" required>
+            <option value="" th:text="#{tickets.chooseCategory}">Choose a category</option>
+            <option th:each="category : ${categories}" th:value="${category.id}" th:text="${@display.category(category.categoryName)}">Category</option>
+        </select>
+
+        <label for="subject" th:text="#{field.subject}">Subject</label>
+        <input id="subject" th:field="*{subject}" maxlength="200" required>
+
+        <label for="description" th:text="#{field.details}">Details</label>
+        <textarea id="description" th:field="*{description}" rows="5" maxlength="4000" required></textarea>
+
+        <div class="grid gap-x-4 sm:grid-cols-2">
+            <div>
+                <label for="zoneId"><span th:text="#{field.zone}">Zone</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                <select id="zoneId" th:field="*{zoneId}">
+                    <option value="" th:text="#{common.noZone}">No specific zone</option>
+                    <option th:each="zone : ${zones}" th:value="${zone.id}" th:text="${zone.name}">Zone</option>
+                </select>
+            </div>
+            <div>
+                <label for="photo"><span th:text="#{field.photo}">Photo</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+                <p class="hint" th:text="#{tickets.photoHint}">JPEG, PNG or WebP, up to 5 MB.</p>
+            </div>
+        </div>
+        <div class="actions"><button type="submit" class="btn" th:text="#{tickets.send}">Send ticket</button></div>
+    </form>
+</main>
+</html>

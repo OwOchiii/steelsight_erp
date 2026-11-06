@@ -1,0 +1,21 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{fragments/layout :: app(#{attendance.title}, 'attendance', ~{::main})}">
+<main class="page" th:with="canEdit=${#authorization.expression('hasAuthority(''CHECKIN_EDIT'')')}">
+    <div class="page-head">
+        <h1 th:text="#{attendance.title}">Attendance</h1>
+        <a class="btn" sec:authorize="hasAuthority('CHECKIN_EDIT')" th:href="@{/attendance/new}">
+            <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#plus}"/></svg>
+            <span th:text="#{attendance.add}">Add a check-in</span>
+        </a>
+    </div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <nav class="tabs" th:attr="aria-label=#{attendance.tabs}">
+        <a th:href="@{/attendance}" th:attr="aria-current=${onSite} ? null : 'page'" th:text="#{attendance.recent}">Recent visits</a>
+        <a th:href="@{/attendance(onSite=true)}" th:attr="aria-current=${onSite} ? 'page' : null" th:text="#{home.onSite}">On site now</a>
+    </nav>
+    <p class="empty panel-less-empty" th:if="${visits.totalElements == 0}" th:text="${onSite} ? #{attendance.emptyOnSite} : #{attendance.emptyRecent}">Empty</p>
+    <th:block th:unless="${visits.isEmpty()}"><div th:replace="~{fragments/lists :: visits(${visits}, ${canEdit})}"></div></th:block>
+    <nav th:replace="~{fragments/lists :: pager(${visits})}"></nav>
+</main>
+</html>

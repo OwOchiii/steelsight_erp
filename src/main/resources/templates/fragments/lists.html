@@ -1,0 +1,112 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div class="table-wrap" th:fragment="tickets(tickets, forHandler)">
+    <table class="data-table">
+        <thead>
+        <tr>
+            <th scope="col" th:text="#{field.subject}">Subject</th>
+            <th scope="col" class="hidden md:table-cell" th:text="#{field.category}">Category</th>
+            <th scope="col" class="hidden lg:table-cell" th:if="${forHandler}" th:text="#{field.from}">From</th>
+            <th scope="col" class="hidden xl:table-cell" th:if="${forHandler}" th:text="#{field.zone}">Zone</th>
+            <th scope="col" class="hidden lg:table-cell" th:if="${forHandler}" th:text="#{field.assignedTo}">Assigned to</th>
+            <th scope="col" class="hidden sm:table-cell" th:text="#{field.opened}">Opened</th>
+            <th scope="col" th:text="#{field.status}">Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="ticket : ${tickets}">
+            <td>
+                <a class="row-title" th:href="@{/tickets/{id}(id=${ticket.id})}" th:text="${ticket.subject}">Subject</a>
+                <span class="row-sub md:hidden" th:text="|${@display.category(ticket.category.categoryName)}, ${@display.date(ticket.createdAt)}|">Category</span>
+                <span class="row-sub lg:hidden" th:if="${forHandler}" th:text="#{tickets.from(${ticket.createdBy.fullName})}">From</span>
+            </td>
+            <td class="hidden md:table-cell" th:text="${@display.category(ticket.category.categoryName)}">Category</td>
+            <td class="hidden lg:table-cell" th:if="${forHandler}" th:text="${ticket.createdBy.fullName}">Name</td>
+            <td class="hidden xl:table-cell" th:if="${forHandler}" th:text="${ticket.zone != null} ? ${ticket.zone.name}">Zone</td>
+            <td class="hidden lg:table-cell" th:if="${forHandler}" th:text="${ticket.assignee != null} ? ${ticket.assignee.fullName}">Name</td>
+            <td class="hidden whitespace-nowrap sm:table-cell" th:text="${@display.date(ticket.createdAt)}">Date</td>
+            <td><span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="table-wrap" th:fragment="violations(violations, forReviewer)">
+    <table class="data-table">
+        <thead>
+        <tr>
+            <th scope="col" th:text="#{field.violation}">Violation</th>
+            <th scope="col" class="hidden md:table-cell" th:text="#{field.detected}">Detected</th>
+            <th scope="col" class="hidden md:table-cell" th:text="#{field.zone}">Zone</th>
+            <th scope="col" class="hidden sm:table-cell" th:if="${forReviewer}" th:text="#{field.worker}">Worker</th>
+            <th scope="col" th:text="#{field.dispute}">Dispute</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="violation : ${violations}">
+            <td>
+                <a class="row-title" th:href="@{/violations/{id}(id=${violation.id})}" th:text="${@display.label(violation.violationType)}">Type</a>
+                <span class="row-sub md:hidden" th:text="|${@display.dateTime(violation.detectedAt)}, ${violation.camera.zone.name}|">When</span>
+                <span class="row-sub sm:hidden" th:if="${forReviewer}" th:text="${violation.identified} ? ${violation.user.fullName} : #{violations.workerUnknown}">Worker</span>
+            </td>
+            <td class="hidden whitespace-nowrap md:table-cell" th:text="${@display.dateTime(violation.detectedAt)}">When</td>
+            <td class="hidden md:table-cell" th:text="${violation.camera.zone.name}">Zone</td>
+            <td class="hidden sm:table-cell" th:if="${forReviewer}" th:text="${violation.identified} ? ${violation.user.fullName} : #{violations.workerUnknown}">Worker</td>
+            <td><span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="table-wrap" th:fragment="visits(statuses, canEdit)">
+    <table class="data-table">
+        <thead>
+        <tr>
+            <th scope="col" th:text="#{field.person}">Person</th>
+            <th scope="col" class="hidden md:table-cell" th:text="#{field.checkedIn}">Checked in</th>
+            <th scope="col" class="hidden md:table-cell" th:text="#{field.checkedOut}">Checked out</th>
+            <th scope="col" th:text="#{field.status}">Status</th>
+            <th scope="col" th:if="${canEdit}"><span class="sr-only" th:text="#{common.actions}">Actions</span></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="status : ${statuses}" th:with="visit=${status.visit}">
+            <td>
+                <span class="row-title" th:text="|${visit.user.fullName} (${visit.user.employeeCode})|">Name</span>
+                <span class="row-sub md:hidden" th:text="#{visits.in(${@display.dateTime(visit.checkInAt)})}">In</span>
+                <span class="row-sub md:hidden" th:if="${visit.checkOutAt}" th:text="${visit.autoClosed} ? #{visits.outEstimated(${@display.dateTime(visit.checkOutAt)})} : #{visits.out(${@display.dateTime(visit.checkOutAt)})}">Out</span>
+                <span class="row-sub" th:if="${visit.zone}" th:text="${visit.zone.name}">Zone</span>
+                <span class="row-sub" th:if="${status.hasShift() and (status.onSite or status.early)}" th:text="#{visits.until(${@display.time(status.requiredCheckOut)})}">Until</span>
+                <span class="row-sub" th:if="${visit.note}" th:text="${visit.note}">Note</span>
+            </td>
+            <td class="hidden whitespace-nowrap md:table-cell" th:text="${@display.dateTime(visit.checkInAt)}">In</td>
+            <td class="hidden md:table-cell">
+                <th:block th:if="${visit.checkOutAt}">
+                    <span class="whitespace-nowrap" th:text="${@display.dateTime(visit.checkOutAt)}">Out</span>
+                    <span class="row-sub" th:if="${visit.autoClosed}" th:text="#{visits.estimated}">estimated</span>
+                </th:block>
+            </td>
+            <td>
+                <div class="tags">
+                    <span class="badge badge-late" th:if="${status.late}" th:text="#{visits.late(${status.minutesLate})}">Late</span>
+                    <span class="badge badge-late" th:if="${status.early}" th:text="#{visits.early(${status.minutesEarly})}">Early</span>
+                    <span class="badge badge-late" th:if="${status.missingCheckOut}" th:text="#{visits.noCheckOut}">No check-out</span>
+                    <span class="badge badge-on_time" th:if="${status.onTime}" th:text="#{visits.onTime}">On time</span>
+                    <span class="badge" th:unless="${status.hasShift()}" th:text="#{visits.noShift}">No shift</span>
+                    <span class="badge" th:text="${@display.label(visit.method)}">Method</span>
+                </div>
+            </td>
+            <td class="cell-end" th:if="${canEdit}"><a class="row-action" th:href="@{/attendance/{id}/edit(id=${visit.id})}" th:text="#{visits.correct}">Correct</a></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<nav class="pager" th:fragment="pager(rows)" th:if="${rows.totalPages > 1 or rows.number > 0}" th:attr="aria-label=#{pager.label}">
+    <a th:if="${rows.hasPrevious()}" th:href="${@display.pageLink(rows.number > rows.totalPages ? rows.totalPages - 1 : rows.number - 1)}" th:text="#{pager.previous}">Previous</a>
+    <span class="quiet" th:text="#{pager.page(${rows.number + 1}, ${rows.totalPages})}">Page</span>
+    <a th:if="${rows.hasNext()}" th:href="${@display.pageLink(rows.number + 1)}" th:text="#{pager.next}">Next</a>
+</nav>
+</body>
+</html>

@@ -1,17 +1,16 @@
 package orochi.steelsight.ticketing.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import orochi.steelsight.model.IdentifiedModel;
 import orochi.steelsight.identity.model.Role;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "ticket_category")
-public class TicketCategory {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class TicketCategory extends IdentifiedModel {
 
     @Column(name = "category_name", nullable = false, unique = true)
     private String categoryName;

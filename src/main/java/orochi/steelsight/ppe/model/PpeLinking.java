@@ -1,19 +1,18 @@
 package orochi.steelsight.ppe.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import orochi.steelsight.model.IdentifiedModel;
 import orochi.steelsight.identity.model.AppUser;
 
 import java.time.OffsetDateTime;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "ppe_linking")
-public class PpeLinking {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class PpeLinking extends IdentifiedModel {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "ppe_vest_id", nullable = false)
@@ -24,7 +23,7 @@ public class PpeLinking {
     private AppUser user;
 
     @Column(name = "linked_at", nullable = false)
-    private OffsetDateTime linkedAt;
+    private OffsetDateTime linkedAt = OffsetDateTime.now();
 
     @Column(name = "unlinked_at")
     private OffsetDateTime unlinkedAt;

@@ -1,17 +1,15 @@
 package orochi.steelsight.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-@Data
+@Getter
+@Setter
 @MappedSuperclass
-public abstract class BaseModel {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public abstract class BaseModel extends IdentifiedModel {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

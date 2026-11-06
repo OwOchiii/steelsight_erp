@@ -1,5 +1,5 @@
 -- =====================================================================
--- Siteworks ERP - PostgreSQL 18 schema (v2)
+-- Steelsight ERP - PostgreSQL 18 schema (v2)
 -- Tested on PostgreSQL 18.6. Uses one PostgreSQL 18 feature: a VIRTUAL generated column
 -- (shift.duration_hours). On PostgreSQL 17 or older, change VIRTUAL to STORED.
 --
@@ -286,8 +286,8 @@ FROM (VALUES
          JOIN role r ON r.role_name = v.role_name;
 
 -- =====================================================================
--- Siteworks ERP - check-in table (additive migration)
--- Run AFTER siteworks_schema.sql. Works on PostgreSQL 17 and 18 (so also on Supabase).
+-- Steelsight ERP - check-in table (additive migration)
+-- Run AFTER steelsight_schema.sql. Works on PostgreSQL 17 and 18 (so also on Supabase).
 --
 -- One row = one visit to site: face check-in, then check-out.
 -- The detection service creates the row (method FACE) and links the vest;

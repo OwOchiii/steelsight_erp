@@ -1,19 +1,23 @@
 package orochi.steelsight.ticketing.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.model.SoftDeletableModel;
 import orochi.steelsight.ppe.model.Violation;
+import orochi.steelsight.scheduling.model.Zone;
 
 import java.time.OffsetDateTime;
 
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Getter
+@Setter
 @Entity
 @Table(name = "ticket")
 public class Ticket extends SoftDeletableModel {
+
+    @Version
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
@@ -41,10 +45,41 @@ public class Ticket extends SoftDeletableModel {
     @JoinColumn(name = "violation_id")
     private Violation violation;
 
+    /** Where the problem is, such as the location of a hazard. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "zone_id")
+    private Zone zone;
+
+    /** Path of a photo in the private storage bucket. */
+    @Column(name = "photo_path")
+    private String photoPath;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TicketStatus status = TicketStatus.OPEN;
 
     @Column(name = "resolved_at")
     private OffsetDateTime resolvedAt;
+
+    public boolean isResolved() {
+        return status == TicketStatus.RESOLVED;
+    }
+
+    /** A PPE dispute is resolved by deciding its violation. */
+    public boolean isDispute() {
+        return violation != null;
+    }
+
+    public void assignTo(AppUser user) {
+        assignee = user;
+        if (status == TicketStatus.OPEN) {
+            status = TicketStatus.IN_PROGRESS;
+        }
+    }
+
+    public void resolveBy(AppUser user, OffsetDateTime at) {
+        status = TicketStatus.RESOLVED;
+        resolver = user;
+        resolvedAt = at;
+    }
 }

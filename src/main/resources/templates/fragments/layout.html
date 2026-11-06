@@ -1,0 +1,111 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:fragment="app(title, active, content)" th:lang="${#locale.language}">
+<head th:replace="~{fragments/layout :: pageHead(${title})}"></head>
+<body hx-boost="true" hx-indicator="#progress">
+<div id="progress" class="progress" aria-hidden="true"></div>
+<th:block th:unless="${forcedPasswordChange}">
+<aside class="sidebar" id="sidebar" th:replace="~{fragments/layout :: sidebar(${active})}"></aside>
+<div class="nav-backdrop" data-nav-toggle></div>
+</th:block>
+<div class="app-body">
+    <header class="topbar">
+        <button type="button" class="icon-btn lg:hidden" data-nav-toggle th:unless="${forcedPasswordChange}" th:attr="aria-label=#{nav.open}">
+            <svg class="icon icon-lg" aria-hidden="true"><use th:href="@{/img/icons.svg#menu}"/></svg>
+        </button>
+        <div class="ml-auto flex items-center gap-2">
+            <form th:replace="~{fragments/layout :: language}"></form>
+            <button th:replace="~{fragments/layout :: themeToggle}"></button>
+            <a class="icon-btn bell" th:href="@{/notifications}" th:with="unread=${@navCounts.unread(#authentication.principal.userId)}"
+               th:attr="aria-label=#{notifications.bell(${unread})},title=#{notifications.title}">
+                <svg class="icon icon-lg" aria-hidden="true"><use th:href="@{/img/icons.svg#bell}"/></svg>
+                <span class="bell-count" aria-hidden="true" th:if="${unread > 0}" th:text="${unread}">1</span>
+            </a>
+            <details class="menu">
+                <summary th:with="me=${#authentication.principal}">
+                    <span class="avatar" aria-hidden="true" th:text="${#strings.substring(me.fullName, 0, 1)}">A</span>
+                    <span class="hidden max-w-40 truncate sm:block" th:text="${me.fullName}">Name</span>
+                </summary>
+                <div class="menu-panel" th:with="me=${#authentication.principal}">
+                    <strong class="block" th:text="${me.fullName}">Name</strong>
+                    <span class="quiet small block" th:text="|${me.username} · ${@display.role(me.roleName)}|">Code</span>
+                    <a class="divider flex items-center gap-2" th:href="@{/account/password}">
+                        <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#pencil}"/></svg>
+                        <span th:text="#{nav.changePassword}">Change password</span>
+                    </a>
+                    <form class="divider" th:action="@{/logout}" method="post" hx-boost="false">
+                        <button type="submit" class="flex w-full items-center gap-2 text-left">
+                            <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#log-out}"/></svg>
+                            <span th:text="#{nav.signOut}">Sign out</span>
+                        </button>
+                    </form>
+                </div>
+            </details>
+        </div>
+    </header>
+    <main th:replace="${content}"></main>
+</div>
+</body>
+</html>
+
+<head th:fragment="pageHead(title)">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="htmx-config" content='{"historyCacheSize":0,"refreshOnHistoryMiss":true,"allowEval":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":false}]}'>
+    <title th:text="|${title} · Steelsight|">Steelsight</title>
+    <script th:src="@{/js/app.js}"></script>
+    <script th:src="@{/js/htmx.min.js}" defer></script>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+
+<aside class="sidebar" th:fragment="sidebar(active)" th:with="me=${#authentication.principal.userId}" th:attr="aria-label=#{nav.main}">
+    <a class="brand" th:href="@{/}">
+        <svg class="icon icon-lg" aria-hidden="true"><use th:href="@{/img/icons.svg#hard-hat}"/></svg>
+        Steelsight
+    </a>
+    <nav>
+        <div class="nav-group">
+            <a th:replace="~{fragments/layout :: navItem(@{/}, 'layout-dashboard', #{nav.home}, ${active == 'home'}, null)}"></a>
+        </div>
+        <div class="nav-group" sec:authorize="hasAnyAuthority('SHIFT_READ_OWN', 'VIOLATION_READ_OWN', 'TICKET_READ_OWN')">
+            <div class="nav-group-title" th:text="#{nav.group.mine}">My work</div>
+            <th:block sec:authorize="hasAuthority('SHIFT_READ_OWN')"><a th:replace="~{fragments/layout :: navItem(@{/timetable}, 'calendar-days', #{nav.timetable}, ${active == 'timetable'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('VIOLATION_READ_OWN')"><a th:replace="~{fragments/layout :: navItem(@{/violations}, 'shield-alert', #{nav.violations}, ${active == 'violations'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('TICKET_READ_OWN')"><a th:replace="~{fragments/layout :: navItem(@{/tickets}, 'ticket', #{nav.tickets}, ${active == 'tickets'}, null)}"></a></th:block>
+        </div>
+        <div class="nav-group" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL', 'VIOLATION_READ_ALL')">
+            <div class="nav-group-title" th:text="#{nav.group.safety}">Safety and support</div>
+            <th:block sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/tickets/queue}, 'inbox', #{nav.queue}, ${active == 'queue'}, ${@navCounts.queue(me)})}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('VIOLATION_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/violations/review}, 'shield-check', #{nav.review}, ${active == 'review'}, ${@navCounts.disputes(me)})}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('VIOLATION_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/safety/shifts}, 'activity', #{nav.safetyShifts}, ${active == 'safetyShifts'}, null)}"></a></th:block>
+        </div>
+        <div class="nav-group" sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL', 'USER_READ_ALL', 'SHIFT_UPDATE_TEAM', 'USER_MANAGE', 'CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')">
+            <div class="nav-group-title" th:text="#{nav.group.workforce}">Workforce</div>
+            <th:block sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/shifts}, 'calendar-range', #{nav.shifts}, ${active == 'shifts'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAnyAuthority('CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/attendance}, 'clipboard-check', #{nav.attendance}, ${active == 'attendance'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAnyAuthority('SHIFT_UPDATE_TEAM', 'USER_MANAGE')"><a th:replace="~{fragments/layout :: navItem(@{/team}, 'users', #{nav.team}, ${active == 'team'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('USER_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/workers}, 'user-round', #{nav.workers}, ${active == 'workers'}, null)}"></a></th:block>
+        </div>
+    </nav>
+</aside>
+
+<a class="nav-item" th:fragment="navItem(href, icon, label, current, count)" th:href="${href}" th:attr="aria-current=${current} ? 'page'">
+    <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#{i}(i=${icon})}"/></svg>
+    <span th:text="${label}">Label</span>
+    <span class="nav-count" th:if="${count != null and count > 0}" th:text="${count}">3</span>
+</a>
+
+<form class="segmented" th:fragment="language" th:action="@{/language}" method="post" hx-boost="false" th:attr="aria-label=#{nav.language}">
+    <button type="submit" name="lang" value="vi" th:attr="aria-pressed=${#locale.language == 'vi'}">VI</button>
+    <button type="submit" name="lang" value="en" th:attr="aria-pressed=${#locale.language != 'vi'}">EN</button>
+</form>
+
+<button type="button" class="icon-btn" th:fragment="themeToggle" data-theme-toggle th:attr="aria-label=#{nav.theme},title=#{nav.theme}">
+    <svg class="icon icon-lg theme-moon" aria-hidden="true"><use th:href="@{/img/icons.svg#moon}"/></svg>
+    <svg class="icon icon-lg theme-sun" aria-hidden="true"><use th:href="@{/img/icons.svg#sun}"/></svg>
+</button>
+
+<div th:fragment="messages">
+    <p class="notice success" role="status" th:if="${success}" th:text="${@display.message(success)}"></p>
+    <p class="notice error" role="alert" th:if="${error}" th:text="${@display.message(error)}"></p>
+</div>

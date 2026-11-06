@@ -1,19 +1,18 @@
 package orochi.steelsight.identity.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import orochi.steelsight.model.IdentifiedModel;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "role")
-public class Role {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class Role extends IdentifiedModel {
 
     @Column(name = "role_name", nullable = false, unique = true)
     private String roleName;

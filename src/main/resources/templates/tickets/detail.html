@@ -1,0 +1,78 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{tickets.ticket}, ${ownTicket} ? 'tickets' : 'queue', ~{::main})}">
+<main class="page">
+    <nav class="crumbs">
+        <a th:if="${ownTicket}" th:href="@{/tickets}" th:text="#{tickets.mine}">My tickets</a>
+        <a th:unless="${ownTicket}" th:href="@{/tickets/queue}" th:text="#{queue.title}">Ticket queue</a>
+    </nav>
+    <div class="page-head"><h1 th:text="${ticket.subject}">Subject</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+
+    <ol class="statusbar" th:attr="aria-label=#{field.status}">
+        <li th:each="step : ${T(orochi.steelsight.ticketing.model.TicketStatus).values()}"
+            th:attr="aria-current=${step == ticket.status} ? 'step'" th:text="${@display.label(step)}">Open</li>
+    </ol>
+
+    <div class="record">
+        <div class="grid gap-4">
+            <section class="sheet">
+                <dl class="facts">
+                    <dt th:text="#{field.category}">Category</dt><dd th:text="${@display.category(ticket.category.categoryName)}">Category</dd>
+                    <dt th:text="#{field.opened}">Opened</dt><dd th:text="#{common.atBy(${@display.dateTime(ticket.createdAt)}, ${ticket.createdBy.fullName})}">When</dd>
+                    <th:block th:if="${ticket.zone}"><dt th:text="#{field.zone}">Zone</dt><dd th:text="${ticket.zone.name}">Zone</dd></th:block>
+                    <th:block th:if="${ticket.assignee}"><dt th:text="#{field.assignedTo}">Assigned to</dt><dd th:text="${ticket.assignee.fullName}">Name</dd></th:block>
+                    <th:block th:if="${ticket.resolvedAt}"><dt th:text="#{field.resolved}">Resolved</dt><dd th:text="#{common.atBy(${@display.dateTime(ticket.resolvedAt)}, ${ticket.resolver.fullName})}">When</dd></th:block>
+                    <th:block th:if="${ticket.violation}"><dt th:text="#{field.violation}">Violation</dt><dd><a th:href="@{/violations/{id}(id=${ticket.violation.id})}" th:text="#{tickets.viewViolation}">View the violation</a></dd></th:block>
+                </dl>
+                <div class="divider">
+                    <p class="body-text" th:text="${ticket.description}">Details</p>
+                    <img class="photo mt-3" th:if="${ticket.photoPath}" th:src="@{/tickets/{id}/photo(id=${ticket.id})}" th:attr="alt=#{tickets.photoAlt}">
+                </div>
+            </section>
+
+            <section class="sheet" th:if="${canHandle and !ticket.resolved and ticket.dispute}">
+                <h2 class="mb-1" th:text="#{tickets.handleDispute}">Handle this dispute</h2>
+                <p class="quiet" th:text="#{tickets.handleDisputeHint}">Deciding the violation resolves this ticket.</p>
+                <div class="actions"><a class="btn" th:href="@{/violations/{id}(id=${ticket.violation.id})}" th:text="#{tickets.goToDecision}">Go to the decision</a></div>
+            </section>
+
+            <section class="sheet" th:if="${canHandle and !ticket.resolved and !ticket.dispute}">
+                <h2 th:text="#{tickets.handle}">Handle this ticket</h2>
+                <form method="post" th:action="@{/tickets/{id}/assignee(id=${ticket.id})}">
+                    <label for="assigneeId" th:text="#{tickets.assignTo}">Assign to</label>
+                    <select id="assigneeId" name="assigneeId" required>
+                        <option value="" th:text="#{tickets.choosePerson}">Choose a person</option>
+                        <option th:each="person : ${assignees}" th:value="${person.id}" th:text="${person.fullName}"
+                                th:selected="${ticket.assignee != null and ticket.assignee.id == person.id}">Name</option>
+                    </select>
+                    <div class="actions"><button type="submit" class="btn secondary" th:text="#{tickets.assign}">Assign</button></div>
+                </form>
+                <form class="divider" method="post" th:action="@{/tickets/{id}/resolve(id=${ticket.id})}">
+                    <label class="mt-0!" for="note"><span th:text="#{tickets.whatWasDone}">What was done?</span> <span class="optional" th:text="#{tickets.whatWasDoneHint}">optional, shown to the reporter</span></label>
+                    <textarea id="note" name="note" rows="3" maxlength="4000"></textarea>
+                    <div class="actions"><button type="submit" class="btn" th:text="#{tickets.resolve}">Resolve ticket</button></div>
+                </form>
+            </section>
+        </div>
+
+        <aside class="panel" th:attr="aria-label=#{tickets.comments}">
+            <div class="panel-head"><h2 th:text="#{tickets.comments}">Comments</h2></div>
+            <div class="panel-body">
+                <form class="mb-4" method="post" th:unless="${ticket.resolved}" th:action="@{/tickets/{id}/comments(id=${ticket.id})}">
+                    <label class="mt-0!" for="body" th:text="#{tickets.addComment}">Add a comment</label>
+                    <textarea id="body" name="body" rows="3" maxlength="4000" required></textarea>
+                    <div class="actions mt-2!"><button type="submit" class="btn" th:text="#{tickets.postComment}">Post comment</button></div>
+                </form>
+                <p class="quiet" th:if="${comments.isEmpty()}" th:text="#{tickets.noComments}">No comments yet.</p>
+                <div class="comment" th:each="comment : ${comments}">
+                    <div class="flex items-center gap-2">
+                        <span class="avatar" aria-hidden="true" th:text="${#strings.substring(comment.author.fullName, 0, 1)}">A</span>
+                        <div><strong class="block" th:text="${comment.author.fullName}">Name</strong><span class="quiet small" th:text="${@display.dateTime(comment.createdAt)}">When</span></div>
+                    </div>
+                    <p class="body-text mt-1" th:text="${comment.body}">Comment</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+</main>
+</html>

@@ -1,0 +1,128 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{team.editDetails}, 'team', ~{::main})}">
+<main class="page narrow">
+    <nav class="crumbs"><a th:href="@{/team}" th:text="#{team.title}">Team</a></nav>
+    <div class="page-head">
+        <h1 th:text="|${member.fullName} (${member.employeeCode})|">Name (Code)</h1>
+        <span class="badge" th:unless="${member.active}" th:text="#{team.inactive}">Inactive</span>
+    </div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <p class="notice" th:if="${self}" th:text="#{team.yourAccount}">This is your account, so you can't change its role, deactivate it or delete it here.</p>
+
+    <section class="panel mb-4">
+        <div class="panel-head"><h2 th:text="#{team.details}">Details</h2></div>
+        <form class="panel-body" method="post" th:action="@{/team/{id}(id=${member.id})}" th:object="${form}">
+            <input type="hidden" th:field="*{version}">
+            <label for="fullName" class="mt-0" th:text="#{field.fullName}">Full name</label>
+            <input id="fullName" th:field="*{fullName}" maxlength="200" required>
+            <div class="grid gap-x-4 sm:grid-cols-2">
+                <div>
+                    <label for="email"><span th:text="#{field.email}">Email</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                    <input id="email" type="email" th:field="*{email}" maxlength="200">
+                </div>
+                <div>
+                    <label for="phoneNumber"><span th:text="#{field.phone}">Phone number</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                    <input id="phoneNumber" type="tel" th:field="*{phoneNumber}" maxlength="30">
+                </div>
+            </div>
+            <div class="actions"><button type="submit" class="btn" th:text="#{team.saveDetails}">Save details</button></div>
+        </form>
+    </section>
+
+    <section class="panel mb-4">
+        <div class="panel-head"><h2 th:text="#{team.facePhoto}">Face photo</h2></div>
+        <div class="panel-body">
+            <div class="face-row">
+                <img class="face-photo" th:if="${member.faceFilePath != null}"
+                     th:src="@{/team/{id}/face(id=${member.id}, v=${member.faceFilePath})}"
+                     th:alt="#{team.photoAlt(${member.fullName})}">
+                <div>
+                    <th:block th:if="${enrolment == null}"><span class="badge" th:text="#{face.none}">No face photo</span></th:block>
+                    <th:block th:if="${enrolment != null}" th:switch="${enrolment.status.name()}">
+                        <th:block th:case="'PENDING'">
+                            <span class="badge" th:text="#{face.pending}">Waiting for enrolment</span>
+                            <p class="hint" th:text="#{face.pendingHint}">The detection service picks this up the next time it runs.</p>
+                        </th:block>
+                        <span th:case="'READY'" class="badge badge-on_time" th:text="#{face.ready}">Face enrolled</span>
+                        <th:block th:case="'FAILED'">
+                            <span class="badge badge-late" th:text="#{face.failed}">Enrolment failed</span>
+                            <p class="hint" th:if="${enrolment.errorMessage}" th:text="#{face.failedReason(${enrolment.errorMessage})}">Reason</p>
+                        </th:block>
+                    </th:block>
+                </div>
+            </div>
+            <form class="setting" method="post" enctype="multipart/form-data" th:action="@{/team/{id}/face(id=${member.id})}">
+                <div class="grow">
+                    <label for="photo" th:text="${member.faceFilePath == null} ? #{team.uploadPhoto} : #{team.replacePhoto}">Upload photo</label>
+                    <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required>
+                </div>
+                <button type="submit" class="btn secondary" th:text="#{team.savePhoto}">Save photo</button>
+            </form>
+            <p class="hint" th:text="#{team.facePhotoHint}">A clear photo of their face, looking at the camera. Used for check-in at the gate. JPEG, PNG or WebP, up to 5 MB.</p>
+        </div>
+    </section>
+
+    <section class="panel mb-4" th:unless="${self}">
+        <div class="panel-head"><h2 th:text="#{team.access}">Role and team</h2></div>
+        <div class="panel-body">
+            <form class="setting mt-0" method="post" th:action="@{/team/{id}/role(id=${member.id})}">
+                <div>
+                    <label for="roleName" th:text="#{field.role}">Role</label>
+                    <select id="roleName" name="roleName">
+                        <option th:each="role : ${roles}" th:value="${role.roleName}" th:selected="${role.id == member.role.id}"
+                                th:text="${@display.role(role.roleName)}">Worker</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn secondary" th:text="#{team.saveRole}">Change role</button>
+            </form>
+            <form class="setting" method="post" th:action="@{/team/{id}/team(id=${member.id})}">
+                <div>
+                    <label for="teamId" th:text="#{nav.team}">Team</label>
+                    <select id="teamId" name="teamId">
+                        <option value="" th:text="#{team.noTeam}">No team</option>
+                        <option th:each="team : ${teams}" th:value="${team.id}"
+                                th:selected="${member.team != null and team.id == member.team.id}" th:text="${team.name}">Team A</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn secondary" th:text="#{team.saveTeam}">Change team</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="panel mb-4">
+        <div class="panel-head"><h2 th:text="#{team.resetPassword}">Reset password</h2></div>
+        <form class="panel-body" method="post" th:action="@{/team/{id}/password(id=${member.id})}">
+            <p class="quiet mt-0" th:text="#{team.resetHint}">Choose a temporary password of at least 8 characters and give it to them. They must change it at their next sign-in.</p>
+            <div class="setting">
+                <div class="grow">
+                    <label for="newPassword" th:text="#{team.newPassword}">Temporary password</label>
+                    <input id="newPassword" type="password" name="newPassword" minlength="8" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn secondary" th:text="#{team.resetPassword}">Reset password</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel mb-4" th:unless="${self}">
+        <div class="panel-head"><h2 th:text="#{team.status}">Account status</h2></div>
+        <div class="panel-body">
+            <p class="quiet mt-0" th:text="${member.active} ? #{team.activeNow} : #{team.inactiveNow}">This account is active and can sign in.</p>
+            <form method="post" th:if="${member.active}" th:action="@{/team/{id}/deactivate(id=${member.id})}">
+                <button type="submit" class="btn secondary" th:text="#{team.deactivate}">Deactivate</button>
+            </form>
+            <form method="post" th:unless="${member.active}" th:action="@{/team/{id}/reactivate(id=${member.id})}">
+                <button type="submit" class="btn secondary" th:text="#{team.reactivate}">Reactivate</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="panel" th:unless="${self}">
+        <div class="panel-head"><h2 th:text="#{team.deleteAccount}">Delete account</h2></div>
+        <form class="panel-body" method="post" th:action="@{/team/{id}/delete(id=${member.id})}">
+            <p class="quiet mt-0" th:text="#{team.deleteHint}">They can no longer sign in, and their face photo and face data are erased. Their shifts, check-ins and tickets stay on record.</p>
+            <label class="check"><input type="checkbox" name="confirm" value="true" required> <span th:text="#{team.deleteConfirm}">I understand this can't be undone from the app</span></label>
+            <div class="actions"><button type="submit" class="btn danger" th:text="#{team.deleteAccount}">Delete account</button></div>
+        </form>
+    </section>
+</main>
+</html>

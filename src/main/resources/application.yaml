@@ -1,13 +1,17 @@
 spring:
+  config:
+    # Local secrets live in .env (git-ignored). On Render these come from the environment.
+    import: optional:file:.env[.properties]
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/steelsight_local
-    username: postgres
-    password:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/steelsight_local}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate   # Flyway owns the schema; Hibernate only checks that it matches
     show-sql: false
     properties:
       hibernate:
@@ -19,5 +23,53 @@ spring:
   thymeleaf:
     cache: false
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health   # Only what Render's health check needs
+
+logging:
+  pattern:
+    # Puts the request id on every line, so one request can be followed through the log.
+    correlation: "[%X{requestId:-}] "
+  level:
+    orochi.steelsight: ${LOG_LEVEL:INFO}       # DEBUG also logs when each request starts
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}   # DEBUG prints every SQL statement, without values
+
 server:
-  port: 8080
+  port: ${PORT:8080}   # Render supplies PORT
+  forward-headers-strategy: framework   # Render's proxy handles HTTPS and forwards to this port
+  servlet:
+    session:
+      cookie:
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}   # set to true on Render
+
+steelsight:
+  detection:
+    # The key the detection software sends as X-Api-Key. Left empty, the API refuses every call.
+    api-key: ${STEELSIGHT_DETECTION_API_KEY:}
+  bootstrap:
+    # Creates the first admin when there is none. Leave the password empty to skip this.
+    admin-employee-code: ${ADMIN_EMPLOYEE_CODE:ADMIN}
+    admin-password: ${ADMIN_PASSWORD:}
+  attendance:
+    # For workers with no team. Each team has its own value, which a manager or admin edits on the Team page.
+    late-after-minutes: ${LATE_AFTER_MINUTES:15}
+  # Times are stored in UTC and shown in this zone.
+  time-zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
+  storage:
+    # Ticket photos: "local" keeps them on disk, "supabase" in a private bucket. Render's disk is
+    # wiped on every redeploy, restart or spin-down, so the prod profile uses Supabase.
+    type: ${STORAGE_TYPE:local}
+    dir: ${STORAGE_DIR:./uploads}
+    supabase-url: ${SUPABASE_URL:}
+    supabase-key: ${SUPABASE_SERVICE_KEY:}
+    supabase-bucket: ${SUPABASE_STORAGE_BUCKET:ticket-photos}
+    supabase-face-bucket: ${SUPABASE_FACE_BUCKET:face-photos}

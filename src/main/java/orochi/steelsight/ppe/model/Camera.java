@@ -1,17 +1,16 @@
 package orochi.steelsight.ppe.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import orochi.steelsight.model.IdentifiedModel;
 import orochi.steelsight.scheduling.model.Zone;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "camera")
-public class Camera {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class Camera extends IdentifiedModel {
 
     @Column(name = "camera_code", nullable = false, unique = true)
     private String cameraCode;

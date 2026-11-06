@@ -1,0 +1,14 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{fragments/layout :: pageHead(#{error.title})}"></head>
+<body>
+<div class="center-screen">
+    <main class="auth-card">
+        <h1 class="mb-2" th:text="${error} ? ${@display.message(error)} : #{error.fallbackTitle}">Something went wrong</h1>
+        <p class="quiet mb-5" th:text="${#strings.isEmpty(message)} ? #{error.tryAgain} : ${@display.message(message)}">Please try again.</p>
+        <p class="quiet small mb-5" th:if="${reference}" th:text="#{error.reference(${reference})}">Reference</p>
+        <a class="btn" th:href="@{/}" th:text="#{error.home}">Back to home</a>
+    </main>
+</div>
+</body>
+</html>
