@@ -1,6 +1,6 @@
 # AI usage log
 
-How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md) and [5 November, including the session that ran past midnight](../transcript/5-11-2026.md).
+How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) and [6 November](../transcript/6-11-2026.md).
 
 | | |
 |---|---|
@@ -45,9 +45,16 @@ The developer committed all of this day's work together at 23:47.
 | 09:29 (6 Nov) | Update the database design document, check for a notification dropdown and the diagram, and write a tech stack matrix | `docs/database-design.md` section 1.6 for the 3 new tables; no dropdown found, since the bell links to a page; diagram updated; `docs/tech-stack.md` | `d4f978f` |
 | 09:36 (6 Nov) | Change the tech stack's connections into a protocol and port table, and show GitLab CI/CD as the pipeline with GitHub only testing for now | Protocol and port table; GitLab CI/CD rows, with GitHub Actions as testing for now | `d4f978f` |
 | 11:24 (6 Nov) | Check why an admin can't upload a face photo when creating or editing an account | Found that no page creates accounts at all, and only name, email and phone could be edited | None |
-| 11:29 to 11:44 (6 Nov) | Plan admin account management, and then stop managers editing anyone | Approved plan, then built: create account, role, team, active status, password reset, face photo upload with enrolment status, delete, own password change, forced change after an admin sets a password, admin-only editing | Not committed |
-| 15:09 (6 Nov) | New rules: one leader per team, leaders plan only their team's shifts, only admin changes workers, leaders export a monthly Excel report for accounting, and tickets go to HSE for safety or to admin for everything else | Ticket routing to HSE or admin with a new leave request category, team setup for admins with one team per leader, and a monthly `.xlsx` report of safety scores, violations, attendance and no-shows | Not committed |
-| 15:37 (6 Nov) | Set up a Docker registry, to get an image URL to give Render | The workflow builds and pushes `ghcr.io/owochiii/steelsight_erp` and deploys that commit's tag through Render's deploy hook; image built and started locally | Not committed |
+| 11:29 to 11:44 (6 Nov) | Plan admin account management, and then stop managers editing anyone | Approved plan, then built: create account, role, team, active status, password reset, face photo upload with enrolment status, delete, own password change, forced change after an admin sets a password, admin-only editing | `94a2c3c` |
+| 15:09 (6 Nov) | New rules: one leader per team, leaders plan only their team's shifts, only admin changes workers, leaders export a monthly Excel report for accounting, and tickets go to HSE for safety or to admin for everything else | Ticket routing to HSE or admin with a new leave request category, team setup for admins with one team per leader, and a monthly `.xlsx` report of safety scores, violations, attendance and no-shows | `94a2c3c` |
+| 15:37 (6 Nov) | Set up a Docker registry, to get an image URL to give Render | The workflow builds and pushes `ghcr.io/owochiii/steelsight_erp` and deploys that commit's tag through Render's deploy hook; image built and started locally | `94a2c3c` |
+| 15:47 (6 Nov) | Commit and push | Commit `94a2c3c` with the day's work; the push failed because WSL has no GitHub sign-in | `94a2c3c`, not pushed |
+| 15:50 (6 Nov) | Write today's log and transcript | This update and `transcript/6-11-2026.md` | Not committed |
+| 16:09 (6 Nov) | List the environment the app and Supabase need | The required and optional variables for Render and local use, the Supabase setup, and what the detection service needs | None |
+| 16:11 (6 Nov) | Make a `.env.example` with those | `.env.example` with local defaults, Render values as comments, and the detection service's settings | Not committed |
+| 16:29 (6 Nov) | Fix a start-up error: `Driver org.postgresql.Driver claims to not accept jdbcUrl` | The Supabase URI had the username and password inside it, which the JDBC driver refuses, and still held the `[YOUR-PASSWORD]` placeholder; split it into `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` | Not in git |
+| 16:37 (6 Nov) | Write the docs and transcript | The database URL format and `.env.example` added to `docs/deployment.md`, this log and `transcript/6-11-2026.md` brought up to date | Not committed |
+| 16:59 (6 Nov) | Write a tutorial for using the app: signing in as admin, creating accounts and so on | `docs/user-guide.md`, by role, using the app's own labels and routes | Not committed |
 
 ## Decisions made by the developer
 
@@ -198,13 +205,17 @@ From the deployment plan the developer approved on 6 November:
 | Problem | Outcome |
 |---|---|
 | `0f3611f` had put the local database password in `application.yaml` and on GitHub | Removed from the file in `bc53de5`. It's still in git history, and history wasn't rewritten |
-| Docker Desktop wasn't running | Wrote the Docker-dependent tests and the image without running them; they're listed as open items |
+| Docker Desktop wasn't running | Wrote the Docker-dependent tests and the image without running them, then ran them all once Docker was back that afternoon |
+| The first full run of the account, team and report work had 11 failures | Fixed: a missing admin permission in `V11`, tests reading the database before changes were written, and tests still expecting managers to handle tickets or edit people |
+| The script that builds the transcript was in a temporary folder that was cleared | Rewritten for `6-11-2026.md` |
+| The Supabase database URL, pasted as shown in Supabase, stopped the app at start-up | Split into a JDBC URL, username and password; the guide now warns about it |
+| `git push` from WSL failed with no GitHub sign-in | The commit is local; the developer pushes from Windows, where they're signed in |
 
 ## Open items
 
 - The database password default was removed from `application.yaml`, but it stays in git history on GitHub through `0f3611f` and older commits. Change it anywhere it's used, and don't reuse it for Supabase.
 - The deployment work isn't fully tested. The new tests that need no Docker pass (21, including translations), but the full suite and `docker build` need Docker Desktop running. Nothing has run against a real Supabase project or Render yet.
-- Push the workflow, run it, make the image package public, then create the Render service from the image, following `docs/deployment.md`. Merge to `master` for automatic deploys.
+- Push `94a2c3c` from Windows, run the workflow, make the image package public, then create the Render service from the image, following `docs/deployment.md`. Merge to `master` for automatic deploys.
 - Check the account, team and report pages in a browser, and open an exported report in Excel.
 - A leave request doesn't cancel shifts, so an approved leave day still counts as a no-show unless admin cancels that shift.
 - The detection service needs the face bucket name, and must process `PENDING` face photos from it.
