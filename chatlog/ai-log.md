@@ -48,13 +48,16 @@ The developer committed all of this day's work together at 23:47.
 | 11:29 to 11:44 (6 Nov) | Plan admin account management, and then stop managers editing anyone | Approved plan, then built: create account, role, team, active status, password reset, face photo upload with enrolment status, delete, own password change, forced change after an admin sets a password, admin-only editing | `94a2c3c` |
 | 15:09 (6 Nov) | New rules: one leader per team, leaders plan only their team's shifts, only admin changes workers, leaders export a monthly Excel report for accounting, and tickets go to HSE for safety or to admin for everything else | Ticket routing to HSE or admin with a new leave request category, team setup for admins with one team per leader, and a monthly `.xlsx` report of safety scores, violations, attendance and no-shows | `94a2c3c` |
 | 15:37 (6 Nov) | Set up a Docker registry, to get an image URL to give Render | The workflow builds and pushes `ghcr.io/owochiii/steelsight_erp` and deploys that commit's tag through Render's deploy hook; image built and started locally | `94a2c3c` |
-| 15:47 (6 Nov) | Commit and push | Commit `94a2c3c` with the day's work; the push failed because WSL has no GitHub sign-in | `94a2c3c`, not pushed |
-| 15:50 (6 Nov) | Write today's log and transcript | This update and `transcript/6-11-2026.md` | Not committed |
+| 15:47 (6 Nov) | Commit and push | Commit `94a2c3c` with the day's work; the push failed because WSL has no GitHub sign-in | `94a2c3c`, pushed later from Windows and merged in PR #1 |
+| 15:50 (6 Nov) | Write today's log and transcript | This update and `transcript/6-11-2026.md` | `f005861` |
 | 16:09 (6 Nov) | List the environment the app and Supabase need | The required and optional variables for Render and local use, the Supabase setup, and what the detection service needs | None |
-| 16:11 (6 Nov) | Make a `.env.example` with those | `.env.example` with local defaults, Render values as comments, and the detection service's settings | Not committed |
+| 16:11 (6 Nov) | Make a `.env.example` with those | `.env.example` with local defaults, Render values as comments, and the detection service's settings | `f005861` |
 | 16:29 (6 Nov) | Fix a start-up error: `Driver org.postgresql.Driver claims to not accept jdbcUrl` | The Supabase URI had the username and password inside it, which the JDBC driver refuses, and still held the `[YOUR-PASSWORD]` placeholder; split it into `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` | Not in git |
-| 16:37 (6 Nov) | Write the docs and transcript | The database URL format and `.env.example` added to `docs/deployment.md`, this log and `transcript/6-11-2026.md` brought up to date | Not committed |
-| 16:59 (6 Nov) | Write a tutorial for using the app: signing in as admin, creating accounts and so on | `docs/user-guide.md`, by role, using the app's own labels and routes | Not committed |
+| 16:37 (6 Nov) | Write the docs and transcript | The database URL format and `.env.example` added to `docs/deployment.md`, this log and `transcript/6-11-2026.md` brought up to date | `f005861` |
+| 16:59 (6 Nov) | Write a tutorial for using the app: signing in as admin, creating accounts and so on | `docs/user-guide.md`, by role, using the app's own labels and routes | `f005861` |
+| 17:08 (6 Nov) | Didn't understand the detection service part of `.env.example` | Explained that those lines are comments for the separate Python service, and offered to move them into `docs/deployment.md`; no answer yet | None |
+| 21:01 (6 Nov) | Read the whole codebase, split it by module, and write the ADR, TDS and Test-Spec from the templates in `00_policy/` | 9 modules; `02_design/MODULE-MAP.md` with the module split, business rules, user stories and 12 gaps; 24 ADRs in `02_design/adr/`; a TDS per module in `03_implement/`; a Test-Spec per module in `04_testing/`, mapping all 244 existing tests | `8611bf3`, committed by the developer |
+| 22:16 (6 Nov) | Write today's log and transcript | This update and the rest of `transcript/6-11-2026.md` | Not committed |
 
 ## Decisions made by the developer
 
@@ -147,6 +150,19 @@ From the deployment plan the developer approved on 6 November:
 - Recommended making the image package public, because Render's support for private `ghcr.io` images wasn't confirmed. The code is public and the image has no secrets.
 - Commits use the developer's name and email from the repository's history, because no git identity is set in WSL.
 
+### 2026-11-06 (design documents)
+
+- Split the code into 9 modules: IAM, Scheduling, Attendance, PPE & Safety, Ticketing, Notification & Detection API, Reporting, Photo Storage and Platform. The page controllers in `web/` went to the module whose service they call.
+- Put the documents in `02_design/`, `03_implement/` and `04_testing/`, the folders the templates refer to, with one ADR file per decision.
+- Kept the templates' headings as written, Vietnamese and English, and wrote the content in English like the other docs.
+- Adapted the parts that assume TypeScript, Prisma and JWT: Flyway SQL for schemas, Java for interfaces, and session and CSRF form endpoints for the API tables.
+- The app returns no error codes, so the error tables use codes as reference IDs only, with the real Vietnamese messages from `messages_vi.properties`.
+- Performance targets are marked *proposed*, because nothing has been measured.
+- There is no SRS, so the business rules come from what the code enforces and the user stories from `docs/user-guide.md`. Both are marked unconfirmed.
+- The ADRs are recorded after the fact. Deciders are the commit author and Claude, and DPO sign-off is left pending everywhere.
+- Laws are cited by name only, without article numbers, rather than guessing them.
+- The Test-Specs say the tests were written alongside the code, not test-first, so the Red Gate was never run. Gaps get 🔴 test cases that aren't written yet.
+
 ## How the work was checked
 
 ### 2026-11-04
@@ -175,6 +191,10 @@ From the deployment plan the developer approved on 6 November:
 - **Not checked in a browser:** the account, team setup and report pages, and opening the `.xlsx` in Excel. They have automated page tests only.
 - The image built locally at 508 MB. With the `prod` profile, a 512 MB memory limit and half a CPU, it started in 20 seconds, used 242 MB, and ran all 11 migrations on an empty database. Health showed `UP`, other actuator pages stayed closed, the session cookie was `Secure`, the first admin was created and signed in, and the detection API refused a call without a key. The test container and its database were then removed.
 - **Not run yet:** the GitHub workflow itself, because it hasn't been pushed.
+- For the design documents, the 39 tests that need no database ran again on `f005861` and passed: attendance rules, sign-in limit, the three storage classes and translations. `JAVA_HOME` had to be set to the Linux JDK first.
+- **Not run for the documents:** the 205 tests that need a database, because Docker isn't installed in this WSL. The Test-Specs give their status from the 15:31 run, since no source file changed after `94a2c3c`.
+- A script checked the documents: no broken links, every BR, US and ADR reference is defined, the code blocks are closed, and all 244 test methods map to a test case.
+- Expected results in the Test-Specs were checked against the real test code for the main cases, and several were corrected.
 
 ## Problems during the work
 
@@ -210,12 +230,22 @@ From the deployment plan the developer approved on 6 November:
 | The script that builds the transcript was in a temporary folder that was cleared | Rewritten for `6-11-2026.md` |
 | The Supabase database URL, pasted as shown in Supabase, stopped the app at start-up | Split into a JDBC URL, username and password; the guide now warns about it |
 | `git push` from WSL failed with no GitHub sign-in | The commit is local; the developer pushes from Windows, where they're signed in |
+| The first test run for the documents failed at once because `JAVA_HOME` wasn't set | Ran again with `JAVA_HOME` set to the Linux JDK 17 |
+| Docker isn't installed in this WSL | Only the 39 tests that need no database ran; the rest use the 15:31 results |
+| The first list of test names missed three methods with digits in their names, such as `comingAt0815…` | Listed them again; all 244 are in the Test-Specs |
+| Some expected results were first written from memory, such as the safety score times and the result of two officers deciding at once | Checked against the tests and corrected |
+| A message key and its Vietnamese text in the IAM error table were guessed | Replaced with the real strings from `messages_vi.properties` |
+| Several documents changed on disk while they were being written, probably in the editor | Left as they were and not overwritten |
 
 ## Open items
 
 - The database password default was removed from `application.yaml`, but it stays in git history on GitHub through `0f3611f` and older commits. Change it anywhere it's used, and don't reuse it for Supabase.
 - The deployment work isn't fully tested. The new tests that need no Docker pass (21, including translations), but the full suite and `docker build` need Docker Desktop running. Nothing has run against a real Supabase project or Render yet.
-- Push `94a2c3c` from Windows, run the workflow, make the image package public, then create the Render service from the image, following `docs/deployment.md`. Merge to `master` for automatic deploys.
+- `94a2c3c` and `f005861` are pushed and merged to `master` (PRs #1 and #2). Check the workflow ran, make the image package public, then create the Render service from the image, following `docs/deployment.md`.
+- The design documents need DPO sign-off, the article numbers of Luật 91/2025 and NĐ 356/2025, and a review of the ADR deciders.
+- Decide on the 12 gaps in `02_design/MODULE-MAP.md` §6, especially manual check-ins with no shift (G1), no consent record for face enrolment (G11), and forgotten check-outs staying open when detection is off (G7).
+- Run the Red Gate from the Test-Specs on the critical test cases, and add JaCoCo if coverage should be measured.
+- Answer whether the detection service notes move from `.env.example` into `docs/deployment.md`.
 - Check the account, team and report pages in a browser, and open an exported report in Excel.
 - A leave request doesn't cancel shifts, so an approved leave day still counts as a no-show unless admin cancels that shift.
 - The detection service needs the face bucket name, and must process `PENDING` face photos from it.
