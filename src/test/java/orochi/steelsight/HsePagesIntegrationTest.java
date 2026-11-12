@@ -277,6 +277,31 @@ class HsePagesIntegrationTest extends PageTestSupport {
     }
 
     @Test
+    void theEditPageShowsWhoCorrectedAVisitAndWhatChanged() throws Exception {
+        Long id = jdbc.queryForObject("""
+                INSERT INTO check_in (user_id, check_in_at, check_out_at, method, recorded_by, note)
+                VALUES (?, '2026-11-04 01:00+00', '2026-11-04 02:00+00', 'MANUAL', ?, 'Typed wrong') RETURNING id""",
+                Long.class, worker, hse);
+        String corrector = jdbc.queryForObject("SELECT full_name FROM app_user WHERE id = ?", String.class, hse);
+
+        mvc.perform(get("/attendance/" + id + "/edit").with(as(hse)))
+                .andExpect(content().string(containsString("This visit hasn&#39;t been corrected.")));
+
+        mvc.perform(post("/attendance/" + id).param("checkInAt", "2026-11-04T08:00").param("checkOutAt", "2026-11-04T16:00")
+                        .param("note", "<b>Left late</b>").param("version", "0")
+                        .with(as(hse)).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+        flush();
+
+        mvc.perform(get("/attendance/" + id + "/edit").with(as(hse)))
+                .andExpect(content().string(containsString("Change history")))
+                .andExpect(content().string(containsString(corrector)))
+                .andExpect(content().string(containsString("Typed wrong → &lt;b&gt;Left late&lt;/b&gt;")))
+                .andExpect(content().string(containsString("Checked out: ")))
+                .andExpect(content().string(not(containsString("Checked in: "))));
+    }
+
+    @Test
     void aManualCheckInNeedsAWorkerAndATime() throws Exception {
         mvc.perform(post("/attendance").param("checkInAt", "2026-11-04T08:00").with(as(hse)).with(csrf()))
                 .andExpect(status().isBadRequest())

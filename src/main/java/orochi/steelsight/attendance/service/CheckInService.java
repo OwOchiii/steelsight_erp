@@ -8,8 +8,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import orochi.steelsight.attendance.model.CheckIn;
 import orochi.steelsight.attendance.model.CheckInMethod;
+import orochi.steelsight.attendance.model.CheckInCorrection;
+import orochi.steelsight.attendance.repository.CheckInCorrectionRepository;
 import orochi.steelsight.attendance.repository.CheckInRepository;
 import orochi.steelsight.exception.BusinessRuleException;
+import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.identity.service.AccessPolicy;
 import orochi.steelsight.identity.service.Permissions;
@@ -31,6 +34,7 @@ public class CheckInService {
 
     private final AccessPolicy access;
     private final CheckInRepository checkIns;
+    private final CheckInCorrectionRepository corrections;
     private final AppUserRepository users;
     private final ShiftRepository shifts;
     private final ZoneRepository zones;
@@ -106,6 +110,13 @@ public class CheckInService {
         return checkIns.require(checkInId);
     }
 
+    /** Newest first. The same people who can correct a visit can see how it was corrected. */
+    @Transactional(readOnly = true)
+    public List<CheckInCorrection> listCorrections(Long actorId, Long checkInId) {
+        access.require(actorId, Permissions.CHECKIN_EDIT);
+        return corrections.findAllByCheckInIdOrderByCorrectedAtDescIdDesc(checkInId);
+    }
+
     @Transactional(readOnly = true)
     public List<Zone> listZones(Long actorId) {
         access.require(actorId, Permissions.CHECKIN_EDIT);
@@ -146,12 +157,17 @@ public class CheckInService {
         requireOrder(checkInAt, checkOutAt);
         CheckIn visit = checkIns.require(checkInId);
         visit.requireVersion(expectedVersion);
+        AppUser corrector = users.require(actorId);
+        String newNote = Text.optional("A note", note, Text.LONG);
+        CheckInCorrection correction = CheckInCorrection.of(visit, corrector, checkInAt, checkOutAt, newNote);
         visit.setCheckInAt(checkInAt);
         visit.setCheckOutAt(checkOutAt);
         visit.setAutoClosed(false);
-        visit.setRecordedBy(users.require(actorId));
-        visit.setNote(Text.optional("A note", note, Text.LONG));
-        return save(visit);
+        visit.setRecordedBy(corrector);
+        visit.setNote(newNote);
+        CheckIn saved = save(visit);
+        corrections.save(correction);
+        return saved;
     }
 
     private void requireOrder(OffsetDateTime checkInAt, OffsetDateTime checkOutAt) {

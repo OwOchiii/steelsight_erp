@@ -21,15 +21,19 @@ import java.time.temporal.ChronoUnit;
 public class AttendanceRules {
 
     private final Duration graceWithoutTeam;
+    private final Duration minimumVisit;
 
-    public AttendanceRules(@Value("${steelsight.attendance.late-after-minutes}") long minutesWithoutTeam) {
+    public AttendanceRules(@Value("${steelsight.attendance.late-after-minutes}") long minutesWithoutTeam,
+                           @Value("${steelsight.attendance.minimum-visit-minutes}") long minimumVisitMinutes) {
         this.graceWithoutTeam = Duration.ofMinutes(minutesWithoutTeam);
+        this.minimumVisit = Duration.ofMinutes(minimumVisitMinutes);
     }
 
     public VisitStatus assess(CheckIn visit) {
         Shift shift = visit.getShift();
+        boolean tooShort = isTooShort(visit);
         if (shift == null || shift.getStatus() == ShiftStatus.CANCELLED) {
-            return new VisitStatus(visit, null, 0, 0);
+            return new VisitStatus(visit, null, 0, 0, tooShort);
         }
         Duration lateBy = positive(Duration.between(toMinute(shift.getStartAt()), toMinute(visit.getCheckInAt())));
         Duration grace = graceFor(visit);
@@ -39,7 +43,13 @@ public class AttendanceRules {
         if (visit.getCheckOutAt() != null && !visit.isAutoClosed()) {
             minutesEarly = positive(Duration.between(toMinute(visit.getCheckOutAt()), requiredCheckOut)).toMinutes();
         }
-        return new VisitStatus(visit, requiredCheckOut, late ? lateBy.toMinutes() : 0, minutesEarly);
+        return new VisitStatus(visit, requiredCheckOut, late ? lateBy.toMinutes() : 0, minutesEarly, tooShort);
+    }
+
+    /** An estimated check-out says nothing about how long the worker stayed, so only a recorded one can be too short. */
+    private boolean isTooShort(CheckIn visit) {
+        return visit.getCheckOutAt() != null && !visit.isAutoClosed()
+                && Duration.between(visit.getCheckInAt(), visit.getCheckOutAt()).compareTo(minimumVisit) < 0;
     }
 
     private Duration graceFor(CheckIn visit) {

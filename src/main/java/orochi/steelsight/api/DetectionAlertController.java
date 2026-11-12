@@ -20,6 +20,8 @@ import java.util.UUID;
 public class DetectionAlertController {
 
     private static final int CAMERA_CODE_LENGTH = 100;
+    private static final int MOST_VIOLATIONS = 100_000;
+    private static final int LONGEST_WINDOW_SECONDS = 86_400;
 
     private final SafetyAlertService alerts;
 
@@ -44,11 +46,11 @@ public class DetectionAlertController {
         if (request.eventId() == null) {
             return "eventId is required";
         }
-        if (request.violationCount() == null || request.violationCount() < 1) {
-            return "violationCount must be at least 1";
+        if (request.violationCount() == null || request.violationCount() < 1 || request.violationCount() > MOST_VIOLATIONS) {
+            return "violationCount must be between 1 and " + MOST_VIOLATIONS;
         }
-        if (request.windowSeconds() == null || request.windowSeconds() < 1) {
-            return "windowSeconds must be at least 1";
+        if (request.windowSeconds() == null || request.windowSeconds() < 1 || request.windowSeconds() > LONGEST_WINDOW_SECONDS) {
+            return "windowSeconds must be between 1 and " + LONGEST_WINDOW_SECONDS;
         }
         if (request.detectedAt() == null) {
             return "detectedAt is required";

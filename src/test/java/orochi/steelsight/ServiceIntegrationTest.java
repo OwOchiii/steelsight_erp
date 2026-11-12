@@ -536,6 +536,26 @@ class ServiceIntegrationTest {
     }
 
     @Test
+    void aCorrectionKeepsTheOldValuesAndWhoChangedThem() {
+        OffsetDateTime in = OffsetDateTime.now().minusHours(9).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, in, in.plusHours(1), "Typed wrong"));
+        em.flush();
+
+        checkInService.correct(hse, visit.getId(), in, in.plusHours(8), "Left at 17:00", visit.getVersion());
+        em.flush();
+
+        Object kept = em.createNativeQuery("""
+                        SELECT count(*) FROM check_in_correction
+                        WHERE check_in_id = :visit AND corrected_by = :hse AND old_recorded_by = :hse
+                          AND old_check_in_at = :in AND old_check_out_at = :oldOut AND new_check_out_at = :newOut
+                          AND old_note = 'Typed wrong' AND new_note = 'Left at 17:00' AND NOT old_auto_closed""")
+                .setParameter("visit", visit.getId()).setParameter("hse", hse).setParameter("in", in)
+                .setParameter("oldOut", in.plusHours(1)).setParameter("newOut", in.plusHours(8))
+                .getSingleResult();
+        assertThat(((Number) kept).intValue()).isEqualTo(1);
+    }
+
+    @Test
     void aStaleCorrectionFailsEvenIfOnlyPlainSqlChangedTheVisit() {
         OffsetDateTime in = OffsetDateTime.now().minusHours(9);
         CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, in, null, null));

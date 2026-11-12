@@ -36,5 +36,22 @@
 
         <div class="actions"><button type="submit" class="btn" th:text="${visit} ? #{attendance.saveCorrection} : #{attendance.add}">Save</button></div>
     </form>
+
+    <section class="panel mt-4" th:if="${visit}" th:attr="aria-label=#{attendance.history}">
+        <div class="panel-head"><h2 th:text="#{attendance.history}">Change history</h2></div>
+        <div class="panel-body">
+            <p class="quiet" th:if="${corrections.isEmpty()}" th:text="#{attendance.historyEmpty}">This visit hasn't been corrected.</p>
+            <div class="comment" th:each="correction : ${corrections}">
+                <strong class="block" th:text="${correction.correctedBy.fullName}">Name</strong>
+                <span class="quiet small" th:text="${@display.dateTime(correction.correctedAt)}">When</span>
+                <p class="body-text mt-1" th:if="${correction.checkInChanged}"
+                   th:text="|#{field.checkedIn}: ${@display.dateTime(correction.oldCheckInAt)} → ${@display.dateTime(correction.newCheckInAt)}|">Checked in</p>
+                <p class="body-text mt-1" th:if="${correction.checkOutChanged}"
+                   th:text="|#{field.checkedOut}: ${correction.oldCheckOutAt != null ? @display.dateTime(correction.oldCheckOutAt) : #messages.msg('attendance.historyNone')} → ${correction.newCheckOutAt != null ? @display.dateTime(correction.newCheckOutAt) : #messages.msg('attendance.historyNone')}|">Checked out</p>
+                <p class="body-text mt-1" th:if="${correction.noteChanged}"
+                   th:text="|#{field.note}: ${correction.oldNote ?: #messages.msg('attendance.historyNone')} → ${correction.newNote ?: #messages.msg('attendance.historyNone')}|">Note</p>
+            </div>
+        </div>
+    </section>
 </main>
 </html>

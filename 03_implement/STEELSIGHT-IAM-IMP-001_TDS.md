@@ -134,6 +134,7 @@
 | Password storage | BCrypt hash only | 100% | `password_hash` starts `$2a$`/`$2b$` | PDPL — security measures |
 | Encryption in transit | Browser ↔ Render HTTPS (Render-terminated); ERP ↔ Supabase `sslmode=require` | TLS (version set by Render/Supabase) | `openssl s_client` (§14.3) | PDPL — security measures |
 | Session cookie | `HttpOnly`, `SameSite=Lax`, `Secure` in prod | configured | §14.3 curl check | — |
+| Session ending | A password change ends the user's other sessions; an admin reset ends all of them (in memory, single instance) | configured | `AccountSecurityTest` | PDPL — security measures |
 | Brute force | Lock after 5 / 20 failures for 15 min | configured | `DeploymentEndpointsTest` | — |
 | CSRF | All page forms | configured (Spring default) | `LoginIntegrationTest.loginWithoutACsrfTokenIsRefused` | — |
 | Access control | Role + scope | Least privilege | §16 | PDPL — least privilege |
@@ -325,7 +326,7 @@ CREATE INDEX idx_user_team ON app_user(team_id);
 -- can_read_ticket, can_update_ticket, can_delete_ticket : see TKT TDS
 ```
 
-> The `steelsight_detection` role can `SELECT (id, employee_code, face_file_path, is_active, deleted_at)` on `app_user` only (ADR-004).
+> The `steelsight_detection` role can `SELECT (id, employee_code, full_name, face_file_path, is_active, deleted_at)` on `app_user` only (ADR-004).
 
 ---
 

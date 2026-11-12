@@ -62,6 +62,8 @@ steelsight:
   attendance:
     # For workers with no team. Each team has its own value, which a manager or admin edits on the Team page.
     late-after-minutes: ${LATE_AFTER_MINUTES:15}
+    # A recorded visit shorter than this doesn't count as attending a shift.
+    minimum-visit-minutes: ${MINIMUM_VISIT_MINUTES:10}
   # Times are stored in UTC and shown in this zone.
   time-zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
   storage:

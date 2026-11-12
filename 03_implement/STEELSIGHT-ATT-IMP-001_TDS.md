@@ -118,6 +118,7 @@
 | Integrity | One open visit per worker | 100% | `uq_check_in_open` | PDPL — accuracy |
 | Idempotency | Retried detection events don't duplicate | 100% | `uq_check_in_event`; `schema_checks.sql` | — |
 | Consistency | Stale corrections refused, even after plain-SQL updates | 100% | `bump_check_in_version()` | — |
+| Audit | Every hand correction keeps the old and new values and who made it | 100% | `check_in_correction`, `ServiceIntegrationTest.aCorrectionKeepsTheOldValuesAndWhoChangedThem` | PDPL — accuracy |
 | Retention | Visits kept indefinitely | *Not defined — DPO* | — | PDPL — storage limitation |
 | Retention | Embeddings | Erased with the account; replaced on a new photo | `trg_user_erase_embedding`, `queueForEnrolment` | PDPL — sensitive data |
 

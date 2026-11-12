@@ -51,7 +51,8 @@ public class MonthlyReportWorkbook {
                 "report.col.violations", "report.col.noHardHat", "report.col.noVest", "report.col.otherViolations",
                 "report.col.awaitingDecision", "report.col.shiftsScheduled", "report.col.shiftsWorked",
                 "report.col.noShows", "report.col.hoursWorked", "report.col.timesLate", "report.col.minutesLate",
-                "report.col.timesEarly", "report.col.minutesEarly", "report.col.missingCheckOuts");
+                "report.col.timesEarly", "report.col.minutesEarly", "report.col.missingCheckOuts",
+                "report.col.needsReview");
         int r = HEADER_ROW + 1;
         for (WorkerRow row : report.workers()) {
             int c = 0;
@@ -73,7 +74,8 @@ public class MonthlyReportWorkbook {
             sheet.value(r, c++, row.minutesLate());
             sheet.value(r, c++, row.timesEarly());
             sheet.value(r, c++, row.minutesEarly());
-            sheet.value(r, c, row.missingCheckOuts());
+            sheet.value(r, c++, row.missingCheckOuts());
+            sheet.value(r, c, row.needsReview());
             r++;
         }
         sheet.width(1, 26);
@@ -103,7 +105,7 @@ public class MonthlyReportWorkbook {
     private void attendance(Worksheet sheet, Report report) {
         header(sheet, 0, "report.col.checkIn", "report.col.checkOut", "report.col.code", "report.col.name",
                 "report.col.shiftStart", "report.col.shiftEnd", "report.col.minutesLate", "report.col.minutesEarly",
-                "report.col.checkOutEstimated");
+                "report.col.checkOutEstimated", "report.col.needsReview");
         int r = 1;
         for (VisitRow row : report.visits()) {
             dateTime(sheet, r, 0, row.checkInAt());
@@ -115,6 +117,7 @@ public class MonthlyReportWorkbook {
             sheet.value(r, 6, row.minutesLate());
             sheet.value(r, 7, row.minutesEarly());
             sheet.value(r, 8, row.checkOutEstimated() ? text("report.yes") : text("report.no"));
+            sheet.value(r, 9, row.needsReview() ? text("report.yes") : text("report.no"));
             r++;
         }
         for (int c : new int[]{0, 1, 4, 5}) {

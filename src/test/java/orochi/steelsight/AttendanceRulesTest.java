@@ -2,9 +2,11 @@ package orochi.steelsight;
 
 import org.junit.jupiter.api.Test;
 import orochi.steelsight.attendance.model.CheckIn;
+import orochi.steelsight.attendance.model.CheckInMethod;
 import orochi.steelsight.attendance.service.AttendanceRules;
 import orochi.steelsight.attendance.service.VisitStatus;
 import orochi.steelsight.identity.model.AppUser;
+import orochi.steelsight.ppe.model.PpeLinking;
 import orochi.steelsight.scheduling.model.Shift;
 import orochi.steelsight.scheduling.model.ShiftStatus;
 import orochi.steelsight.scheduling.model.Team;
@@ -16,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** The 08:00 to 17:00 shift from the requirement, for a worker with no team: 15 minutes before a late tag. */
 class AttendanceRulesTest {
 
-    private final AttendanceRules rules = new AttendanceRules(15);
+    private final AttendanceRules rules = new AttendanceRules(15, 10);
 
     @Test
     void arrivingAndLeavingOnTimeHasNoTags() {
@@ -145,6 +147,52 @@ class AttendanceRulesTest {
             assertThat(status.isEarly()).isFalse();
             assertThat(status.isOnTime()).isFalse();
         }
+    }
+
+    @Test
+    void aRecordedVisitUnderTheMinimumIsTooShort() {
+        assertThat(assess("08:00", "08:09").tooShort()).isTrue();
+        assertThat(assess("08:00", "08:10").tooShort()).isFalse();
+    }
+
+    @Test
+    void aVisitStillOpenOrWithAnEstimatedCheckOutIsNotTooShort() {
+        assertThat(assess("08:00", null).tooShort()).isFalse();
+
+        CheckIn estimated = visit(at("08:00"), at("08:01"), shift());
+        estimated.setAutoClosed(true);
+        assertThat(rules.assess(estimated).tooShort()).isFalse();
+    }
+
+    @Test
+    void anAutoClosedGateVisitWithNoVestNeedsReview() {
+        CheckIn visit = visit(at("08:00"), at("17:00"), shift());
+        visit.setAutoClosed(true);
+
+        assertThat(rules.assess(visit).isNeedsReview()).isTrue();
+    }
+
+    @Test
+    void anAutoClosedGateVisitWithAVestDoesNotNeedReview() {
+        CheckIn visit = visit(at("08:00"), at("17:00"), shift());
+        visit.setAutoClosed(true);
+        visit.setPpeLinking(new PpeLinking());
+
+        assertThat(rules.assess(visit).isNeedsReview()).isFalse();
+    }
+
+    @Test
+    void aRecordedCheckOutWithNoVestDoesNotNeedReview() {
+        assertThat(assess("08:00", "17:00").isNeedsReview()).isFalse();
+    }
+
+    @Test
+    void aManualEntryNeverHasAVestSoItDoesNotNeedReview() {
+        CheckIn visit = visit(at("08:00"), at("17:00"), shift());
+        visit.setAutoClosed(true);
+        visit.setMethod(CheckInMethod.MANUAL);
+
+        assertThat(rules.assess(visit).isNeedsReview()).isFalse();
     }
 
     private VisitStatus assess(String in, String out) {

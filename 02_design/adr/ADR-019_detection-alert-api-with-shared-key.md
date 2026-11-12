@@ -33,7 +33,9 @@ The smallest API that keeps recipient choice and throttling in the ERP, with no 
 - `DetectionAlertApiTest` (8 cases) and `DetectionApiWithoutKeyTest`; `pagesStillRequireACsrfToken` shows the page chain is unaffected.
 
 **Negative (trade-offs accepted):**
-- No API rate limit; a leaked key could flood `safety_alert` (notifications are still throttled).
+- A leaked key can still add up to 60 `safety_alert` rows a minute (`ApiLimiter`), and can silence a camera whose code it knows. Before 2026-11-09 one fake alert silenced every camera; the quiet period is now per registered camera, and all other codes share one.
+- The limiter checks the key first and counts wrong keys separately, because `X-Forwarded-For` can be faked and a limit applied before the key check could lock out the real caller.
+- The shared key is still the only proof of who is calling; requests aren't signed.
 - No OpenAPI document (gap G10).
 
 **Risks:**

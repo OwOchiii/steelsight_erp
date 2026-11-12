@@ -65,8 +65,7 @@ public class AttendanceController extends PageController {
         form.setNote(visit.getNote());
         form.setVersion(visit.getVersion());
         model.addAttribute("form", form);
-        model.addAttribute("visit", visit);
-        return "attendance/form";
+        return showEditForm(user, visit, model);
     }
 
     @PostMapping("/attendance/{id}")
@@ -78,10 +77,13 @@ public class AttendanceController extends PageController {
                     siteTime.toInstant(form.getCheckOutAt()), form.getNote(), form.getVersion());
             redirect.addFlashAttribute("success", "The check-in was corrected.");
             return "redirect:/attendance";
-        }, () -> {
-            model.addAttribute("visit", checkIns.getForEdit(user.getUserId(), id));
-            return "attendance/form";
-        });
+        }, () -> showEditForm(user, checkIns.getForEdit(user.getUserId(), id), model));
+    }
+
+    private String showEditForm(AuthenticatedUser user, CheckIn visit, Model model) {
+        model.addAttribute("visit", visit);
+        model.addAttribute("corrections", checkIns.listCorrections(user.getUserId(), visit.getId()));
+        return "attendance/form";
     }
 
     private String showNewForm(AuthenticatedUser user, Model model) {

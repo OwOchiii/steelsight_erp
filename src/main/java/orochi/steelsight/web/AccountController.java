@@ -15,6 +15,7 @@ import orochi.steelsight.exception.BusinessRuleException;
 import orochi.steelsight.identity.service.UserService;
 import orochi.steelsight.security.AuthenticatedUser;
 import orochi.steelsight.security.PasswordChangeRequiredFilter;
+import orochi.steelsight.security.UserSessions;
 
 /** The signed-in person's own account. */
 @Controller
@@ -22,6 +23,7 @@ import orochi.steelsight.security.PasswordChangeRequiredFilter;
 public class AccountController extends PageController {
 
     private final UserService users;
+    private final UserSessions sessions;
 
     @GetMapping(PasswordChangeRequiredFilter.PAGE)
     public String passwordForm(HttpSession session, Model model) {
@@ -39,6 +41,7 @@ public class AccountController extends PageController {
                 throw new BusinessRuleException("The new passwords don't match");
             }
             users.changeOwnPassword(user.getUserId(), form.getCurrentPassword(), form.getNewPassword());
+            sessions.endOthers(user.getUserId(), session.getId());
             session.removeAttribute(PasswordChangeRequiredFilter.SESSION_FLAG);
             redirect.addFlashAttribute("success", "Your password was changed.");
             return "redirect:/";

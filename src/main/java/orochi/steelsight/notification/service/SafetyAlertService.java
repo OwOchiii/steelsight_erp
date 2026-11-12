@@ -13,6 +13,7 @@ import orochi.steelsight.notification.model.Notification;
 import orochi.steelsight.notification.model.SafetyAlert;
 import orochi.steelsight.notification.repository.NotificationRepository;
 import orochi.steelsight.notification.repository.SafetyAlertRepository;
+import orochi.steelsight.ppe.repository.CameraRepository;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -27,10 +28,13 @@ public class SafetyAlertService {
 
     private static final Logger log = LoggerFactory.getLogger(SafetyAlertService.class);
     private static final Duration QUIET_AFTER_NOTIFYING = Duration.ofMinutes(15);
+    private static final Duration OLDEST_TO_NOTIFY = Duration.ofHours(1);
+    private static final Duration FURTHEST_AHEAD_TO_NOTIFY = Duration.ofMinutes(5);
     private static final String HSE_ROLE = "HSE_OFFICER";
 
     private final JdbcTemplate jdbc;
     private final SafetyAlertRepository alerts;
+    private final CameraRepository cameras;
     private final NotificationRepository notifications;
     private final AppUserRepository users;
     private final RoleRepository roles;
@@ -39,14 +43,14 @@ public class SafetyAlertService {
     }
 
     /**
-     * Every new alert is kept, but HSE only hears again once the quiet time since the last notice has
-     * passed. Detection retries until a call is confirmed, so a known event id changes nothing.
+     * Every new alert is kept, but HSE only hears again once the quiet time since that source's last
+     * notice has passed. Detection retries until a call is confirmed, so a known event id changes nothing.
      *
      * @return false if this event id had already arrived
      */
     public boolean record(NewAlert alert) {
         OffsetDateTime now = OffsetDateTime.now();
-        boolean notify = !alerts.existsByNotifiedTrueAndReceivedAtAfter(now.minus(QUIET_AFTER_NOTIFYING));
+        boolean notify = isCurrent(alert, now) && !sourceWasJustNotified(alert.cameraCode(), now);
         List<Long> created = jdbc.queryForList("""
                 INSERT INTO safety_alert (event_id, violation_count, window_seconds, detected_at, camera_code, notified)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -60,6 +64,28 @@ public class SafetyAlertService {
             tellHse(alerts.getReferenceById(created.get(0)), now);
         }
         return true;
+    }
+
+    /** An alert from too long ago, or from the future, is kept but tells nobody and starts no quiet time. */
+    private boolean isCurrent(NewAlert alert, OffsetDateTime now) {
+        boolean current = !alert.detectedAt().isBefore(now.minus(OLDEST_TO_NOTIFY))
+                && !alert.detectedAt().isAfter(now.plus(FURTHEST_AHEAD_TO_NOTIFY));
+        if (!current) {
+            log.warn("Safety alert {} not notified: detected at {}, now {}", alert.eventId(), alert.detectedAt(), now);
+        }
+        return current;
+    }
+
+    /**
+     * Each registered camera has its own quiet time, so an alert from one camera can't silence the others.
+     * Any other code shares a single quiet time, so that inventing camera codes can't flood HSE.
+     */
+    private boolean sourceWasJustNotified(String cameraCode, OffsetDateTime now) {
+        OffsetDateTime since = now.minus(QUIET_AFTER_NOTIFYING);
+        boolean registered = cameraCode != null && cameras.findByCameraCode(cameraCode).isPresent();
+        return registered
+                ? alerts.existsByNotifiedTrueAndCameraCodeAndReceivedAtAfter(cameraCode, since)
+                : alerts.anyNotifiedFromUnregisteredCameraSince(since);
     }
 
     private void tellHse(SafetyAlert alert, OffsetDateTime now) {

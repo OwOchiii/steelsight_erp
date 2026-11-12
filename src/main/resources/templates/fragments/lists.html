@@ -92,6 +92,7 @@
                     <span class="badge badge-late" th:if="${status.late}" th:text="#{visits.late(${status.minutesLate})}">Late</span>
                     <span class="badge badge-late" th:if="${status.early}" th:text="#{visits.early(${status.minutesEarly})}">Early</span>
                     <span class="badge badge-late" th:if="${status.missingCheckOut}" th:text="#{visits.noCheckOut}">No check-out</span>
+                    <span class="badge badge-late" th:if="${status.needsReview}" th:text="#{visits.needsReview}">Needs review</span>
                     <span class="badge badge-on_time" th:if="${status.onTime}" th:text="#{visits.onTime}">On time</span>
                     <span class="badge" th:unless="${status.hasShift()}" th:text="#{visits.noShift}">No shift</span>
                     <span class="badge" th:text="${@display.label(visit.method)}">Method</span>

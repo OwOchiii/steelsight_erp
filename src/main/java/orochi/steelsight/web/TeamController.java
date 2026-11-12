@@ -26,6 +26,7 @@ import orochi.steelsight.identity.service.UserService;
 import orochi.steelsight.scheduling.model.Team;
 import orochi.steelsight.scheduling.service.TeamService;
 import orochi.steelsight.security.AuthenticatedUser;
+import orochi.steelsight.security.UserSessions;
 import orochi.steelsight.storage.PhotoAlbum;
 import orochi.steelsight.storage.PhotoStorage;
 
@@ -44,6 +45,7 @@ public class TeamController extends PageController {
     private final TeamService teams;
     private final PhotoStorage photos;
     private final SiteTime siteTime;
+    private final UserSessions sessions;
 
     @GetMapping("/team")
     public String list(@AuthenticationPrincipal AuthenticatedUser user,
@@ -193,7 +195,10 @@ public class TeamController extends PageController {
     public String resetPassword(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
                                 @RequestParam(required = false) String newPassword, RedirectAttributes redirect) {
         return attempt(redirect, editPage(id), "The password was reset. They must change it at their next sign-in.",
-                () -> users.resetPassword(user.getUserId(), id, newPassword));
+                () -> {
+                    users.resetPassword(user.getUserId(), id, newPassword);
+                    sessions.endAll(id);
+                });
     }
 
     @PostMapping("/team/{id}/face")

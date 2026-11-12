@@ -1,5 +1,8 @@
 package orochi.steelsight;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -227,22 +230,24 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
 
     @Test
     void editingAShiftSavesAndAStaleFormIsRefused() throws Exception {
-        Long id = shift(worker, zone, "timestamptz '2026-11-10 08:00+07'", "timestamptz '2026-11-10 16:00+07'");
+        // A week ahead in site time: a shift that hasn't started yet can't be marked completed.
+        String day = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(7).toString();
+        Long id = shift(worker, zone, "timestamptz '" + day + " 08:00+07'", "timestamptz '" + day + " 16:00+07'");
 
         mvc.perform(get("/shifts/" + id + "/edit").with(as(manager)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("2026-11-10T08:00")))
+                .andExpect(content().string(containsString(day + "T08:00")))
                 .andExpect(content().string(not(containsString("Mark completed"))))
                 .andExpect(content().string(containsString("Cancel shift")));
 
-        var edit = form(worker, "2026-11-10T09:00", "2026-11-10T17:00");
+        var edit = form(worker, day + "T09:00", day + "T17:00");
         edit.add("version", "0");
         mvc.perform(post("/shifts/" + id).params(edit).with(as(manager)).with(csrf()))
                 .andExpect(status().is3xxRedirection());
-        assertThat(textColumn("SELECT start_at AT TIME ZONE 'UTC' FROM shift WHERE id = ?", id)).startsWith("2026-11-10 02:00");
+        assertThat(textColumn("SELECT start_at AT TIME ZONE 'UTC' FROM shift WHERE id = ?", id)).startsWith(day + " 02:00");
         assertThat(textColumn("SELECT updated_by::text FROM shift WHERE id = ?", id)).isEqualTo(manager.toString());
 
-        var stale = form(worker, "2026-11-10T10:00", "2026-11-10T17:00");
+        var stale = form(worker, day + "T10:00", day + "T17:00");
         stale.add("version", "0");
         mvc.perform(post("/shifts/" + id).params(stale).with(as(manager)).with(csrf()))
                 .andExpect(status().isConflict())
