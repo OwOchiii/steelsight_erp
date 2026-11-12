@@ -2,7 +2,7 @@
 
 ## 1. Overall
 
-The Steelsight database has 19 tables in 6 logical domains, stored in PostgreSQL 17 with the pgvector extension. It is the shared record for the ERP web app and the Python detection service.
+The Steelsight database has 20 tables in 6 logical domains, stored in PostgreSQL 17 with the pgvector extension. It is the shared record for the ERP web app and the Python detection service.
 
 ```mermaid
 erDiagram
@@ -18,6 +18,9 @@ erDiagram
     ppe_linking |o--o{ check_in : "ppe_linking_id"
     app_user |o--o{ check_in : "recorded_by"
     app_user ||--|| face_embedding : "user_id"
+    check_in ||--o{ check_in_correction : "check_in_id"
+    app_user ||--o{ check_in_correction : "corrected_by"
+    app_user |o--o{ check_in_correction : "old_recorded_by"
     app_user ||--o{ shift : "user_id"
     zone ||--o{ shift : "zone_id"
     app_user ||--o{ shift : "created_by"
@@ -50,7 +53,7 @@ The schema is grouped into 6 logical domains:
 | No. | Domain | Tables | Description |
 | --- | --- | --- | --- |
 | 1.1 | Identity and Access Management | role, permission, role_permission, app_user | Stores user accounts and what each one may do. A user has one role and a role holds many permissions. |
-| 1.2 | Worker Management | team, check_in, face_embedding | Groups workers into teams, records each site visit, and holds face enrolment for gate check-in. |
+| 1.2 | Worker Management | team, check_in, face_embedding, check_in_correction | Groups workers into teams, records each site visit and every hand correction of one, and holds face enrolment for gate check-in. |
 | 1.3 | Shift Management | zone, shift | Holds the timetable: which worker is in which site zone, and when. |
 | 1.4 | PPE and Safety Monitoring | ppe_vest, ppe_linking, camera, violation | Records vests, cameras and the PPE violations the detection service finds, including dispute decisions. |
 | 1.5 | Ticket Management | ticket_category, ticket, ticket_comment | Handles requests, hazard reports and PPE disputes, each routed to the role that handles its category. |
@@ -156,7 +159,7 @@ Every person who uses the system.
 
 ### 1.2 Worker Management
 
-This domain groups workers into teams and records when they are on site. Admin puts each worker in a team. Each team has one leader, a manager, and a manager leads at most one team. The leader plans shifts only for that team's workers, and exports its monthly report for accounting. A check-in row is one site visit, created by face match at the gate or entered by hand by HSE. Enrolment runs through face_embedding: the ERP queues a photo, and the detection service computes the vector. The account fields for each worker are in app_user, under Identity and Access Management.
+This domain groups workers into teams and records when they are on site. Admin puts each worker in a team. Each team has one leader, a manager, and a manager leads at most one team. The leader plans shifts only for that team's workers, and exports its monthly report for accounting. A check-in row is one site visit, created by face match at the gate or entered by hand by HSE. Enrolment runs through face_embedding: the ERP queues a photo, and the detection service computes the vector. When HSE or Admin corrects a visit by hand, check_in_correction keeps what it said before, because a correction overwrites the visit and these times feed the monthly report. The account fields for each worker are in app_user, under Identity and Access Management.
 
 ```mermaid
 erDiagram
@@ -168,6 +171,9 @@ erDiagram
     ppe_linking |o--o{ check_in : "ppe_linking_id"
     app_user |o--o{ check_in : "recorded_by"
     app_user ||--|| face_embedding : "user_id"
+    check_in ||--o{ check_in_correction : "check_in_id"
+    app_user ||--o{ check_in_correction : "corrected_by"
+    app_user |o--o{ check_in_correction : "old_recorded_by"
     team {
         bigint id PK
         text name UK
@@ -204,6 +210,20 @@ erDiagram
         text error_message
         timestamptz created_at
         timestamptz updated_at
+    }
+    check_in_correction {
+        bigint id PK
+        bigint check_in_id FK
+        bigint corrected_by FK
+        timestamptz corrected_at
+        timestamptz old_check_in_at
+        timestamptz old_check_out_at
+        text old_note
+        bigint old_recorded_by FK
+        boolean old_auto_closed
+        timestamptz new_check_in_at
+        timestamptz new_check_out_at
+        text new_note
     }
 ```
 
@@ -258,6 +278,25 @@ One row per worker, which also acts as the enrolment queue.
 | 7 | error_message | text | Variable |  | Yes | No | Why enrolment failed, such as no face found |
 | 8 | created_at | timestamptz | 8 bytes |  | No | No | When the row was created |
 | 9 | updated_at | timestamptz | 8 bytes |  | No | No | When the row last changed; set by a trigger |
+
+#### 1.2.4 check_in_correction
+
+What one hand correction of a visit changed. Rows are only ever added, and the visit's edit page shows them to users who can correct visits. Corrections made before this table existed have no history.
+
+| No. | Field Name | Data Type | Field Size | P/F Key | Nullable | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | id | bigint | 8 bytes | PK | No | Yes | Generated correction ID |
+| 2 | check_in_id | bigint | 8 bytes | FK → check_in(id) | No | No | The visit that was corrected |
+| 3 | corrected_by | bigint | 8 bytes | FK → app_user(id) | No | No | Who made the correction |
+| 4 | corrected_at | timestamptz | 8 bytes |  | No | No | When it was made; defaults to now |
+| 5 | old_check_in_at | timestamptz | 8 bytes |  | No | No | Arrival time before the correction |
+| 6 | old_check_out_at | timestamptz | 8 bytes |  | Yes | No | Departure time before the correction; empty means the visit was still open |
+| 7 | old_note | text | Variable |  | Yes | No | Note before the correction |
+| 8 | old_recorded_by | bigint | 8 bytes | FK → app_user(id) | Yes | No | Who had entered or corrected the visit before; empty for a face check-in nobody had changed |
+| 9 | old_auto_closed | boolean | 1 byte |  | No | No | True when the old check-out was an estimate |
+| 10 | new_check_in_at | timestamptz | 8 bytes |  | No | No | Arrival time after the correction |
+| 11 | new_check_out_at | timestamptz | 8 bytes |  | Yes | No | Departure time after the correction; empty means still on site |
+| 12 | new_note | text | Variable |  | Yes | No | Note after the correction |
 
 ### 1.3 Shift Management
 
@@ -589,7 +628,7 @@ A report from the detection service that too many violations are happening.
 | 4 | window_seconds | integer | 4 bytes |  | No | No | Length of the time window they were counted in; above 0 |
 | 5 | detected_at | timestamptz | 8 bytes |  | No | No | When the detection service raised the alert |
 | 6 | camera_code | text | Variable |  | Yes | No | Camera code as sent; not a foreign key, so a mistyped code can't lose an alert |
-| 7 | notified | boolean | 1 byte |  | No | No | False when HSE had been alerted within the last 15 minutes, so no new notification was sent |
+| 7 | notified | boolean | 1 byte |  | No | No | True when HSE was notified. False when the same source was notified within the last 15 minutes, or the alert was detected over 1 hour ago or over 5 minutes ahead. Each registered camera is its own source, and all other codes share one |
 | 8 | received_at | timestamptz | 8 bytes |  | No | No | When the ERP received it; defaults to now |
 
 #### 1.6.3 notification

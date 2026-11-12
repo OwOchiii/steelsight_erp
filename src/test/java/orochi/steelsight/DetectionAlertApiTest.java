@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -95,10 +96,63 @@ class DetectionAlertApiTest extends PageTestSupport {
     }
 
     @Test
+    void anAlertFromOneRegisteredCameraDoesNotSilenceAnother() throws Exception {
+        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
+        camera("API-CAM-1");
+        camera("API-CAM-2");
+
+        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now()).andExpect(status().isCreated());
+        send(UUID.randomUUID(), "API-CAM-2", OffsetDateTime.now()).andExpect(status().isCreated());
+        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now()).andExpect(status().isCreated());
+
+        assertThat(alerts()).isEqualTo(3);
+        assertThat(notices(hse)).isEqualTo(2);
+    }
+
+    @Test
+    void anAlertFromAnUnknownCameraDoesNotSilenceARegisteredOne() throws Exception {
+        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
+        camera("API-CAM-1");
+
+        send(UUID.randomUUID(), "MADE-UP", OffsetDateTime.now()).andExpect(status().isCreated());
+        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now()).andExpect(status().isCreated());
+
+        assertThat(notices(hse)).isEqualTo(2);
+    }
+
+    @Test
+    void inventingCameraCodesCannotFloodHse() throws Exception {
+        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
+
+        send(UUID.randomUUID(), "MADE-UP-1", OffsetDateTime.now()).andExpect(status().isCreated());
+        send(UUID.randomUUID(), "MADE-UP-2", OffsetDateTime.now()).andExpect(status().isCreated());
+        send(UUID.randomUUID(), "MADE-UP-3", OffsetDateTime.now()).andExpect(status().isCreated());
+
+        assertThat(alerts()).isEqualTo(3);
+        assertThat(notices(hse)).isEqualTo(1);
+    }
+
+    @Test
+    void anAlertTooOldOrTooFarAheadIsKeptSilentlyAndStartsNoQuietTime() throws Exception {
+        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
+        camera("API-CAM-1");
+
+        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now().minusHours(2)).andExpect(status().isCreated());
+        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now().plusMinutes(10)).andExpect(status().isCreated());
+        assertThat(alerts()).isEqualTo(2);
+        assertThat(notices(hse)).isZero();
+
+        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now()).andExpect(status().isCreated());
+        assertThat(notices(hse)).isEqualTo(1);
+    }
+
+    @Test
     void aBadBodyIsRefusedAsJson() throws Exception {
         for (String body : new String[]{
                 "not json",
                 "{}",
+                "{\"eventId\":\"" + UUID.randomUUID() + "\",\"violationCount\":100001,\"windowSeconds\":60,\"detectedAt\":\"2026-11-05T09:30:00+07:00\"}",
+                "{\"eventId\":\"" + UUID.randomUUID() + "\",\"violationCount\":7,\"windowSeconds\":86401,\"detectedAt\":\"2026-11-05T09:30:00+07:00\"}",
                 "{\"eventId\":\"not-a-uuid\",\"violationCount\":7,\"windowSeconds\":60,\"detectedAt\":\"2026-11-05T09:30:00+07:00\"}",
                 "{\"eventId\":\"" + UUID.randomUUID() + "\",\"violationCount\":0,\"windowSeconds\":60,\"detectedAt\":\"2026-11-05T09:30:00+07:00\"}",
                 "{\"eventId\":\"" + UUID.randomUUID() + "\",\"violationCount\":7,\"windowSeconds\":0,\"detectedAt\":\"2026-11-05T09:30:00+07:00\"}",
@@ -127,9 +181,22 @@ class DetectionAlertApiTest extends PageTestSupport {
         return mvc.perform(post(PATH).header("X-Api-Key", "test-key").contentType(MediaType.APPLICATION_JSON).content(body(event)));
     }
 
+    private ResultActions send(UUID event, String camera, OffsetDateTime detectedAt) throws Exception {
+        return mvc.perform(post(PATH).header("X-Api-Key", "test-key").contentType(MediaType.APPLICATION_JSON)
+                .content(body(event, camera, detectedAt)));
+    }
+
     private String body(UUID event) {
+        return body(event, "CAM-B2", OffsetDateTime.now());
+    }
+
+    private String body(UUID event, String camera, OffsetDateTime detectedAt) {
         return "{\"eventId\":\"" + event + "\",\"violationCount\":7,\"windowSeconds\":60,"
-                + "\"detectedAt\":\"2026-11-05T09:30:00+07:00\",\"cameraCode\":\"CAM-B2\"}";
+                + "\"detectedAt\":\"" + detectedAt + "\",\"cameraCode\":\"" + camera + "\"}";
+    }
+
+    private void camera(String code) {
+        camera(code, zone("Zone " + code));
     }
 
     private Integer alerts() {

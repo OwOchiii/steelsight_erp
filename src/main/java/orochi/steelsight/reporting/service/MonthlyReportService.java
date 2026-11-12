@@ -57,6 +57,9 @@ public class MonthlyReportService {
     @Value("${steelsight.time-zone}")
     private String timeZone;
 
+    @Value("${steelsight.attendance.minimum-visit-minutes}")
+    private int minimumVisitMinutes;
+
     /** to is the end of the month, or now for the month that is still running. */
     public record Period(YearMonth month, OffsetDateTime from, OffsetDateTime to) {
     }
@@ -64,7 +67,8 @@ public class MonthlyReportService {
     public record WorkerRow(Long id, String code, String name, String team, Integer score, String level,
                             int noHardHat, int noVest, int otherViolations, int awaitingDecision,
                             int shiftsScheduled, int shiftsWorked, int noShows, BigDecimal hoursWorked,
-                            int timesLate, long minutesLate, int timesEarly, long minutesEarly, int missingCheckOuts) {
+                            int timesLate, long minutesLate, int timesEarly, long minutesEarly, int missingCheckOuts,
+                            int needsReview) {
         public int violations() {
             return noHardHat + noVest + otherViolations;
         }
@@ -76,7 +80,7 @@ public class MonthlyReportService {
 
     public record VisitRow(OffsetDateTime checkInAt, OffsetDateTime checkOutAt, String code, String name,
                            OffsetDateTime shiftStart, OffsetDateTime shiftEnd, long minutesLate, long minutesEarly,
-                           boolean checkOutEstimated) {
+                           boolean checkOutEstimated, boolean needsReview) {
     }
 
     public record NoShowRow(OffsetDateTime shiftStart, OffsetDateTime shiftEnd, String code, String name) {
@@ -131,18 +135,21 @@ public class MonthlyReportService {
         }, Timestamp.from(period.from().toInstant()), Timestamp.from(period.to().toInstant()));
 
         // A visit counts for a shift when it is linked to it, or overlaps it: detection doesn't link them yet.
+        // A recorded visit under the minimum doesn't count; an estimated check-out can't say how long they stayed.
         List<ShiftRow> shifts = jdbc.query("""
                 SELECT s.user_id, s.start_at, s.end_at,
                        EXISTS (SELECT 1 FROM check_in c
                                WHERE c.user_id = s.user_id
                                  AND (c.shift_id = s.id
-                                      OR (c.check_in_at < s.end_at AND COALESCE(c.check_out_at, now()) > s.start_at))) AS attended
+                                      OR (c.check_in_at < s.end_at AND COALESCE(c.check_out_at, now()) > s.start_at))
+                                 AND (c.check_out_at IS NULL OR c.auto_closed
+                                      OR c.check_out_at - c.check_in_at >= make_interval(mins => ?))) AS attended
                 FROM shift s
                 WHERE s.status <> 'CANCELLED' AND s.start_at >= ? AND s.start_at < ?
                 ORDER BY s.start_at, s.id
                 """, (row, n) -> new ShiftRow(row.getLong("user_id"), time(row.getTimestamp("start_at")),
                         time(row.getTimestamp("end_at")), row.getBoolean("attended")),
-                Timestamp.from(period.from().toInstant()), Timestamp.from(period.to().toInstant()))
+                minimumVisitMinutes, Timestamp.from(period.from().toInstant()), Timestamp.from(period.to().toInstant()))
                 .stream().filter(s -> workers.containsKey(s.userId())).toList();
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         List<NoShowRow> noShows = shifts.stream()
@@ -190,7 +197,8 @@ public class MonthlyReportService {
                 mine.stream().mapToLong(VisitStatus::minutesLate).sum(),
                 (int) mine.stream().filter(VisitStatus::isEarly).count(),
                 mine.stream().mapToLong(VisitStatus::minutesEarly).sum(),
-                (int) mine.stream().filter(VisitStatus::isMissingCheckOut).count());
+                (int) mine.stream().filter(VisitStatus::isMissingCheckOut).count(),
+                (int) mine.stream().filter(VisitStatus::isNeedsReview).count());
     }
 
     private VisitRow visitRow(VisitStatus status) {
@@ -199,7 +207,7 @@ public class MonthlyReportService {
         return new VisitRow(visit.getCheckInAt(), visit.getCheckOutAt(), visit.getUser().getEmployeeCode(),
                 visit.getUser().getFullName(), shift == null ? null : shift.getStartAt(),
                 shift == null ? null : shift.getEndAt(), status.minutesLate(), status.minutesEarly(),
-                status.isMissingCheckOut());
+                status.isMissingCheckOut(), status.isNeedsReview());
     }
 
     private record Scope(Team team, List<AppUser> workers) {

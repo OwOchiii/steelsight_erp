@@ -31,8 +31,7 @@ GitLab CI/CD is the project's pipeline. While the code is still on GitHub, GitHu
 | Backend | Photo storage | Local disk or Supabase Storage REST API | `PhotoStorage` with a local version for development and a Supabase version for production, keeping ticket and face photos apart | Photos survive restarts on Render |
 | Backend | Excel export | fastexcel 0.18.4 | Writes the monthly report as an `.xlsx` file by streaming, with sheets for the summary, violations, attendance and no-shows | Team leaders send safety and attendance figures to accounting for pay and bonuses |
 | Backend | Boilerplate | Lombok 1.18.42 | Generates getters, setters and constructors at compile time | Shorter entity and service code |
-| Backend | API docs | springdoc-openapi 3.0.3 | In `pom.xml` but not used yet | Reserved for documenting the REST API |
-| Database | Relational database | PostgreSQL 17 | 19 tables in 6 domains, with triggers and `can_*` permission functions | The shared record for the ERP and the detection service |
+| Database | Relational database | PostgreSQL 17 | 20 tables in 6 domains, with triggers and `can_*` permission functions | The shared record for the ERP and the detection service |
 | Database | Vector extension | pgvector | Stores face embeddings | Face matching at the gate |
 | Database | Range extension | btree_gist | Supports an exclusion constraint | Stops a worker having overlapping shifts |
 | Database | Row level security | PostgreSQL RLS | On for every table, with policies only for the detection role | Blocks Supabase's public Data API, and limits what detection can read and write |

@@ -26,12 +26,13 @@ final class TodayRoster {
     }
 
     static List<Row> rows(List<Shift> shifts, List<VisitStatus> visits, OffsetDateTime now) {
+        List<VisitStatus> counted = visits.stream().filter(status -> !status.tooShort()).toList();
         List<Row> rows = new ArrayList<>();
         for (Shift shift : shifts) {
             if (shift.getStatus() == ShiftStatus.CANCELLED) {
                 continue;
             }
-            VisitStatus visit = visitFor(shift, visits).orElse(null);
+            VisitStatus visit = visitFor(shift, counted).orElse(null);
             rows.add(new Row(shift, visit, stateOf(shift, visit, now)));
         }
         rows.sort(Comparator.comparing(Row::state).thenComparing(row -> row.shift().getStartAt()));

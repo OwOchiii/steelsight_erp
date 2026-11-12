@@ -75,7 +75,7 @@
 | BR-NTF-001 | Business Rule | One warning/danger notice per level per month | `notify_safety_level()`, `uq_notification_level` | PDPL — transparency | ADR-014 |
 | BR-NTF-002 | Business Rule | `X-Api-Key` required; none configured → refuse all | `ApiKeyFilter`, `SecurityConfig.apiFilterChain` | — | ADR-019 |
 | BR-NTF-003 | Business Rule | Same `eventId` → 200 duplicate | `SafetyAlertService.record()` | — | ADR-005 |
-| BR-NTF-004 | Business Rule | Notify all active HSE unless notified < 15 min ago | `SafetyAlertService.record()/tellHse()` | — | ADR-019 |
+| BR-NTF-004 | Business Rule | Notify all active HSE unless the same source was notified < 15 min ago (each registered camera is one source; all other codes share one); an alert detected > 1 h ago or > 5 min ahead is kept without notifying | `SafetyAlertService.record()/tellHse()` | — | ADR-019 |
 | BR-NTF-005 | Business Rule | Own notifications only | `NotificationService` | PDPL — least privilege | ADR-022 |
 | BR-NTF-006 | Business Rule | No stored text | `notification` columns | — | ADR-022 |
 | US-WRK-005 | User Story | Told at warning/danger | trigger + `notifications/list` | — | ADR-014 |
@@ -104,7 +104,7 @@
 | Latency | `POST /api/v1/detection/alerts` warm | *proposed* `< 200 ms` p95 | Request log ms | — |
 | Availability | Alert API | *configured:* Render wakes on request (≥ 1 min cold start); detection's outbox retries meanwhile | Detection outbox | — |
 | Delivery | Level notice while ERP sleeps | Always (DB trigger) | ADR-014 | — |
-| Throttle | HSE alert notices | ≤ 1 notifying alert per 15 min (best effort, gap G5) | `safety_alert.notified` | — |
+| Throttle | HSE alert notices | ≤ 1 notifying alert per source per 15 min (best effort, gap G5) | `safety_alert.notified` | — |
 
 ### 4.2. Data Integrity & Retention
 
@@ -122,7 +122,7 @@
 | Fail closed | Empty key → refuse every call | configured | `DetectionApiWithoutKeyTest` | — |
 | Isolation | API chain stateless, no session, CSRF off; page chain unaffected | configured | `DetectionAlertApiTest.pagesStillRequireACsrfToken` | — |
 | Encryption in transit | HTTPS via Render | Render TLS | §14.3 | PDPL |
-| Rate limit | None on the API | **Gap** | — | — |
+| Rate limit | 60 calls/min with the right key (whole API); 10 wrong keys/min per address; 429 with `Retry-After`; in memory, per instance | configured | `ApiLimiterTest`, `ApiKeyFilterTest` | — |
 | `SECURITY DEFINER` | `search_path` pinned | configured | V8 source | — |
 
 ### 4.4. Scalability & Capacity Planning

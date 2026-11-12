@@ -79,6 +79,7 @@ BEGIN
   -- the detection role can do its job
   SET LOCAL ROLE steelsight_detection;
   PERFORM id, face_file_path FROM app_user;
+  PERFORM employee_code, full_name FROM app_user;          -- V13: names for the gate screen
   ASSERT (SELECT count(*) FROM face_embedding) = 1, 'detection should see embeddings';
   UPDATE face_embedding SET status = 'READY', model_name = 'buffalo_l', embedding = array_fill(0.1, ARRAY[512])::vector;
   INSERT INTO violation (camera_id, violation_type, detected_at, snapshot_path)
@@ -100,6 +101,11 @@ BEGIN
   BEGIN
     PERFORM password_hash FROM app_user;
     RAISE EXCEPTION 'CHECK_FAILED: detection read password_hash';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    PERFORM email, phone_number FROM app_user;
+    RAISE EXCEPTION 'CHECK_FAILED: detection read contact details';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   BEGIN

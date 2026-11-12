@@ -1,11 +1,11 @@
 # AI usage log
 
-How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) and [6 November](../transcript/6-11-2026.md).
+How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md) and [9 November](../transcript/9-11-2026.md).
 
 | | |
 |---|---|
 | Tool | Claude Code (Opus 5.5) |
-| Dates | 2026-11-04 to 2026-11-06 (one session ran past midnight) |
+| Dates | 2026-11-04 to 2026-11-09 (one session ran past midnight) |
 | Branch | `feature/erp-backend` |
 
 ## Summary by request
@@ -59,6 +59,16 @@ The developer committed all of this day's work together at 23:47.
 | 21:01 (6 Nov) | Read the whole codebase, split it by module, and write the ADR, TDS and Test-Spec from the templates in `00_policy/` | 9 modules; `02_design/MODULE-MAP.md` with the module split, business rules, user stories and 12 gaps; 24 ADRs in `02_design/adr/`; a TDS per module in `03_implement/`; a Test-Spec per module in `04_testing/`, mapping all 244 existing tests | `8611bf3`, committed by the developer |
 | 22:16 (6 Nov) | Write today's log and transcript | This update and the rest of `transcript/6-11-2026.md` | Not committed |
 
+### 2026-11-09
+
+| Time | What the developer asked for | What was produced | Commit |
+|---|---|---|---|
+| 16:34 | Find the API the detection server calls for violation alerts, and suggest how to secure it | Located `DetectionAlertController`, found it was already guarded by an API key, and listed the remaining ways to abuse it | None |
+| 16:39 | Add rate limiting and stop fake alerts silencing real ones; suggest JWT and other security | `ApiLimiter`, a quiet period per registered camera, delayed or future alerts kept without notifying, upper limits on counts; advice against JWT | Not committed |
+| 16:46 | Run a full security review of the pages and permissions | Review of every route and its service checks, plus a temporary test of routes as a worker: no critical or high findings, 2 medium, 5 low | None |
+| 16:51 | Fix the three top findings | Password changes end other sessions, `check_in_correction` history table (`V12`), Swagger library removed | Not committed |
+| 16:59 | Add the history section, and write the log and today's transcript | Change history on the visit edit page in both languages, this update and `transcript/9-11-2026.md` | Not committed |
+
 ## Decisions made by the developer
 
 ### 2026-11-04
@@ -94,6 +104,12 @@ The developer committed all of this day's work together at 23:47.
 - PPE disputes and safety concerns go to HSE, and every other ticket, including a new leave request category, goes to admin only. Team leaders no longer see or handle tickets.
 - The report counts no-shows: past shifts with no check-in.
 
+### 2026-11-09
+
+- Add rate limiting and the fix for silenced alerts now, and leave request signing for later because it needs a change in the detection codebase.
+- Fix the session, attendance history and Swagger findings first, and leave the other four low findings for later.
+- Show the attendance change history on the visit edit page.
+
 ## Decisions suggested by Claude and accepted by the developer
 
 ### 2026-11-04
@@ -123,6 +139,11 @@ From the deployment plan the developer approved on 6 November:
 - Run the tests in GitHub Actions and deploy through a Render deploy hook, leaving scanning and the image registry until the move to GitLab.
 - Keep ticket photos in a private Supabase bucket, served through the ticket page so its permission checks apply.
 - Lock sign-in for 15 minutes after 5 failures from one address on one employee code.
+
+### 2026-11-09
+
+- Not adding JWT. The developer asked for a suggestion; the advice was that it adds nothing for one machine calling one endpoint, and that server sessions suit a server-rendered app better. The developer moved on to the security review instead.
+- Removing the Swagger library rather than switching it off, because nothing used it.
 
 ## Decisions made by Claude and reported to the developer
 
@@ -163,6 +184,16 @@ From the deployment plan the developer approved on 6 November:
 - Laws are cited by name only, without article numbers, rather than guessing them.
 - The Test-Specs say the tests were written alongside the code, not test-first, so the Red Gate was never run. Gaps get 🔴 test cases that aren't written yet.
 
+### 2026-11-09
+
+- Changed the first suggestion of putting the rate limit before the key check. `X-Forwarded-For` can be faked, so that order could have locked out the real detection server. The key is checked first, and wrong keys are counted separately.
+- Limits of 60 calls a minute with the right key and 10 wrong keys a minute per address.
+- Each registered camera has its own quiet period, and every other camera code shares one, so inventing codes can't flood HSE.
+- An alert detected over 1 hour ago or over 5 minutes ahead is kept without notifying anyone. A wrong clock on the detection machine would silence alerts, which is logged as a warning.
+- `violationCount` above 100,000 and `windowSeconds` above 86,400 return 400.
+- A password change ends the person's other sessions, and an admin reset ends all of them, including the admin's own if they reset themselves.
+- The attendance history can be seen only by people who can correct visits (`CHECKIN_EDIT`). It starts with this change, because older corrections had already overwritten their values.
+
 ## How the work was checked
 
 ### 2026-11-04
@@ -195,6 +226,14 @@ From the deployment plan the developer approved on 6 November:
 - **Not run for the documents:** the 205 tests that need a database, because Docker isn't installed in this WSL. The Test-Specs give their status from the 15:31 run, since no source file changed after `94a2c3c`.
 - A script checked the documents: no broken links, every BR, US and ADR reference is defined, the code blocks are closed, and all 244 test methods map to a test case.
 - Expected results in the Test-Specs were checked against the real test code for the main cases, and several were corrected.
+
+### 2026-11-09
+
+- The full suite passed with 266 tests at the end of the day, on a real PostgreSQL with migration `V12`. It ran with the developer's uncommitted attendance and report changes in the working tree.
+- New tests cover the rate limits, the quiet period per camera, delayed alerts, ended sessions after a password change or reset, the correction history, the history section and the removed Swagger routes.
+- The security review read every page controller with its service and the SQL permission functions. A temporary test requested 15 routes as a worker: 13 returned 403 and the 2 Swagger routes returned 200. That test was then deleted.
+- **Not checked in a browser:** the history section.
+- **Not reviewed:** dependency vulnerabilities, the real Render and Supabase settings, and the detection codebase. No live attack test was done.
 
 ## Problems during the work
 
@@ -237,8 +276,23 @@ From the deployment plan the developer approved on 6 November:
 | A message key and its Vietnamese text in the IAM error table were guessed | Replaced with the real strings from `messages_vi.properties` |
 | Several documents changed on disk while they were being written, probably in the editor | Left as they were and not overwritten |
 
+### 2026-11-09
+
+| Problem | Outcome |
+|---|---|
+| `./mvnw` failed in WSL because `JAVA_HOME` points at the Windows JDK | Ran with the Linux JDK 17 |
+| Docker wasn't running for the first alert test run | Only the 12 tests that need no database ran; the alert tests passed once the developer started Docker |
+| A test helper used the wrong `zone` column | Replaced with the helpers in `PageTestSupport` |
+| A missing `AppUser` import stopped the first build of the fixes | Added the import |
+
 ## Open items
 
+- Today's security work isn't committed. `V12` runs on the next deploy.
+- The detection service must retry on 429, keep its clock accurate, and send camera codes that exactly match the `camera` table.
+- Sign the detection API's requests with HMAC, which needs a matching change in the detection codebase.
+- Remaining low findings from the review: no Content-Security-Policy, no second login factor for admins and the first admin isn't forced to change the password, sign-in lockouts can be triggered by anyone and reset on restart, and no limit on photo uploads.
+- Run a dependency vulnerability scan; the app is on Spring Boot 4.0.0.
+- Check the attendance change history in a browser, in both languages.
 - The database password default was removed from `application.yaml`, but it stays in git history on GitHub through `0f3611f` and older commits. Change it anywhere it's used, and don't reuse it for Supabase.
 - The deployment work isn't fully tested. The new tests that need no Docker pass (21, including translations), but the full suite and `docker build` need Docker Desktop running. Nothing has run against a real Supabase project or Render yet.
 - `94a2c3c` and `f005861` are pushed and merged to `master` (PRs #1 and #2). Check the workflow ran, make the image package public, then create the Render service from the image, following `docs/deployment.md`.
