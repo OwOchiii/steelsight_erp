@@ -104,8 +104,13 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   BEGIN
-    PERFORM email, phone_number FROM app_user;
-    RAISE EXCEPTION 'CHECK_FAILED: detection read contact details';
+    PERFORM email FROM app_user;
+    RAISE EXCEPTION 'CHECK_FAILED: detection read email';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    PERFORM phone_number FROM app_user;
+    RAISE EXCEPTION 'CHECK_FAILED: detection read phone_number';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   BEGIN
