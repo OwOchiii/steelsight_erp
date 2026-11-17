@@ -17,7 +17,7 @@ erDiagram
     camera |o--o{ check_in : "camera_id"
     ppe_linking |o--o{ check_in : "ppe_linking_id"
     app_user |o--o{ check_in : "recorded_by"
-    app_user ||--|| face_embedding : "user_id"
+    app_user ||--o{ face_embedding : "user_id"
     check_in ||--o{ check_in_correction : "check_in_id"
     app_user ||--o{ check_in_correction : "corrected_by"
     app_user |o--o{ check_in_correction : "old_recorded_by"
@@ -170,7 +170,7 @@ erDiagram
     camera |o--o{ check_in : "camera_id"
     ppe_linking |o--o{ check_in : "ppe_linking_id"
     app_user |o--o{ check_in : "recorded_by"
-    app_user ||--|| face_embedding : "user_id"
+    app_user ||--o{ face_embedding : "user_id"
     check_in ||--o{ check_in_correction : "check_in_id"
     app_user ||--o{ check_in_correction : "corrected_by"
     app_user |o--o{ check_in_correction : "old_recorded_by"
@@ -203,6 +203,7 @@ erDiagram
     face_embedding {
         bigint id PK
         bigint user_id FK,UK
+        text pose UK
         text source_file_path
         text status
         vector embedding
@@ -265,19 +266,20 @@ One visit to site, from check-in to check-out.
 
 #### 1.2.3 face_embedding
 
-One row per worker, which also acts as the enrolment queue.
+One row per worker and angle (pose), which also acts as the enrolment queue. Every worker with a face photo has a FRONT row, the photo on their account (app_user.face_file_path). An admin can add a LEFT and a RIGHT row, photos with the head turned, so the gate camera still recognises a worker who isn't looking straight at it. The detection service matches a face against all of a worker's READY rows and keeps the best score (V14).
 
 | No. | Field Name | Data Type | Field Size | P/F Key | Nullable | Unique | Description |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | id | bigint | 8 bytes | PK | No | Yes | Generated row ID |
-| 2 | user_id | bigint | 8 bytes | FK → app_user(id) | No | Yes | The worker; the row is deleted with the user |
-| 3 | source_file_path | text | Variable |  | No | No | Photo this row was made from |
-| 4 | status | text | Variable |  | No | No | PENDING (default), READY or FAILED |
-| 5 | embedding | vector | 512 dimensions |  | Yes | No | InsightFace vector; required when READY; biometric data |
-| 6 | model_name | text | Variable |  | Yes | No | Model that made the vector, because vectors from different models do not compare; required when READY |
-| 7 | error_message | text | Variable |  | Yes | No | Why enrolment failed, such as no face found |
-| 8 | created_at | timestamptz | 8 bytes |  | No | No | When the row was created |
-| 9 | updated_at | timestamptz | 8 bytes |  | No | No | When the row last changed; set by a trigger |
+| 2 | user_id | bigint | 8 bytes | FK → app_user(id) | No | Yes, with pose | The worker; the rows are deleted with the user |
+| 3 | pose | text | Variable |  | No | Yes, with user_id | FRONT (default), LEFT or RIGHT: which way the worker faces in the photo |
+| 4 | source_file_path | text | Variable |  | No | No | Photo this row was made from |
+| 5 | status | text | Variable |  | No | No | PENDING (default), READY or FAILED |
+| 6 | embedding | vector | 512 dimensions |  | Yes | No | InsightFace vector; required when READY; biometric data |
+| 7 | model_name | text | Variable |  | Yes | No | Model that made the vector, because vectors from different models do not compare; required when READY |
+| 8 | error_message | text | Variable |  | Yes | No | Why enrolment failed, such as no face found |
+| 9 | created_at | timestamptz | 8 bytes |  | No | No | When the row was created |
+| 10 | updated_at | timestamptz | 8 bytes |  | No | No | When the row last changed; set by a trigger |
 
 #### 1.2.4 check_in_correction
 

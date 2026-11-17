@@ -257,13 +257,17 @@ class TeamsTicketsAndReportTest extends PageTestSupport {
     void theReportIsOnlyForLeadersAndAdmins() throws Exception {
         mvc.perform(get("/team/report").with(as(worker))).andExpect(status().isForbidden());
         mvc.perform(get("/team/report").with(as(hse))).andExpect(status().isForbidden());
+        // A month that can't be exported goes back to the Team page, where the month was chosen, with the reason
         mvc.perform(get("/team/report").with(as(freeManager)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("You don&#39;t lead a team yet")));
+                .andExpect(status().isSeeOther())
+                .andExpect(header().string("Location", "/team"))
+                .andExpect(flash().attribute("error", "You don't lead a team yet"));
         mvc.perform(get("/team/report").param("month", YearMonth.now().plusMonths(2).toString()).with(as(leader)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isSeeOther())
+                .andExpect(flash().attribute("error", "Choose a month that has already started"));
         mvc.perform(get("/team/report").param("month", "not-a-month").with(as(leader)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isSeeOther())
+                .andExpect(flash().attribute("error", "Choose a month to export"));
 
         mvc.perform(get("/team").with(as(leader))).andExpect(content().string(containsString("Download Excel")));
         mvc.perform(get("/team").with(as(freeManager))).andExpect(content().string(not(containsString("Download Excel"))));

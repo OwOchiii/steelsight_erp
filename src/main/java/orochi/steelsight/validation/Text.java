@@ -18,12 +18,13 @@ public final class Text {
         return optional(field, value, maxLength);
     }
 
-    /** Blank becomes null, so it can't collide on a unique column or show as an empty value. */
+    /** Blank becomes null, so it can't collide on a unique column or show as an empty value. Line breaks become \n. */
     public static String optional(String field, String value, int maxLength) {
         if (value == null || value.isBlank()) {
             return null;
         }
-        String trimmed = value.strip();
+        // Browsers count a line break as one character for maxlength but send it as \r\n.
+        String trimmed = value.replace("\r\n", "\n").strip();
         if (trimmed.length() > maxLength) {
             throw new BusinessRuleException(field + " can be at most " + maxLength + " characters");
         }

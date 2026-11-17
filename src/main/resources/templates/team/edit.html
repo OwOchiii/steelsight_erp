@@ -54,11 +54,51 @@
             <form class="setting" method="post" enctype="multipart/form-data" th:action="@{/team/{id}/face(id=${member.id})}">
                 <div class="grow">
                     <label for="photo" th:text="${member.faceFilePath == null} ? #{team.uploadPhoto} : #{team.replacePhoto}">Upload photo</label>
-                    <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required>
+                    <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}" required>
                 </div>
                 <button type="submit" class="btn secondary" th:text="#{team.savePhoto}">Save photo</button>
             </form>
             <p class="hint" th:text="#{team.facePhotoHint}">A clear photo of their face, looking at the camera. Used for check-in at the gate. JPEG, PNG or WebP, up to 5 MB.</p>
+
+            <div class="divider">
+                <h3 class="mb-1" th:text="#{team.faceAngles}">Extra angles</h3>
+                <p class="hint mt-0" th:text="#{team.faceAnglesHint}">Optional. A photo with the head turned about 30 to 45 degrees to each side helps the gate camera recognise them when they don't look straight at it.</p>
+                <p class="hint" th:if="${member.faceFilePath == null}" th:text="#{team.faceAnglesNeedFront}">Add the photo looking at the camera first.</p>
+                <th:block th:if="${member.faceFilePath != null}" th:each="pose : ${extraPoses}"
+                          th:with="row=${angles.get(pose)}, slug=${#strings.toLowerCase(pose.name())}">
+                    <div class="face-row mt-3">
+                        <img class="face-photo" th:if="${row != null}"
+                             th:src="@{/team/{id}/face/{pose}(id=${member.id}, pose=${slug}, v=${row.sourceFilePath})}"
+                             th:alt="#{${'team.faceAngleAlt.' + slug}(${member.fullName})}">
+                        <div>
+                            <strong th:text="#{${'face.pose.' + slug}}">Turned left</strong>
+                            <div class="mt-1">
+                                <span class="badge" th:if="${row == null}" th:text="#{face.none}">No face photo</span>
+                                <th:block th:if="${row != null}" th:switch="${row.status.name()}">
+                                    <span th:case="'PENDING'" class="badge" th:text="#{face.pending}">Waiting for enrolment</span>
+                                    <span th:case="'READY'" class="badge badge-on_time" th:text="#{face.ready}">Face enrolled</span>
+                                    <th:block th:case="'FAILED'">
+                                        <span class="badge badge-late" th:text="#{face.failed}">Enrolment failed</span>
+                                        <p class="hint" th:if="${row.errorMessage}" th:text="#{face.failedReason(${row.errorMessage})}">Reason</p>
+                                    </th:block>
+                                </th:block>
+                            </div>
+                        </div>
+                    </div>
+                    <form class="setting" method="post" enctype="multipart/form-data"
+                          th:action="@{/team/{id}/face/{pose}(id=${member.id}, pose=${slug})}">
+                        <div class="grow">
+                            <label th:for="'photo-' + ${slug}" th:text="${row == null} ? #{team.uploadPhoto} : #{team.replacePhoto}">Upload photo</label>
+                            <input th:id="'photo-' + ${slug}" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}" required>
+                        </div>
+                        <button type="submit" class="btn secondary" th:text="#{team.savePhoto}">Save photo</button>
+                    </form>
+                    <form class="mt-2" method="post" th:if="${row != null}"
+                          th:action="@{/team/{id}/face/{pose}/delete(id=${member.id}, pose=${slug})}">
+                        <button type="submit" class="btn danger" th:text="#{team.removePhoto}">Remove photo</button>
+                    </form>
+                </th:block>
+            </div>
         </div>
     </section>
 

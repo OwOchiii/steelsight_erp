@@ -2,7 +2,7 @@
 # Mẫu Đặc tả Kiểm thử Hướng Phát triển
 
 **Document ID:** `STEELSIGHT-PPE-TDD-001`
-**Version:** `1.0`
+**Version:** `1.1`
 **Date:** `2026-11-06`
 **Status:** `Draft`
 **Standard:** ISO/IEC/IEEE 29119-3:2021 — Software Testing Part 3: Test Documentation
@@ -31,6 +31,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | `2026-11-06` | `Claude Code (Opus 5.5)` | Khởi tạo tài liệu — TDD spec cho PPE & Safety |
+| `2026-11-16` | `Claude Code (Opus 5.5) — ADR-025` | ADR-025: PPE-TC-015 notes `decision=BOGUS` is now 400. Old value kept here: 404 |
 
 ---
 
@@ -380,7 +381,7 @@ assertThat(v.get("dispute_status")).isEqualTo("DISPUTED");
 | PPE-TC-011 | `PagesIntegrationTest` — `disputingAViolationOpensATicketAndCannotBeRepeated` | COND-003 | HIGH | 🟢L |
 | PPE-TC-012 | `PagesIntegrationTest` — `aDisputeNeedsAReason` | COND-003 | MEDIUM | 🟢L |
 | PPE-TC-013 | `ServiceIntegrationTest` — `onlyTheOwnerDisputesAndOnlyOnce` | COND-003 | HIGH | 🟢L |
-| PPE-TC-015 | `ServiceIntegrationTest` — `decisionsNeedReviewRightsAndAValidOutcome`; `HsePagesIntegrationTest` — `aDecisionMustBeUpheldOrOverturned` | COND-004 | HIGH | 🟢L |
+| PPE-TC-015 | `ServiceIntegrationTest` — `decisionsNeedReviewRightsAndAValidOutcome`; `HsePagesIntegrationTest` — `aDecisionMustBeUpheldOrOverturned` *(since 2026-11-16 a `decision` that isn't a `DisputeStatus`, e.g. `BOGUS`, is 400 / back with "One of the values isn't valid", not 404 — ADR-025)* | COND-004 | HIGH | 🟢L |
 | PPE-TC-016 | `HsePagesIntegrationTest` — `aSecondDecisionIsRefused` | COND-004 | MEDIUM | 🟢L |
 | PPE-TC-018 | `HsePagesIntegrationTest` — `managersCannotDecideDisputes`, `workersCannotReachTheReviewPagesOrActions` | COND-004 | HIGH | 🟢L |
 | PPE-TC-019 | `ServiceAtomicityTest` — `failedTicketInsertLeavesTheViolationUndisputed` | COND-005 | HIGH | 🟢L |

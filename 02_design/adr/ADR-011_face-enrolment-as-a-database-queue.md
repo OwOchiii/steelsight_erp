@@ -53,9 +53,12 @@ Decoupled through the shared database (ADR-004), safe when either side is offlin
 Theo ADR-011:
 1. To enrol or re-enrol a face, call FaceEmbeddingRepository.queueForEnrolment(userId, storedPhotoName) in the
    SAME transaction that sets app_user.face_file_path. Never insert/update face_embedding any other way.
+   Extra angles (V14): queueForEnrolment(userId, "LEFT"|"RIGHT", storedPhotoName) through
+   UserService.changeFaceAngle, and deleteAngle through UserService.removeFaceAngle. Only the FRONT row
+   mirrors app_user.face_file_path; LEFT/RIGHT photos live only in source_file_path.
 2. Do NOT map, read or log face_embedding.embedding in the ERP.
 3. Only USER_MANAGE holders may change or view face photos and enrolment status (UserService.faceEnrolment,
-   faceStatuses, facePhotoPath).
+   faceStatuses, facePhotoPath, changeFaceAngle, removeFaceAngle, faceAngles, faceAnglePath).
 4. face_file_path holds only the stored file name in the FACE album, never a path or URL.
 ```
 

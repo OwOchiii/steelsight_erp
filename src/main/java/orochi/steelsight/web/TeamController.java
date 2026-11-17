@@ -19,7 +19,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import orochi.steelsight.attendance.model.FacePose;
 import orochi.steelsight.exception.BusinessRuleException;
+import orochi.steelsight.exception.NotFoundException;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.identity.service.UserService;
@@ -228,6 +230,46 @@ public class TeamController extends PageController {
                 .body(photos.load(PhotoAlbum.FACE, path));
     }
 
+    /** Adds or replaces a photo of the worker turned left or right. */
+    @PostMapping("/team/{id}/face/{pose}")
+    public String changeFaceAngle(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
+                                  @PathVariable String pose, @RequestParam(required = false) MultipartFile photo,
+                                  RedirectAttributes redirect) {
+        requireAdmin(user);
+        FacePose angle = pose(pose);
+        return attempt(redirect, editPage(id), "The photo was saved and queued for enrolment.", () -> {
+            if (photo == null || photo.isEmpty()) {
+                throw new BusinessRuleException("Choose a photo to upload");
+            }
+            String stored = photos.store(PhotoAlbum.FACE, photo);
+            try {
+                users.changeFaceAngle(user.getUserId(), id, angle, stored);
+            } catch (RuntimeException e) {
+                photos.delete(PhotoAlbum.FACE, stored);
+                throw e;
+            }
+        });
+    }
+
+    @PostMapping("/team/{id}/face/{pose}/delete")
+    public String removeFaceAngle(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
+                                  @PathVariable String pose, RedirectAttributes redirect) {
+        requireAdmin(user);
+        FacePose angle = pose(pose);
+        return attempt(redirect, editPage(id), "The photo and its face data were removed.",
+                () -> users.removeFaceAngle(user.getUserId(), id, angle));
+    }
+
+    @GetMapping("/team/{id}/face/{pose}")
+    public ResponseEntity<Resource> faceAnglePhoto(@AuthenticationPrincipal AuthenticatedUser user,
+                                                   @PathVariable Long id, @PathVariable String pose) {
+        String path = users.faceAnglePath(user.getUserId(), id, pose(pose));
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(photos.contentType(path)))
+                .cacheControl(CacheControl.noStore())
+                .body(photos.load(PhotoAlbum.FACE, path));
+    }
+
     @PostMapping("/team/{id}/delete")
     public String delete(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
                          @RequestParam(defaultValue = "false") boolean confirm, RedirectAttributes redirect) {
@@ -250,8 +292,15 @@ public class TeamController extends PageController {
         model.addAttribute("roles", users.listRoles(user.getUserId()));
         model.addAttribute("teams", teams.listManaged(user.getUserId()));
         model.addAttribute("enrolment", users.faceEnrolment(user.getUserId(), member.getId()).orElse(null));
+        model.addAttribute("angles", users.faceAngles(user.getUserId(), member.getId()));
+        model.addAttribute("extraPoses", FacePose.EXTRA);
         model.addAttribute("self", member.getId().equals(user.getUserId()));
         return "team/edit";
+    }
+
+    private static FacePose pose(String text) {
+        return FacePose.parse(text).filter(p -> p != FacePose.FRONT)
+                .orElseThrow(() -> new NotFoundException("Face angle", text));
     }
 
     private String editPage(Long id) {

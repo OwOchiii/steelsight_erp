@@ -4,7 +4,7 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | `STEELSIGHT-STO-IMP-001` |
-| **Version** | `1.0` |
+| **Version** | `1.1` |
 | **Date** | `2026-11-06` |
 | **Status** | `Draft` |
 | **Document Owner** | `Nguyen Vu An` |
@@ -12,7 +12,7 @@
 | **Reviewed by** | `[ ] Pending — Tech Lead` |
 | **DPO Sign-off** | `[ ] Pending` *(**required**: stores face photos — biometric — with a third-party processor)* |
 | **Approved by** | `[ ] Pending — Principal Architect` |
-| **Last Review** | `2026-11-06` |
+| **Last Review** | `2026-11-16` |
 | **Based on EDS** | `v2.0` |
 
 ---
@@ -24,6 +24,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code as built (commit d4f978f onward) |
+| 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: the 5 MB rule moved into the app (`PhotoStorage.MAX_BYTES`, STO-006, 400 with the form kept) and the browser checks first. Old values kept here: container limit was `max-file-size: 5MB, max-request-size: 6MB`; STO-002 (413) was triggered by `MaxUploadSizeExceededException` at 5 MB; the §15 check expected 413 for a 7 MB photo |
 
 ---
 
@@ -72,7 +73,7 @@
 
 | Requirement ID | Loại (BR/ADR/US) | Mô tả yêu cầu | Thành phần Code | Compliance Target | ADR liên quan |
 |----------------|------------------|---------------|-----------------|-------------------|---------------|
-| BR-STO-001 | Business Rule | JPEG/PNG/WebP by magic bytes, ≤ 5 MB | `PhotoFormat.extensionOf()`, `spring.servlet.multipart.*` | PDPL — security | ADR-020 |
+| BR-STO-001 | Business Rule | JPEG/PNG/WebP by magic bytes, ≤ 5 MB checked by the app (browser checks first; container ceiling 20 MB) | `PhotoFormat.extensionOf()`, `PhotoStorage.MAX_BYTES`, `app.js`, `MultipartLimitFilter` | PDPL — security | ADR-020, ADR-025 |
 | BR-STO-002 | Business Rule | Random UUID names; only valid names loaded | `PhotoFormat.isStoredName()`, `LocalPhotoStorage.resolve()` | PDPL — security | ADR-020 |
 | BR-STO-003 | Business Rule | Separate face and ticket albums; same bucket refused | `PhotoAlbum`, `SupabasePhotoStorage` ctor | PDPL — sensitive data | ADR-020 |
 | BR-STO-004 | Business Rule | Served only through ERP after permission checks, `no-store` | `TicketController.photo()`, `TeamController.facePhoto()` | PDPL — access control | ADR-020 |
@@ -101,7 +102,7 @@
 | Category | Requirement | Target SLA | Measurement Method | Compliance Basis |
 |----------|-------------|------------|---------------------|------------------|
 | Timeouts | Supabase connect / read | *configured* 5 s / 30 s | `SupabasePhotoStorage.timeouts()` | — |
-| Size | Upload | *configured* ≤ 5 MB file, ≤ 6 MB request | `application.yaml` | — |
+| Size | Upload | *configured* ≤ 5 MB photo (app rule, `PhotoStorage.MAX_BYTES`); container ceiling 20 MB file, 25 MB request; Tomcat discards up to 100 MB of a refused body | `PhotoFormat`, `application.yaml` | — |
 | Availability | Photos | Supabase Storage availability (free tier); no fallback | — | — |
 
 ### 4.2. Data Integrity & Retention
@@ -178,7 +179,8 @@ PhotoStorage ..> PhotoAlbum
 
 ```yaml
 # application.yaml
-spring.servlet.multipart: { max-file-size: 5MB, max-request-size: 6MB }
+spring.servlet.multipart: { max-file-size: 20MB, max-request-size: 25MB }   # ceiling only; the 5 MB rule is PhotoStorage.MAX_BYTES
+server.tomcat.max-swallow-size: 100MB                                       # read a refused upload instead of dropping the connection
 steelsight.storage:
   type: ${STORAGE_TYPE:local}                     # local | supabase
   dir: ${STORAGE_DIR:./uploads}                   # local: tickets at top level, faces in faces/
@@ -356,7 +358,8 @@ public enum PhotoAlbum { TICKET, FACE }
 | Code | HTTP Status | Message (EN) | Message (VI) | Trigger Condition |
 |------|-------------|--------------|--------------|-------------------|
 | `STO-001` | 400 | The photo must be a JPEG, PNG or WebP image | Ảnh phải ở định dạng JPEG, PNG hoặc WebP | Magic bytes don't match |
-| `STO-002` | 413 | Photo too large — Go back and choose a photo under 5 MB. | Ảnh quá lớn — Hãy quay lại và chọn ảnh dưới 5 MB. | `MaxUploadSizeExceededException` |
+| `STO-002` | 413 | Photo too large — Go back and choose a photo under 5 MB. | Ảnh quá lớn — Hãy quay lại và chọn ảnh dưới 5 MB. | Upload over the 20 MB container ceiling (`MultipartLimitFilter` → `PageErrorController`, error page) |
+| `STO-006` | 400 | The photo must be 5 MB or smaller | Ảnh chỉ được tối đa 5 MB | Photo over `PhotoStorage.MAX_BYTES`; the form is shown again with what was typed. The browser shows *This photo is larger than 5 MB. Choose a smaller one.* (`photo.tooLarge`) before sending |
 | `STO-003` | 400 | Choose a photo to upload | Vui lòng chọn ảnh để tải lên | Empty face upload (`TeamController`) |
 | `STO-004` | 404 | Page not found | Không tìm thấy trang | Invalid stored name; object missing |
 | `STO-005` | 500 | Something went wrong — This is a problem on our side. | Đã xảy ra lỗi — Đây là lỗi từ phía hệ thống. | Supabase outage, upload failure |
@@ -556,7 +559,14 @@ head -c 7000000 /dev/urandom > big.jpg
 curl -s -b $JAR -o /dev/null -w '%{http_code}\n' -F categoryId=2 -F subject=x -F description=y -F photo=@big.jpg -F _csrf=$CSRF $BASE/tickets
 ```
 
-**Expected Response (413):** "Photo too large".
+**Expected Response (400):** the ticket form again, with "The photo must be 5 MB or smaller" and the subject and details still filled in.
+
+```bash
+head -c 30000000 /dev/zero > huge.jpg
+curl -s -b $JAR -o /dev/null -w '%{http_code} %{content_type}\n' -H 'Accept: */*' -F photo=@huge.jpg -F _csrf=$CSRF $BASE/tickets
+```
+
+**Expected Response (413, text/html):** "Photo too large" error page, never JSON.
 
 ---
 

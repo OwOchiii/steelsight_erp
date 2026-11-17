@@ -51,7 +51,7 @@
         <p class="hint" th:text="#{team.startingPasswordHint}">At least 8 characters. They must choose their own the first time they sign in.</p>
 
         <label for="photo"><span th:text="#{team.facePhoto}">Face photo</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
-        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}">
         <p class="hint" th:text="#{team.facePhotoHint}">A clear photo of their face, looking at the camera. Used for check-in at the gate. JPEG, PNG or WebP, up to 5 MB.</p>
 
         <div class="actions"><button type="submit" class="btn" th:text="#{team.createAccount}">Create account</button></div>

@@ -34,6 +34,21 @@ document.addEventListener('keydown', function (event) {
     }
 });
 
+// A photo over the limit is flagged as soon as it's chosen, so nobody waits for an upload that will be refused.
+// The browser then won't send the form and shows the message next to the field. The server checks again.
+document.addEventListener('change', function (event) {
+    var input = event.target;
+    if (!input.matches || !input.matches('input[type="file"][data-max-bytes]')) {
+        return;
+    }
+    var max = Number(input.getAttribute('data-max-bytes'));
+    var tooLarge = Array.prototype.some.call(input.files || [], function (file) { return file.size > max; });
+    input.setCustomValidity(tooLarge ? input.getAttribute('data-too-large') || 'Too large' : '');
+    if (tooLarge) {
+        input.reportValidity();
+    }
+});
+
 document.addEventListener('htmx:beforeSwap', function () {
     document.documentElement.removeAttribute('data-nav-open');
 });
