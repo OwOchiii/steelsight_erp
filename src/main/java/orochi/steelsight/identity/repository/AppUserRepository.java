@@ -2,8 +2,11 @@ package orochi.steelsight.identity.repository;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import orochi.steelsight.exception.NotFoundException;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.repository.SoftDeletableRepository;
 
@@ -13,6 +16,22 @@ import java.util.Optional;
 public interface AppUserRepository extends SoftDeletableRepository<AppUser, Long> {
 
     Optional<AppUser> findByEmployeeCodeAndDeletedAtIsNull(String employeeCode);
+
+    /**
+     * SELECT ... FOR UPDATE on a live user: holds the row until the transaction ends. A caller that
+     * waited behind a soft delete finds no row, because Postgres checks the WHERE again after the wait.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM AppUser u WHERE u.id = :id AND u.deletedAt IS NULL")
+    Optional<AppUser> findLiveByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * Like require(id), and locked for this transaction, so face-photo changes and the soft delete
+     * for one person run one after another, even when they change no column of app_user.
+     */
+    default AppUser requireForUpdate(Long id) {
+        return findLiveByIdForUpdate(id).orElseThrow(() -> new NotFoundException("Record", id));
+    }
 
     Optional<AppUser> findByEmailAndDeletedAtIsNull(String email);
 

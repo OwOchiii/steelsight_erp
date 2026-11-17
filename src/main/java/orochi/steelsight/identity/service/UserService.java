@@ -253,7 +253,8 @@ public class UserService {
     public FaceEmbedding changeFaceAngle(Long actorId, Long userId, FacePose pose, String photoPath) {
         access.require(actorId, Permissions.USER_MANAGE);
         requireExtraAngle(pose);
-        AppUser user = users.require(userId);
+        // Locked, so this runs wholly before or after a soft delete or another change to this person's photos.
+        AppUser user = users.requireForUpdate(userId);
         if (user.getDeletedAt() != null) {
             throw new NotFoundException("User", userId);
         }
@@ -272,6 +273,7 @@ public class UserService {
     public void removeFaceAngle(Long actorId, Long userId, FacePose pose) {
         access.require(actorId, Permissions.USER_MANAGE);
         requireExtraAngle(pose);
+        users.requireForUpdate(userId);
         FaceEmbedding row = embeddings.findByUserIdAndPose(userId, pose)
                 .orElseThrow(() -> new NotFoundException("Face photo of user", userId));
         String path = row.getSourceFilePath();
@@ -335,7 +337,8 @@ public class UserService {
         if (!teams.findAllByManagerId(userId).isEmpty()) {
             throw new BusinessRuleException("Give this user's teams a new manager first");
         }
-        AppUser user = users.require(userId);
+        // Locked, so a face-angle upload can't slip in between reading the photos and deleting.
+        AppUser user = users.requireForUpdate(userId);
         String photo = user.getFaceFilePath();
         // The trigger deletes the extra-angle rows too, so note their photos first.
         List<String> anglePhotos = embeddings.findAllByUserIdOrderByPose(userId).stream()

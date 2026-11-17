@@ -55,8 +55,9 @@ public class ReportController {
         } catch (BusinessRuleException e) {
             log.info("Rule broken: {}", e.getMessage());
             RequestContextUtils.getOutputFlashMap(request).put("error", e.getMessage());
-            RequestContextUtils.saveOutputFlashMap(TEAM_PAGE, request, response);
-            return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create(request.getContextPath() + TEAM_PAGE)).build();
+            String target = request.getContextPath() + TEAM_PAGE;
+            RequestContextUtils.saveOutputFlashMap(target, request, response);
+            return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create(target)).build();
         }
         byte[] file = workbook.write(report);
         String name = "steelsight-" + slug(report.team() == null ? "all-workers" : report.team()) + "-" + chosen + ".xlsx";
