@@ -4,7 +4,7 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | `STEELSIGHT-PLT-IMP-001` |
-| **Version** | `1.0` |
+| **Version** | `1.1` |
 | **Date** | `2026-11-06` |
 | **Status** | `Draft` |
 | **Document Owner** | `Nguyen Vu An` |
@@ -12,7 +12,7 @@
 | **Reviewed by** | `[ ] Pending — Tech Lead` |
 | **DPO Sign-off** | `[ ] Pending` *(logging, hosting location, RLS)* |
 | **Approved by** | `[ ] Pending — Principal Architect` |
-| **Last Review** | `2026-11-06` |
+| **Last Review** | `2026-11-16` |
 | **Based on EDS** | `v2.0` |
 
 ---
@@ -24,6 +24,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code, Dockerfile and CI as built |
+| 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: added `PageErrorController`, `MultipartLimitFilter`, `SamePage`, BR-PLT-009, PLT-009 (403 expired form), C7, a real-Tomcat check in §15.2. Old values kept here: PLT-005 message was "Someone else changed this — Go back, reload the page and try again." (error page); PLT-003 trigger included missing CSRF; PLT-006 trigger was "Upload limit" (5 MB container limit); PLT-001/002 were error pages only; PLT-004 included any bad id type; `/language` redirected to the Referer path only, now path and query; the 409 error path went to `PageExceptionHandler` |
 
 ---
 
@@ -64,7 +65,7 @@
 | **Upstream Dependencies** | Spring Boot 4.0.0, Spring Security 7, Thymeleaf 3.1, htmx 2.0.7, PostgreSQL 17 + pgvector + btree_gist, Flyway, Render, Supabase, GitHub Actions |
 | **Downstream Consumers** | All modules |
 
-**Code location:** `SteelsightErpApplication`, `model/**`, `repository/**`, `exception/**`, `validation/Text`, `config/LocaleConfig`, `web/PageController`, `web/PageExceptionHandler`, `web/RequestLogFilter`, `web/HomeController`, `web/LanguageController`, `web/Display`, `web/SiteTime`, `web/Charts`, `web/NavCounts`, `templates/fragments/**`, `templates/home.html`, `templates/error.html`, `messages*.properties`, `static/**`, `db/migration/afterMigrate__enable_rls.sql`, `application*.yaml`, `Dockerfile`, `.github/workflows/ci.yml`, `pom.xml`, `package.json`, `scripts/build-icons.mjs`.
+**Code location:** `SteelsightErpApplication`, `model/**`, `repository/**`, `exception/**`, `validation/Text`, `config/LocaleConfig`, `web/PageController`, `web/PageExceptionHandler`, `web/PageErrorController`, `web/MultipartLimitFilter`, `web/SamePage`, `web/RequestLogFilter`, `web/HomeController`, `web/LanguageController`, `web/Display`, `web/SiteTime`, `web/Charts`, `web/NavCounts`, `templates/fragments/**`, `templates/home.html`, `templates/error.html`, `messages*.properties`, `static/**`, `db/migration/afterMigrate__enable_rls.sql`, `application*.yaml`, `Dockerfile`, `.github/workflows/ci.yml`, `pom.xml`, `package.json`, `scripts/build-icons.mjs`.
 
 ---
 
@@ -75,11 +76,12 @@
 | BR-PLT-001 | Business Rule | Flyway only; RLS on all tables | `ddl-auto: validate`, `afterMigrate__enable_rls.sql` | PDPL — security | ADR-003, ADR-004 |
 | BR-PLT-002 | Business Rule | One request line + request id; no personal data | `RequestLogFilter`, `PageController.submit()` | PDPL — minimisation | ADR-024 |
 | BR-PLT-003 | Business Rule | CSRF on forms; API stateless | `SecurityConfig` | — | ADR-002, ADR-019 |
-| BR-PLT-004 | Business Rule | Error pages with right status | `PageExceptionHandler` | — | ADR-024 |
+| BR-PLT-004 | Business Rule | Error pages with right status; never JSON on a page | `PageExceptionHandler`, `PageErrorController`, `MultipartLimitFilter` | — | ADR-024, ADR-025 |
 | BR-PLT-005 | Business Rule | UTC storage, site-time display | `hibernate.jdbc.time_zone`, `SiteTime`, `Display` | — | ADR-018 |
 | BR-PLT-006 | Business Rule | Same keys in both languages; cookie for a year | `TranslationsTest`, `LocaleConfig`, `LanguageController` | — | ADR-002 |
 | BR-PLT-007 | Business Rule | Only `/actuator/health`, public, no details | `management.endpoints.web.exposure.include` | PDPL — security | ADR-023 |
-| BR-PLT-008 | Business Rule | Versioned entities; 409 on stale | `Versioned`, `StaleEditException` | — | ADR-006 |
+| BR-PLT-008 | Business Rule | Versioned entities; 409 on stale, form kept | `Versioned`, `StaleEditException`, `PageController.submit()` | — | ADR-006, ADR-025 |
+| BR-PLT-009 | Business Rule | A mistake is shown on its page; back via the Referer's path only; line breaks counted once | `PageController`, `PageExceptionHandler.backOrPage`, `SamePage`, `Text` | — | ADR-025 |
 | US-ALL-001 | User Story | Bilingual, light/dark, phone-friendly | templates, `app.css`, `app.js`, `LocaleConfig` | — | ADR-002 |
 
 ---
@@ -95,6 +97,7 @@
 | [ADR-018](../02_design/adr/ADR-018_shift-overlap-exclusion-and-site-time.md) | Accepted | Site time | `SiteTime` |
 | [ADR-023](../02_design/adr/ADR-023_hosting-render-and-supabase.md) | Accepted (GitLab move pending) | Render + Supabase | Dockerfile, CI, prod profile |
 | [ADR-024](../02_design/adr/ADR-024_request-id-logging-without-personal-data.md) | Accepted | Request-id logging | `RequestLogFilter` |
+| [ADR-025](../02_design/adr/ADR-025_mistakes-shown-where-they-were-made.md) | Accepted | Mistakes shown where they were made, never JSON | `PageController`, `PageExceptionHandler`, `PageErrorController`, `MultipartLimitFilter`, `SamePage` |
 
 ---
 
@@ -127,7 +130,7 @@
 | Public data API | Supabase Data API blocked | RLS on every table | `RepositoryIntegrationTest.everyPublicTableHasRowLevelSecurity` | PDPL |
 | Container | Non-root user (uid 1001), JRE only | configured | `Dockerfile` | — |
 | Secrets | None in Git; env only | configured | `.env.example`, `.gitignore` | PDPL |
-| Open redirect | `/language` uses only the Referer path | configured | `LanguageController.pageBefore()` | — |
+| Open redirect | `/language` and every redirect back to a form use only the Referer's path and query; `//` and `/\` paths are refused, braces encoded | configured | `SamePage.of()`, `ErrorPagesTest.goingBackNeverLeavesTheSite` | — |
 | XSS | Thymeleaf escapes by default | configured | `PagesIntegrationTest.pageTextIsEscaped` | — |
 | Static analysis / dependency scan | Semgrep, Trivy | **Planned** (GitLab), not in repo | — | — |
 
@@ -185,7 +188,7 @@ class Text <<final>> {
   + LONG = 4000
   + SHORT = 200
   + required(field, value, max)
-  + optional(field, value, max)
+  + optional(field, value, max)   ' \r\n → \n before measuring
 }
 
 abstract class PageController {
@@ -194,7 +197,19 @@ abstract class PageController {
   # attempt(redirect, target, msg, action): String
   # submit(binding, model, response, action, showForm): String
 }
-class PageExceptionHandler <<ControllerAdvice>>
+class PageExceptionHandler <<ControllerAdvice>> {
+  ~ STALE_EDIT, BAD_VALUE
+  - backOrPage(request, status, title, message): String
+}
+class PageErrorController <<ErrorController>> {
+  + error(request, response): ModelAndView   ' /error: HTML, or JSON for /api/
+}
+class MultipartLimitFilter <<OncePerRequestFilter>> {
+  ' order HIGHEST_PRECEDENCE + 10, before Spring Security
+}
+class SamePage <<final>> {
+  ~ of(request): Optional<String>
+}
 class RequestLogFilter <<OncePerRequestFilter>> {
   + REQUEST_ID = "requestId"
 }
@@ -216,6 +231,9 @@ BaseRepository <|-- SoftDeletableRepository
 PageController ..> BusinessRuleException
 PageExceptionHandler ..> NotFoundException
 PageExceptionHandler ..> StaleEditException
+PageExceptionHandler ..> SamePage
+PageController ..> StaleEditException
+MultipartLimitFilter ..> PageErrorController : sendError(413/400)
 @enduml
 ```
 
@@ -291,9 +309,11 @@ C --> B : 400, HX-Push-Url: false, same form + error (INFO "Rule broken: …")
 B -> C : GET /x/999
 C -> H : NotFoundException
 H --> B : 404 error page
-B -> C : POST /x (stale)
-C -> H : StaleEditException
-H --> B : 409 "Someone else changed this"
+B -> C : POST /x (stale form)
+C -> C : submit() catches StaleEditException
+C --> B : 409, same form + what was typed + "Someone else changed this while you were editing…"
+B -> H : POST /x/button (bad value, Referer: /x)
+H --> B : 302 /x + flash "One of the values isn't valid…" (no Referer → 400 error page)
 B -> C : GET /x (bug)
 C -> H : RuntimeException
 H -> H : log.error("Unexpected failure", e)
@@ -345,7 +365,7 @@ public interface Versioned { Long getVersion(); default void requireVersion(long
 
 public final class Text {
   public static final int LONG = 4000, SHORT = 200;
-  /** "<field> is required" when blank; trims; "<field> can be at most <n> characters". */
+  /** "<field> is required" when blank; trims; \r\n counts as one character; "<field> can be at most <n> characters". */
   public static String required(String field, String value, int maxLength);
   /** Blank → null (never an empty string on a unique column). */
   public static String optional(String field, String value, int maxLength);
@@ -354,9 +374,9 @@ public final class Text {
 abstract class PageController {
   protected Pageable pageOf(int number);                         // max(number, 0), size 20
   protected <T> Page<T> pageOf(List<T> rows, int number);        // in-memory paging
-  /** Buttons: run, flash success or the rule's message, redirect to target. */
+  /** Buttons: run, flash success or the rule's (or stale edit's) message, redirect to target. */
   protected String attempt(RedirectAttributes r, String target, String successMessage, Runnable action);
-  /** Forms: action's view, or 400 + the same form + error; logs field names only. */
+  /** Forms: action's view, or 400 (rule) / 409 (stale edit) + the same form with what was typed + error; logs field names only. */
   protected String submit(BindingResult b, Model m, HttpServletResponse res, Supplier<String> action, Supplier<String> showForm);
 }
 
@@ -418,7 +438,7 @@ public interface SoftDeletableRepository<T extends SoftDeletableModel, ID> exten
 #### `POST /language`
 
 **Request:** `lang=vi&_csrf=<token>`, `Referer: https://<host>/shifts?week=2026-11-10`
-**Response — 302:** `Location: /shifts` (path of the Referer only; anything else → `/`), `Set-Cookie: steelsight-language=vi; Max-Age=31536000; SameSite=Lax`.
+**Response — 302:** `Location: /shifts?week=2026-11-10` (path and query of the Referer via `SamePage`; anything else → `/`), `Set-Cookie: steelsight-language=vi; Max-Age=31536000; SameSite=Lax`.
 
 ---
 
@@ -428,12 +448,13 @@ public interface SoftDeletableRepository<T extends SoftDeletableModel, ID> exten
 
 | Code | HTTP Status | Message (EN) | Message (VI) | Trigger Condition |
 |------|-------------|--------------|--------------|-------------------|
-| `PLT-001` | 400 | One of the values isn't valid. Check the form and try again. | Có giá trị không hợp lệ. Hãy kiểm tra biểu mẫu và thử lại. | Form binding error |
-| `PLT-002` | 400 | That didn't work — *(the rule's message)* | Không thực hiện được — *(translated)* | `BusinessRuleException` outside `submit`/`attempt` |
-| `PLT-003` | 403 | Not allowed — You don't have access to this page. | Không được phép — Bạn không có quyền truy cập trang này. | `AccessDeniedException`, missing CSRF |
-| `PLT-004` | 404 | Page not found — We couldn't find what you were looking for. | Không tìm thấy trang — Không tìm thấy nội dung bạn cần. | `NotFoundException`, bad id type, unknown path |
-| `PLT-005` | 409 | Someone else changed this — Go back, reload the page and try again. | Người khác đã thay đổi nội dung này — Hãy quay lại, tải lại trang và thử lại. | `OptimisticLockingFailureException` |
-| `PLT-006` | 413 | Photo too large — Go back and choose a photo under 5 MB. | Ảnh quá lớn — Hãy quay lại và chọn ảnh dưới 5 MB. | Upload limit |
+| `PLT-001` | 400 | One of the values isn't valid. Check the form and try again. | Có giá trị không hợp lệ. Hãy kiểm tra biểu mẫu và thử lại. | Form binding error (same form); or a POST value that can't be converted or is missing (back to the Referer's page as a notice, else error page) |
+| `PLT-002` | 400 | That didn't work — *(the rule's message)* | Không thực hiện được — *(translated)* | `BusinessRuleException` outside `submit`/`attempt`: a POST goes back to the Referer's page with the message; otherwise the error page |
+| `PLT-003` | 403 | Not allowed — You don't have access to this page. | Không được phép — Bạn không có quyền truy cập trang này. | `AccessDeniedException` |
+| `PLT-009` | 403 | This page has expired — Go back, reload the page and try again. | Trang này đã hết hạn — Hãy quay lại, tải lại trang và thử lại. | Missing or old CSRF token, usually a form left open after the session ended (`PageErrorController`) |
+| `PLT-004` | 404 | Page not found — We couldn't find what you were looking for. | Không tìm thấy trang — Không tìm thấy nội dung bạn cần. | `NotFoundException`, bad id in the path or a GET query, unknown path |
+| `PLT-005` | 409 | Someone else changed this while you were editing. Reload the page, check their changes and try again. | Người khác đã thay đổi nội dung này trong lúc bạn đang sửa. Hãy tải lại trang, xem các thay đổi đó và thử lại. | `OptimisticLockingFailureException`: shown on the form (`submit`), as a notice (`attempt`, or a POST with a Referer), else on the error page titled "Someone else changed this" |
+| `PLT-006` | 413 | Photo too large — Go back and choose a photo under 5 MB. | Ảnh quá lớn — Hãy quay lại và chọn ảnh dưới 5 MB. | Upload over the 20 MB / 25 MB container ceiling (`MultipartLimitFilter` → `PageErrorController`). A photo of 5–20 MB is STO-005 on the form |
 | `PLT-007` | 4xx | That didn't work — Go back and try again. | Không thực hiện được — Hãy quay lại và thử lại. | Framework `ErrorResponse` (405, 415 …) |
 | `PLT-008` | 500 | Something went wrong — This is a problem on our side. *(+ reference)* | Đã xảy ra lỗi — Đây là lỗi từ phía hệ thống. | Any other exception; logged with stack trace |
 
@@ -659,6 +680,15 @@ curl -s -b $JAR -o /dev/null -w '%{redirect_url}\n' -H 'Referer: https://evil.ex
 
 **Expected:** redirect to `https://<service>.onrender.com/phish` (path only on the same host), never to `evil.example`.
 
+```bash
+# An upload over the container ceiling, sent the way htmx sends it
+head -c 30000000 /dev/zero > big.jpg
+curl -s -o /dev/null -w '%{http_code} %{content_type}\n' -H 'HX-Request: true' -H 'Accept: */*' \
+  -F 'photo=@big.jpg;type=image/jpeg' $BASE/tickets
+```
+
+**Expected:** `413 text/html` with "Photo too large", never JSON (checked locally on 2026-11-16). A form posted without its CSRF token gives `403 text/html` with "This page has expired".
+
 ---
 
 ## 16. Bảng tổng hợp phân quyền (Authorization Matrix)
@@ -683,7 +713,8 @@ curl -s -b $JAR -o /dev/null -w '%{redirect_url}\n' -H 'Referer: https://evil.ex
 |---|-----------|-----------------|---------------|
 | C1 | Entities extend `IdentifiedModel`/`BaseModel`/`SoftDeletableModel`; never override equals/hashCode/toString with fields | `PLT` invariants | `2026-11-06` |
 | C2 | Rule failures throw `BusinessRuleException` with an English sentence that has a `msg.*` VI key | `BR-PLT-004/006` | `2026-11-06` |
-| C3 | Forms via `PageController.submit`, buttons via `attempt`; no try/catch for 403/404/409 in controllers | `ADR-002`, `BR-PLT-004` | `2026-11-06` |
+| C3 | Forms via `PageController.submit`, buttons via `attempt`; no try/catch for 403/404/409 in controllers | `ADR-002`, `ADR-025`, `BR-PLT-004/009` | `2026-11-16` |
+| C7 | `/error` belongs to `PageErrorController` (HTML; JSON only for `/api/`); upload rules checked in the app, container limits are a ceiling; redirects back only through `SamePage` | `ADR-025`, `BR-PLT-004/009` | `2026-11-16` |
 | C4 | Times via `SiteTime`/`Display`; storage UTC | `ADR-018`, `BR-PLT-005` | `2026-11-06` |
 | C5 | Logs: SLF4J, path only, no personal values; request id via MDC | `ADR-024`, `BR-PLT-002` | `2026-11-06` |
 | C6 | Config by env vars; nothing secret in Git; only health exposed | `ADR-023`, `BR-PLT-007` | `2026-11-06` |
@@ -692,15 +723,17 @@ curl -s -b $JAR -o /dev/null -w '%{redirect_url}\n' -H 'Referer: https://evil.ex
 
 ```
 [CONSTRAINT BLOCK — Module: PLT — Platform]
-Theo TDS STEELSIGHT-PLT-IMP-001 và các ADR liên quan (ADR-002, 003, 004, 006, 018, 023, 024):
+Theo TDS STEELSIGHT-PLT-IMP-001 và các ADR liên quan (ADR-002, 003, 004, 006, 018, 023, 024, 025):
 
 1. New entities extend IdentifiedModel (or BaseModel / SoftDeletableModel) and implement Versioned when edited
    through a form. Do not add Lombok @Data/@EqualsAndHashCode/@ToString on entities.
 2. Lookups by id use repository.require(id) (404 on missing or soft-deleted). Rule violations throw
    BusinessRuleException("<English sentence>"), and a matching msg.<slug> key is added to
    messages_vi.properties (and any new label to both message files).
-3. Controllers extend PageController; forms use submit(...), buttons use attempt(...). Let
-   PageExceptionHandler handle AccessDenied (403), NotFound (404), OptimisticLock (409), upload size (413), bugs (500).
+3. Controllers extend PageController; forms use submit(...) (rule → 400, stale edit → 409, both re-show the
+   form with what was typed), buttons use attempt(...). Let PageExceptionHandler handle AccessDenied (403),
+   NotFound (404) and bugs (500); it sends a failed POST back to its page through SamePage. Do not add another
+   handler for /error: PageErrorController owns it (ADR-025).
 4. Convert and format times only with SiteTime and Display (site zone APP_TIME_ZONE); the DB stores UTC.
 5. Log with SLF4J; never log passwords, form values, query strings, photo bytes or keys; sanitise \r\n\t
    in typed values. Do not add actuator endpoints, System.out, or secrets in application*.yaml.

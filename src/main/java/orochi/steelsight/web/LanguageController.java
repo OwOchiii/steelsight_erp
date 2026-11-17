@@ -7,7 +7,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.LocaleResolver;
-import org.springframework.web.util.UriComponentsBuilder;
 import orochi.steelsight.config.LocaleConfig;
 
 import java.util.Locale;
@@ -23,20 +22,6 @@ public class LanguageController {
     public String choose(@RequestParam(required = false) String lang, HttpServletRequest request,
                          HttpServletResponse response) {
         locales.setLocale(request, response, "vi".equals(lang) ? LocaleConfig.VIETNAMESE : Locale.ENGLISH);
-        return "redirect:" + pageBefore(request);
-    }
-
-    /** Only the path of the Referer is used, so this can't redirect to another site. */
-    private String pageBefore(HttpServletRequest request) {
-        String referer = request.getHeader("Referer");
-        if (referer == null) {
-            return "/";
-        }
-        try {
-            String path = UriComponentsBuilder.fromUriString(referer).build().getPath();
-            return path == null || !path.startsWith("/") || path.startsWith("//") ? "/" : path;
-        } catch (IllegalArgumentException e) {
-            return "/";
-        }
+        return "redirect:" + SamePage.of(request).orElse("/");
     }
 }

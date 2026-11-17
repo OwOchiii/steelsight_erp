@@ -2,7 +2,7 @@
 # Mẫu Đặc tả Kiểm thử Hướng Phát triển
 
 **Document ID:** `STEELSIGHT-RPT-TDD-001`
-**Version:** `1.0`
+**Version:** `1.1`
 **Date:** `2026-11-06`
 **Status:** `Draft`
 **Standard:** ISO/IEC/IEEE 29119-3:2021 — Software Testing Part 3: Test Documentation
@@ -31,6 +31,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | `2026-11-06` | `Claude Code (Opus 5.5)` | Khởi tạo tài liệu — TDD spec cho Reporting |
+| `2026-11-16` | `Claude Code (Opus 5.5) — ADR-025` | ADR-025: RPT report refusals expected as 303 to `/team` with a flash error. Old value kept here: 400 error pages |
 
 ---
 
@@ -202,7 +203,7 @@ class ReportNewCasesTest extends PageTestSupport {
 **TDD Phase:** 🟢 GREEN
 
 **Test Steps (Attack Simulation):** worker and HSE request the report; a MANAGER with no team; a future month; `month=not-a-month`
-**Expected Result (PASS = hệ thống an toàn):** worker 403; HSE 403; free manager 400 "You don't lead a team yet"; future month 400; bad month 400; the Team page shows "Download Excel" to the leader only
+**Expected Result (PASS = hệ thống an toàn):** worker 403; HSE 403; free manager, future month and bad month each **303 to `/team`** with flash `error` "You don't lead a team yet", "Choose a month that has already started", "Choose a month to export" *(was 400 error pages until 2026-11-16, ADR-025)*; the Team page shows "Download Excel" to the leader only
 **Expected Result (FAIL = lỗ hổng tồn tại):** pay data for people outside the actor's team
 **Current Status:** 🟢L
 

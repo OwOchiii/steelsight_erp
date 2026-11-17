@@ -3,6 +3,7 @@ package orochi.steelsight.web;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -44,11 +45,17 @@ abstract class PageController {
         } catch (BusinessRuleException e) {
             log.info("Rule broken: {}", e.getMessage());
             redirect.addFlashAttribute("error", e.getMessage());
+        } catch (OptimisticLockingFailureException e) {
+            log.warn("Edit conflict: {}", e.getMessage());
+            redirect.addFlashAttribute("error", PageExceptionHandler.STALE_EDIT);
         }
         return "redirect:" + target;
     }
 
-    /** For a form: returns the action's view, or shows the form again with what was typed and the problem. */
+    /**
+     * For a form: returns the action's view, or shows the form again with what was typed and the problem.
+     * That includes an edit someone else saved first, so the person doesn't lose what they typed.
+     */
     protected String submit(BindingResult binding, Model model, HttpServletResponse response,
                             Supplier<String> action, Supplier<String> showForm) {
         try {
@@ -63,6 +70,12 @@ abstract class PageController {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             response.setHeader("HX-Push-Url", "false");
             model.addAttribute("error", e.getMessage());
+            return showForm.get();
+        } catch (OptimisticLockingFailureException e) {
+            log.warn("Edit conflict: {}", e.getMessage());
+            response.setStatus(HttpServletResponse.SC_CONFLICT);
+            response.setHeader("HX-Push-Url", "false");
+            model.addAttribute("error", PageExceptionHandler.STALE_EDIT);
             return showForm.get();
         }
     }

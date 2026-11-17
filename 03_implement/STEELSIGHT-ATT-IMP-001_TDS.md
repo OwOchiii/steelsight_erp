@@ -4,7 +4,7 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | `STEELSIGHT-ATT-IMP-001` |
-| **Version** | `1.0` |
+| **Version** | `1.1` |
 | **Date** | `2026-11-06` |
 | **Status** | `Draft` |
 | **Document Owner** | `Nguyen Vu An` |
@@ -12,7 +12,7 @@
 | **Reviewed by** | `[ ] Pending — Tech Lead` |
 | **DPO Sign-off** | `[ ] Pending` *(**required**: face embeddings are biometric, sensitive personal data)* |
 | **Approved by** | `[ ] Pending — Principal Architect` |
-| **Last Review** | `2026-11-06` |
+| **Last Review** | `2026-11-16` |
 | **Based on EDS** | `v2.0` |
 
 ---
@@ -24,6 +24,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code as built (V1, V2, V5, V7) |
+| 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: ATT-010 now keeps the form, with the longer stale-edit message. Old value kept here: 409 error page "Someone else changed this" |
 
 ---
 
@@ -335,7 +336,7 @@ D -> DB : close_stale_check_ins() → UPDATE check_in SET check_out_at, auto_clo
 H -> Ctl : POST /attendance/9 version=2
 Ctl -> S : correct(..., expectedVersion=2)
 S --> Ctl : StaleEditException
-Ctl --> H : 409 "Someone else changed this"
+Ctl --> H : 409, same form + typed values + "Someone else changed this while you were editing…"
 @enduml
 ```
 
@@ -534,7 +535,7 @@ note=Gate camera offline      # optional, ≤ 4000
 | `ATT-007` | 400 | One of the values isn't valid. Check the form and try again. | Có giá trị không hợp lệ. Hãy kiểm tra biểu mẫu và thử lại. | Unparseable date in form |
 | `ATT-008` | 403 | Not allowed | Không được phép | No `CHECKIN_*` permission |
 | `ATT-009` | 404 | Page not found | Không tìm thấy trang | Unknown visit/zone |
-| `ATT-010` | 409 | Someone else changed this | Người khác đã thay đổi nội dung này | Stale version (incl. detection update) |
+| `ATT-010` | 409 | Someone else changed this while you were editing. Reload the page, check their changes and try again. | Người khác đã thay đổi nội dung này trong lúc bạn đang sửa. Hãy tải lại trang, xem các thay đổi đó và thử lại. | Stale version (incl. detection update); the form is shown again with what was typed |
 | `ATT-DB-01` | — (SQL error to detection) | `shift % does not belong to user %` / `vest link % does not belong to user %` | — | `check_in_same_worker()` |
 
 ---

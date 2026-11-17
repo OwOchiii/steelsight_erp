@@ -185,7 +185,7 @@ Format: **ID** — rule — *enforced at*.
 | ID | Rule | Enforced at |
 |----|------|-------------|
 | BR-RPT-001 | A team leader exports their own team's WORKER-role members; `REPORT_EXPORT_ALL` (Admin) exports every worker. A leader with no team is refused. | `MonthlyReportService.scopeOf()` |
-| BR-RPT-002 | The month must have started; with none chosen, last month. The running month is counted up to now. | `MonthlyReportService.period()`, `ReportController.monthOf()` |
+| BR-RPT-002 | The month must have started; with none chosen, last month. The running month is counted up to now. A month that can't be exported goes back to the Team page with the reason. | `MonthlyReportService.period()`, `ReportController.monthOf()` |
 | BR-RPT-003 | Violation counts leave out OVERTURNED; DISPUTED ones are counted and also shown as awaiting a decision. | `MonthlyReportService.build()` |
 | BR-RPT-004 | A non-cancelled shift counts as worked if a visit is linked to it or overlaps it; a shift that has ended with neither is a no-show. | `MonthlyReportService.build()` SQL |
 | BR-RPT-005 | Hours worked are the sum of closed visits' lengths, to 2 decimals. | `MonthlyReportService.row()` |
@@ -195,7 +195,7 @@ Format: **ID** — rule — *enforced at*.
 
 | ID | Rule | Enforced at |
 |----|------|-------------|
-| BR-STO-001 | A photo must be JPEG, PNG or WebP, judged by its first bytes, and under 5 MB. | `PhotoFormat.extensionOf()`, `spring.servlet.multipart.max-file-size` |
+| BR-STO-001 | A photo must be JPEG, PNG or WebP, judged by its first bytes, and 5 MB or smaller. The app checks the size, so the form shows the problem; the browser checks it first, and the container only refuses uploads over a 20 MB ceiling. | `PhotoFormat.extensionOf()`, `PhotoStorage.MAX_BYTES`, `app.js`, `spring.servlet.multipart.*` |
 | BR-STO-002 | Stored names are random UUIDs; only names matching `[A-Za-z0-9][A-Za-z0-9._-]{0,99}` without `..` are loaded or deleted. | `PhotoFormat.isStoredName()`, `LocalPhotoStorage.resolve()` |
 | BR-STO-003 | Face photos and ticket photos are kept apart (folder or bucket); one bucket for both is refused at startup. | `PhotoAlbum`, `SupabasePhotoStorage` constructor |
 | BR-STO-004 | Browsers get photos only through ERP endpoints after the owning record's permission check, with `Cache-Control: no-store`. | `TicketController.photo()`, `TeamController.facePhoto()` |
@@ -209,11 +209,12 @@ Format: **ID** — rule — *enforced at*.
 | BR-PLT-001 | Flyway alone changes the schema; Hibernate only validates. Row Level Security is switched on for every public table after each migrate. | `ddl-auto: validate`, `afterMigrate__enable_rls.sql` |
 | BR-PLT-002 | Each request gets one log line with method, path, status, user and time, and every line in the request carries its request ID. Query strings, form bodies and passwords are never logged. | `RequestLogFilter`, `SignInLog`, `PageController.submit()` |
 | BR-PLT-003 | Every browser form needs a CSRF token; the API is stateless and has none. | Spring Security defaults, `SecurityConfig` |
-| BR-PLT-004 | Failures show an error page with the right status: 400 rule, 403 denied, 404 not found, 409 stale edit, 413 upload too large, 500 bug with a reference to quote. | `PageExceptionHandler` |
+| BR-PLT-004 | Failures that aren't the person's mistake to fix show an error page with the right status: 403 denied (or "page has expired" for a failed CSRF check), 404 not found, 413 upload over the ceiling, 500 bug with a reference to quote. Pages never get JSON; only `/api/` does. | `PageExceptionHandler`, `PageErrorController`, `MultipartLimitFilter` |
 | BR-PLT-005 | Times are stored in UTC and shown, entered and grouped in the site time zone. | `hibernate.jdbc.time_zone: UTC`, `SiteTime` |
 | BR-PLT-006 | English and Vietnamese have the same keys; every message written in the code has a Vietnamese translation. The choice is kept in a cookie for a year. | `TranslationsTest`, `LocaleConfig`, `Display.message()` |
 | BR-PLT-007 | Only `/actuator/health` is exposed, publicly and without details. | `management.endpoints.web.exposure.include: health` |
-| BR-PLT-008 | `app_user`, `shift`, `check_in`, `violation` and `ticket` carry a version; an edit from a stale form fails with 409. | `@Version`, `Versioned`, `StaleEditException` |
+| BR-PLT-008 | `app_user`, `shift`, `check_in`, `violation` and `ticket` carry a version; an edit from a stale form fails with 409 and shows the form again with what was typed. | `@Version`, `Versioned`, `StaleEditException`, `PageController.submit()` |
+| BR-PLT-009 | A mistake is shown on the page where it was made: a form shows itself again with the problem and what was typed; a button, or a POST whose value can't be read, goes back to its page with the problem as a notice. Going back uses only the path and query of the Referer. Text is measured with line breaks counted once, as the browser counts them. | `PageController.submit/attempt`, `PageExceptionHandler.backOrPage`, `SamePage`, `Text` |
 
 ---
 
@@ -276,6 +277,7 @@ Format: **ID** — rule — *enforced at*.
 | [ADR-022](adr/ADR-022_notifications-store-no-text.md) | Notifications store no text | NTF |
 | [ADR-023](adr/ADR-023_hosting-render-and-supabase.md) | Host on Render (container) and Supabase (database, storage) | PLT |
 | [ADR-024](adr/ADR-024_request-id-logging-without-personal-data.md) | One log line per request with a request ID and no personal data | PLT |
+| [ADR-025](adr/ADR-025_mistakes-shown-where-they-were-made.md) | A mistake is shown on the page where it was made, and never as raw JSON | PLT, STO (all) |
 
 ---
 

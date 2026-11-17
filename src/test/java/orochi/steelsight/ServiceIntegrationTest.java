@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import orochi.steelsight.attendance.model.CheckIn;
 import orochi.steelsight.attendance.model.EmbeddingStatus;
+import orochi.steelsight.attendance.model.FacePose;
 import orochi.steelsight.attendance.repository.FaceEmbeddingRepository;
 import orochi.steelsight.attendance.service.CheckInService;
 import orochi.steelsight.attendance.service.CheckInService.ManualCheckIn;
@@ -152,9 +153,29 @@ class ServiceIntegrationTest {
         AppUser updated = userService.changeFacePhoto(admin, worker, "w1.jpg");
 
         assertThat(updated.getFaceFilePath()).isEqualTo("w1.jpg");
-        assertThat(embeddings.findByUserId(worker).orElseThrow().getStatus()).isEqualTo(EmbeddingStatus.PENDING);
+        assertThat(embeddings.findFrontByUserId(worker).orElseThrow().getStatus()).isEqualTo(EmbeddingStatus.PENDING);
         assertThat(userService.faceStatuses(admin, java.util.List.of(worker, otherWorker)))
                 .containsExactly(java.util.Map.entry(worker, EmbeddingStatus.PENDING));
+    }
+
+    @Test
+    void extraAnglesNeedTheFrontPhotoFirstAndDontChangeTheListStatus() {
+        assertThatThrownBy(() -> userService.changeFaceAngle(admin, worker, FacePose.LEFT, "l.jpg"))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> userService.changeFaceAngle(admin, worker, FacePose.FRONT, "f.jpg"))
+                .isInstanceOf(BusinessRuleException.class);
+
+        userService.changeFacePhoto(admin, worker, "w1.jpg");
+        userService.changeFaceAngle(admin, worker, FacePose.LEFT, "l.jpg");
+
+        assertThat(userService.faceAngles(admin, worker)).containsOnlyKeys(FacePose.LEFT);
+        assertThat(userService.faceAnglePath(admin, worker, FacePose.LEFT)).isEqualTo("l.jpg");
+        assertThat(userService.faceStatuses(admin, java.util.List.of(worker)))
+                .containsExactly(java.util.Map.entry(worker, EmbeddingStatus.PENDING));
+
+        userService.removeFaceAngle(admin, worker, FacePose.LEFT);
+        assertThat(userService.faceAngles(admin, worker)).isEmpty();
+        assertThat(embeddings.findFrontByUserId(worker)).isPresent();
     }
 
     @Test
@@ -163,7 +184,10 @@ class ServiceIntegrationTest {
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> userService.faceEnrolment(manager, worker)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> userService.facePhotoPath(manager, worker)).isInstanceOf(AccessDeniedException.class);
-        assertThat(embeddings.findByUserId(worker)).isEmpty();
+        assertThatThrownBy(() -> userService.changeFaceAngle(manager, worker, FacePose.LEFT, "l.jpg"))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> userService.faceAngles(manager, worker)).isInstanceOf(AccessDeniedException.class);
+        assertThat(embeddings.findAllByUserIdOrderByPose(worker)).isEmpty();
     }
 
     @Test
@@ -190,7 +214,7 @@ class ServiceIntegrationTest {
         assertThat(created.getEmployeeCode()).isEqualTo("W8");
         assertThat(created.getFaceFilePath()).isEqualTo("w8.jpg");
         assertThat(created.isMustChangePassword()).isTrue();
-        assertThat(embeddings.findByUserId(created.getId()).orElseThrow().getStatus()).isEqualTo(EmbeddingStatus.PENDING);
+        assertThat(embeddings.findFrontByUserId(created.getId()).orElseThrow().getStatus()).isEqualTo(EmbeddingStatus.PENDING);
     }
 
     @Test
@@ -218,7 +242,7 @@ class ServiceIntegrationTest {
         userService.softDelete(admin, worker);
         em.flush();
 
-        assertThat(embeddings.findByUserId(worker)).isEmpty();
+        assertThat(embeddings.findAllByUserIdOrderByPose(worker)).isEmpty();
         assertThat(users.findByIdAndDeletedAtIsNull(worker)).isEmpty();
     }
 

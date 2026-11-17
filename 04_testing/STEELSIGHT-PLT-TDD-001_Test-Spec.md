@@ -2,7 +2,7 @@
 # Mẫu Đặc tả Kiểm thử Hướng Phát triển
 
 **Document ID:** `STEELSIGHT-PLT-TDD-001`
-**Version:** `1.0`
+**Version:** `1.1`
 **Date:** `2026-11-06`
 **Status:** `Draft`
 **Standard:** ISO/IEC/IEEE 29119-3:2021 — Software Testing Part 3: Test Documentation
@@ -15,7 +15,7 @@
 **References:**
 - `02_design/MODULE-MAP.md` — BR / US catalog
 - `03_implement/STEELSIGHT-PLT-IMP-001_TDS.md` — Technical Specification
-- `02_design/adr/ADR-002`, `ADR-003`, `ADR-004`, `ADR-006`, `ADR-018`, `ADR-023`, `ADR-024`
+- `02_design/adr/ADR-002`, `ADR-003`, `ADR-004`, `ADR-006`, `ADR-018`, `ADR-023`, `ADR-024`, `ADR-025`
 - `Luật 91/2025/QH15` — logging, processors
 
 > **Quy ước TDD:** viết test → chạy → FAIL 🔴 → implement → PASS 🟢 → refactor 🔵. Không mark ✅ nếu `sh ./mvnw verify` chưa xanh. Synthetic data only.
@@ -23,6 +23,8 @@
 > **Retrospective note & status legend:** see `STEELSIGHT-IAM-TDD-001`. 🟢V = re-run here on `f005861` · 🟢L = last local run 2026-11-06 15:31 (code of `94a2c3c`), not re-run (no Docker) · 🔴 = not written.
 >
 > **Suite-wide numbers (last local run):** 244 tests in 26 classes, 0 failures, 0 errors, 0 skipped. Re-run in this session: the 39 database-free tests in 6 classes, all passing.
+>
+> **Update 2026-11-16:** full suite re-run with Docker on the working tree after ADR-025: **282 tests in 33 classes, 0 failures, 0 errors, 0 skipped**. 🟢V below on PLT-TC-035…045 means this run.
 
 ---
 
@@ -33,6 +35,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | `2026-11-06` | `Claude Code (Opus 5.5)` | Khởi tạo tài liệu — TDD spec cho Platform |
+| `2026-11-16` | `Claude Code (Opus 5.5) — ADR-025` | ADR-025: TC-COND-009, logic issues L6–L7, PLT-TC-035…045 (`ErrorPagesTest`, `MultipartLimitFilterTest`, `TextTest`); full suite 282/282 on 2026-11-16 |
 
 ---
 
@@ -88,6 +91,8 @@
 | L3 | Template: RLS optional | RLS on every public table, re-applied after every migrate | PLT-TC-005 |
 | L4 | Coverage ≥ 80% | No coverage tool configured | Exit criteria mark it "not measurable" until JaCoCo is added (PLT-TC-030 🔴) |
 | L5 | CI scans (Semgrep, Trivy) | Planned for GitLab; not in the repository | PLT-TC-031 🔴 |
+| L6 | BR-PLT-004: a too-large upload shows the 413 page | Tomcat refused it before Spring MVC; the CSRF check then failed (403) and Spring Boot's `/error` answered JSON to htmx (`Accept: */*`). MockMvc never dispatches to `/error`, so no test could see it | ADR-025. PLT-TC-039…041 call `/error` directly with the servlet error attributes; PLT-TC-042 drives the filter with Tomcat's real message; the real-Tomcat check is in TDS §15.2 |
+| L7 | A form value that can't be converted is a missing page (404) | It's the person's mistake on a form | PLT-TC-037: POST → back to the page with a notice; path ids and GETs stay 404 (PLT-TC-015) |
 
 ---
 
@@ -126,6 +131,7 @@ PLT bao gồm các layer:
 | TC-COND-006 | Translations complete | `TranslationsTest` | PLT-TC-008…010 |
 | TC-COND-007 | Logging: stack trace + reference; 404 not a bug; refused requests logged | `RequestLogFilter`, `PageExceptionHandler` | PLT-TC-011…013 |
 | TC-COND-008 | CSRF, escaping, menus per role, bad ids, paging | web shell | PLT-TC-014…020 |
+| TC-COND-009 | A mistake is shown where it was made; pages never get JSON; redirects stay on the site; line breaks counted once | `PageController`, `PageExceptionHandler`, `PageErrorController`, `MultipartLimitFilter`, `SamePage`, `Text` | PLT-TC-035…045 |
 
 ### TDS-04 — Test Techniques / Kỹ thuật Kiểm thử
 
@@ -277,7 +283,7 @@ public class TestDatabase {
 **Test Steps (Attack Simulation):** POST `/language` with `Referer: https://evil.example/phish`, `Referer: //evil.example/x`, and no Referer
 **Expected Result (PASS):** `Location` is `/phish`, `/`, `/` respectively — never another host
 **Expected Result (FAIL):** redirect to `evil.example`
-**Current Status:** 🔴 Not written
+**Current Status:** 🔴 Not written for `/language` itself. Since 2026-11-16 `/language` uses `SamePage.of()`, whose rules PLT-TC-038 covers.
 
 ---
 
@@ -306,6 +312,104 @@ mvc.perform(get("/").with(as(hse))).andExpect(content().string(not(containsStrin
 **Current Status:** 🟢L
 
 ---
+
+### MISTAKES SHOWN WHERE THEY WERE MADE (ADR-025, added 2026-11-16)
+
+> All in `ErrorPagesTest.java` unless stated. 🟢V = passed in the 2026-11-16 full run (282/282).
+
+### PLT-TC-035 — A photo over 5 MB shows the ticket form again with what was typed
+
+**Severity:** `HIGH`
+**Feature Under Test:** `PhotoFormat.extensionOf()` size check, `PageController.submit()`
+**Test File:** `ErrorPagesTest.java` — `aPhotoOverTheLimitShowsTheTicketFormAgainWithWhatWasTyped`
+**TDD Phase:** 🟢 GREEN
+**Condition Ref:** `TC-COND-009`
+**Oracle Source:** `ADR-025 §Decision 1`, `BR-STO-001`
+
+**Test Steps:** as a worker, multipart POST `/tickets` with a 5 MB + 1 byte JPEG, subject "Kept subject", details "Kept details"
+**Expected Result (PASS):** 400; the page contains "The photo must be 5 MB or smaller", "Kept subject" and "Kept details"; no ticket row
+**Expected Result (FAIL):** an error page, JSON, a redirect, or a saved ticket
+**Current Status:** 🟢V
+
+---
+
+### PLT-TC-037 — A bad value sent by a form goes back to that page with the problem
+
+**Severity:** `MEDIUM`
+**Feature Under Test:** `PageExceptionHandler.badValue`, `backOrPage`
+**Test File:** `ErrorPagesTest.java` — `aBadValueSentByAFormGoesBackToThatPageWithTheProblem`
+**TDD Phase:** 🟢 GREEN
+**Condition Ref:** `TC-COND-009`
+**Oracle Source:** `ADR-025 §Decision 5`
+
+**Test Steps:** as HSE, POST `/tickets/{id}/assignee` with `assigneeId=abc` (1) with `Referer: http://localhost/tickets/{id}`, (2) without a Referer; (3) POST `/tickets/abc/comments`
+**Expected Result (PASS):** (1) redirect to `/tickets/{id}` with flash `error = "One of the values isn't valid. Check the form and try again."`; (2) 400 error page with the same message; (3) 404
+**Expected Result (FAIL):** 404 for (1) or (2), or a redirect anywhere else
+**Current Status:** 🟢V
+
+---
+
+### PLT-TC-038 — Going back never leaves the site
+
+**Severity:** `HIGH`
+**OWASP:** `A01:2021`
+**CWE:** `CWE-601 — Open Redirect`
+**Feature Under Test:** `SamePage.of()` (also used by `/language`)
+**Test File:** `ErrorPagesTest.java` — `goingBackNeverLeavesTheSite`
+**TDD Phase:** 🟢 GREEN
+**Condition Ref:** `TC-COND-009`
+
+**Test Steps (Attack Simulation):** POST a bad value with `Referer` set to `https://evil.example/tickets?x={y}`, `https://evil.example//x`, `https://evil.example/\x`, `javascript:alert(1)`
+**Expected Result (PASS):** `/tickets?x=%7By%7D` (host dropped, braces encoded so the redirect isn't read as a URI template); `/x` (Spring 7's parser folds the doubled slash, so this stays on the site); the last two get the 400 error page and no `Location`
+**Expected Result (FAIL):** any `Location` with another host, starting `//` or `/\`, or a 500 from an unencoded brace
+**Current Status:** 🟢V — the first run expected `https://evil.example//x` to be refused; it is in fact a safe local `/x`, and the test was corrected
+
+---
+
+### PLT-TC-039 — An upload over the ceiling gets the error page, not JSON
+
+**Severity:** `HIGH`
+**Feature Under Test:** `PageErrorController`
+**Test File:** `ErrorPagesTest.java` — `anUploadOverTheCeilingGetsTheErrorPageNotJson`
+**TDD Phase:** 🟢 GREEN
+**Condition Ref:** `TC-COND-009`
+**Oracle Source:** `ADR-025 §Decision 4`; logic issue L6
+
+**Test Steps:** GET `/error` with `Accept: */*` (as htmx sends), `jakarta.servlet.error.status_code = 413`, `request_uri = /tickets`
+**Expected Result (PASS):** 413, `text/html`, "Photo too large", no JSON
+**Expected Result (FAIL):** `application/json` or Spring Boot's `{"status": …}` body
+**Current Status:** 🟢V
+
+---
+
+### PLT-TC-042 — An upload over the ceiling is refused as too large before the CSRF check sees it
+
+**Severity:** `HIGH`
+**Feature Under Test:** `MultipartLimitFilter`
+**Test File:** `web/MultipartLimitFilterTest.java` — `anUploadOverTheCeilingIsRefusedAsTooLargeBeforeTheCsrfCheckSeesIt`, `aBrokenUploadIsABadRequest`, `otherRequestsPassStraightThrough`
+**TDD Phase:** 🟢 GREEN
+**Condition Ref:** `TC-COND-009`
+**Oracle Source:** `ADR-025 §Decision 3`
+
+**Test Steps:** a multipart request whose `getParts()` throws Tomcat's own message *"The field photo exceeds its maximum permitted size of 20971520 bytes."*; one that throws *"Stream ended unexpectedly"*; a urlencoded POST
+**Expected Result (PASS):** 413 and the chain is not called; 400 and the chain is not called; the urlencoded request passes through unchanged
+**Expected Result (FAIL):** the chain runs (Spring Security would then answer 403), or any other status
+**Current Status:** 🟢V (no database needed)
+
+---
+
+### TC catalogue — added 2026-11-16
+
+| TC ID | Test (class — method) | Condition | Severity | Status |
+|-------|----------------------|-----------|----------|--------|
+| PLT-TC-036 | `ErrorPagesTest` — `thePhotoInputsKnowTheLimitSoTheBrowserCanCheckFirst`: the ticket form's photo input has `data-max-bytes="5242880"` and the translated `data-too-large` | COND-009 | MEDIUM | 🟢V |
+| PLT-TC-040 | `ErrorPagesTest` — `anExpiredFormSaysSoInsteadOfForbidden`: `/error` with 403 and a `MissingCsrfTokenException` → `text/html` "This page has expired" | COND-009 | MEDIUM | 🟢V |
+| PLT-TC-041 | `ErrorPagesTest` — `theApiStillGetsJson`: `/error` for `/api/v1/detections` → `{"error":"The request was rejected"}` | COND-009 | MEDIUM | 🟢V |
+| PLT-TC-043 | `ErrorPagesTest` — `aFormWithoutItsSecurityTokenIsRefusedWithTheReasonKept`: POST without CSRF → 403 with `WebAttributes.ACCESS_DENIED_403` a `CsrfException` | COND-009 | MEDIUM | 🟢V |
+| PLT-TC-044 | `validation/TextTest` — `textThatFitsTheBrowsersLimitFitsOursToo`: 1000 × `"a\r\n"` + 1000 × `"b"` fits a 3000 limit, with no `\r` kept | COND-009 | LOW | 🟢V |
+| PLT-TC-045 | `validation/TextTest` — `textOverTheLimitIsStillRefused` | COND-009 | LOW | 🟢V |
+
+Stale edits keep the form (`PageController.submit`, 409): covered by the existing 409 assertions in `ManagerPagesIntegrationTest` (`editingAShiftSavesAndAStaleFormIsRefused`, `badProfileEditsAreRefused`) and `HsePagesIntegrationTest`, which still find "Someone else changed this" and 409.
 
 ### TC catalogue — remaining existing tests
 
@@ -336,6 +440,7 @@ mvc.perform(get("/").with(as(hse))).andExpect(content().string(not(containsStrin
 | `PLT-TC-008…010` | `TranslationsTest.java` | `[ ]` not evidenced | `f005861` (re-run 2026-11-06, 3/3) | — |
 | `PLT-TC-001…007, 011…017` | `SteelsightErpApplicationTests`, `SchemaChecksSqlTest`, `RepositoryIntegrationTest`, `DeploymentEndpointsTest`, `RequestLoggingTest`, `PagesIntegrationTest`, `HsePagesIntegrationTest`, `ManagerPagesIntegrationTest` | `[ ]` | `94a2c3c` (last local run) | — |
 | `PLT-TC-030…034` | *(new)* | `[ ]` | — | — |
+| `PLT-TC-035…045` | `ErrorPagesTest`, `MultipartLimitFilterTest`, `TextTest` | `[ ]` written after the code | working tree after `8f9d2f1` (full run 2026-11-16, 282/282) | — |
 
 ### 5.1 Red Gate Protocol (CASE 2.0 — GATE-2)
 

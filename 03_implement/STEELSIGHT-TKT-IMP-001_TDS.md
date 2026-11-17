@@ -4,7 +4,7 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | `STEELSIGHT-TKT-IMP-001` |
-| **Version** | `1.0` |
+| **Version** | `1.1` |
 | **Date** | `2026-11-06` |
 | **Status** | `Draft` |
 | **Document Owner** | `Nguyen Vu An` |
@@ -12,7 +12,7 @@
 | **Reviewed by** | `[ ] Pending — Tech Lead` |
 | **DPO Sign-off** | `[ ] Pending` *(free text and photos may contain personal data, e.g. leave reasons)* |
 | **Approved by** | `[ ] Pending — Principal Architect` |
-| **Last Review** | `2026-11-06` |
+| **Last Review** | `2026-11-16` |
 | **Based on EDS** | `v2.0` |
 
 ---
@@ -24,6 +24,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code as built (V1, V3, V4, V11) |
+| 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: TKT-016 (photo of 5–20 MB, 400, form kept). Old value kept here: TKT-015 (413) was triggered by the 5 MB multipart limit |
 
 ---
 
@@ -493,7 +494,8 @@ photo=<file>                     # optional JPEG/PNG/WebP ≤ 5 MB
 | `TKT-012` | 400 | The photo must be a JPEG, PNG or WebP image | Ảnh phải ở định dạng JPEG, PNG hoặc WebP | Not an image |
 | `TKT-013` | 403 | Not allowed | Không được phép | `can_read/update_ticket` false |
 | `TKT-014` | 404 | Page not found | Không tìm thấy trang | Unknown/deleted ticket, category, zone; no photo |
-| `TKT-015` | 413 | Photo too large — Go back and choose a photo under 5 MB. | Ảnh quá lớn — Hãy quay lại và chọn ảnh dưới 5 MB. | Multipart limit |
+| `TKT-015` | 413 | Photo too large — Go back and choose a photo under 5 MB. | Ảnh quá lớn — Hãy quay lại và chọn ảnh dưới 5 MB. | Upload over the 20 MB container ceiling (error page) |
+| `TKT-016` | 400 | The photo must be 5 MB or smaller | Ảnh chỉ được tối đa 5 MB | Photo of 5–20 MB; the form is shown again with what was typed (STO-006) |
 
 ---
 

@@ -28,7 +28,7 @@
             </div>
             <div>
                 <label for="photo"><span th:text="#{field.photo}">Photo</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
-                <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+                <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}">
                 <p class="hint" th:text="#{tickets.photoHint}">JPEG, PNG or WebP, up to 5 MB.</p>
             </div>
         </div>

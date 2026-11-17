@@ -14,6 +14,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import orochi.steelsight.attendance.model.EmbeddingStatus;
 import orochi.steelsight.attendance.model.FaceEmbedding;
+import orochi.steelsight.attendance.model.FacePose;
 import orochi.steelsight.attendance.repository.FaceEmbeddingRepository;
 import orochi.steelsight.exception.BusinessRuleException;
 import orochi.steelsight.exception.NotFoundException;
@@ -30,6 +31,7 @@ import orochi.steelsight.validation.Text;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -243,18 +245,77 @@ public class UserService {
         return users.require(userId);
     }
 
-    /** The detection service's progress with this person's face photo, if they have one. */
+    /**
+     * Admins only. Adds or replaces a photo of the worker turned LEFT or RIGHT, so the gate camera
+     * still knows them when they don't look straight at it. Queued for enrolment in the same
+     * transaction; a replaced photo is removed only once that has committed.
+     */
+    public FaceEmbedding changeFaceAngle(Long actorId, Long userId, FacePose pose, String photoPath) {
+        access.require(actorId, Permissions.USER_MANAGE);
+        requireExtraAngle(pose);
+        // Locked, so this runs wholly before or after a soft delete or another change to this person's photos.
+        AppUser user = users.requireForUpdate(userId);
+        if (user.getDeletedAt() != null) {
+            throw new NotFoundException("User", userId);
+        }
+        if (user.getFaceFilePath() == null) {
+            throw new BusinessRuleException("Add the photo looking at the camera first");
+        }
+        String old = embeddings.findByUserIdAndPose(userId, pose).map(FaceEmbedding::getSourceFilePath).orElse(null);
+        embeddings.queueForEnrolment(userId, pose.name(), photoPath);
+        if (old != null && !old.equals(photoPath)) {
+            removeFacePhotoAfterCommit(old);
+        }
+        return embeddings.findByUserIdAndPose(userId, pose).orElseThrow();
+    }
+
+    /** Admins only. Removes one extra angle and its face data; the photo goes after commit. */
+    public void removeFaceAngle(Long actorId, Long userId, FacePose pose) {
+        access.require(actorId, Permissions.USER_MANAGE);
+        requireExtraAngle(pose);
+        users.requireForUpdate(userId);
+        FaceEmbedding row = embeddings.findByUserIdAndPose(userId, pose)
+                .orElseThrow(() -> new NotFoundException("Face photo of user", userId));
+        String path = row.getSourceFilePath();
+        embeddings.deleteAngle(userId, pose.name());
+        removeFacePhotoAfterCommit(path);
+    }
+
+    /** The detection service's progress with this person's FRONT face photo, if they have one. */
     @Transactional(readOnly = true)
     public Optional<FaceEmbedding> faceEnrolment(Long actorId, Long userId) {
         access.require(actorId, Permissions.USER_MANAGE);
-        return embeddings.findByUserId(userId);
+        return embeddings.findFrontByUserId(userId);
     }
 
+    /** The extra angles (LEFT, RIGHT) this person has, by pose. */
+    @Transactional(readOnly = true)
+    public Map<FacePose, FaceEmbedding> faceAngles(Long actorId, Long userId) {
+        access.require(actorId, Permissions.USER_MANAGE);
+        Map<FacePose, FaceEmbedding> angles = new EnumMap<>(FacePose.class);
+        for (FaceEmbedding row : embeddings.findAllByUserIdOrderByPose(userId)) {
+            if (row.getPose() != FacePose.FRONT) {
+                angles.put(row.getPose(), row);
+            }
+        }
+        return angles;
+    }
+
+    /** The status of each person's FRONT photo, the one that decides whether they are enrolled. */
     @Transactional(readOnly = true)
     public Map<Long, EmbeddingStatus> faceStatuses(Long actorId, Collection<Long> userIds) {
         access.require(actorId, Permissions.USER_MANAGE);
-        return embeddings.findAllByUserIdIn(userIds).stream()
+        return embeddings.findAllByUserIdInAndPose(userIds, FacePose.FRONT).stream()
                 .collect(Collectors.toMap(e -> e.getUser().getId(), FaceEmbedding::getStatus));
+    }
+
+    @Transactional(readOnly = true)
+    public String faceAnglePath(Long actorId, Long userId, FacePose pose) {
+        access.require(actorId, Permissions.USER_MANAGE);
+        requireExtraAngle(pose);
+        return embeddings.findByUserIdAndPose(userId, pose)
+                .map(FaceEmbedding::getSourceFilePath)
+                .orElseThrow(() -> new NotFoundException("Face photo of user", userId));
     }
 
     @Transactional(readOnly = true)
@@ -276,14 +337,21 @@ public class UserService {
         if (!teams.findAllByManagerId(userId).isEmpty()) {
             throw new BusinessRuleException("Give this user's teams a new manager first");
         }
-        AppUser user = users.require(userId);
+        // Locked, so a face-angle upload can't slip in between reading the photos and deleting.
+        AppUser user = users.requireForUpdate(userId);
         String photo = user.getFaceFilePath();
+        // The trigger deletes the extra-angle rows too, so note their photos first.
+        List<String> anglePhotos = embeddings.findAllByUserIdOrderByPose(userId).stream()
+                .filter(row -> row.getPose() != FacePose.FRONT)
+                .map(FaceEmbedding::getSourceFilePath)
+                .toList();
         user.setDeletedAt(OffsetDateTime.now());
         user.setActive(false);
         user.setFaceFilePath(null);
         if (photo != null) {
             removeFacePhotoAfterCommit(photo);
         }
+        anglePhotos.forEach(this::removeFacePhotoAfterCommit);
     }
 
     public void changeOwnPassword(Long actorId, String currentPassword, String newPassword) {
@@ -323,6 +391,12 @@ public class UserService {
             throw new BusinessRuleException("That email address doesn't look right");
         }
         return email;
+    }
+
+    private static void requireExtraAngle(FacePose pose) {
+        if (pose == null || pose == FacePose.FRONT) {
+            throw new BusinessRuleException("Choose the left or the right angle");
+        }
     }
 
     /** Only after commit, so a rolled-back change never loses the photo that is still in use. */

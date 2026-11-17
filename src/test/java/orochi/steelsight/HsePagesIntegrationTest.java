@@ -135,8 +135,9 @@ class HsePagesIntegrationTest extends PageTestSupport {
                 .andExpect(flash().attributeExists("error"));
         mvc.perform(post("/violations/" + id + "/decision").param("decision", "NONE").with(as(hse)).with(csrf()))
                 .andExpect(flash().attributeExists("error"));
+        // A value the form can't send is a bad request, not a missing page
         mvc.perform(post("/violations/" + id + "/decision").param("decision", "BOGUS").with(as(hse)).with(csrf()))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isBadRequest());
 
         assertThat(disputeStatus(id)).isEqualTo("DISPUTED");
     }

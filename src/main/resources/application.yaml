@@ -25,8 +25,11 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 6MB
+      # A ceiling, not the rule. Photos may be 5 MB (PhotoStorage.MAX_BYTES); the app checks that itself,
+      # so the form can show the problem and keep what was typed. Only a request over this ceiling is
+      # refused before the page sees it, and MultipartLimitFilter turns that into a readable error page.
+      max-file-size: 20MB
+      max-request-size: 25MB
 
 management:
   endpoints:
@@ -44,6 +47,10 @@ logging:
 
 server:
   port: ${PORT:8080}   # Render supplies PORT
+  tomcat:
+    # How much of a refused upload Tomcat reads and discards. Past this it drops the connection, and the
+    # browser shows a network error instead of our error page. Larger than the multipart ceiling above.
+    max-swallow-size: 100MB
   forward-headers-strategy: framework   # Render's proxy handles HTTPS and forwards to this port
   servlet:
     session:

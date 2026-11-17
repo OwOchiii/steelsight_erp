@@ -4,7 +4,7 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | `STEELSIGHT-PPE-IMP-001` |
-| **Version** | `1.0` |
+| **Version** | `1.1` |
 | **Date** | `2026-11-06` |
 | **Status** | `Draft` |
 | **Document Owner** | `Nguyen Vu An` |
@@ -12,7 +12,7 @@
 | **Reviewed by** | `[ ] Pending — Tech Lead` |
 | **DPO Sign-off** | `[ ] Pending` *(camera snapshots of identifiable workers; scores affect pay)* |
 | **Approved by** | `[ ] Pending — Principal Architect` |
-| **Last Review** | `2026-11-06` |
+| **Last Review** | `2026-11-16` |
 | **Based on EDS** | `v2.0` |
 
 ---
@@ -24,6 +24,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code as built (V1, V2, V8) |
+| 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: PPE-011 is a 302 + flash through `attempt()`; PPE-012 for an unreadable `decision`. Old values kept here: PPE-011 was a 409 error page; `decision=BOGUS` was a 404 |
 
 ---
 
@@ -341,7 +342,7 @@ A -> VS : decide(42, UPHELD)
 B -> VS : decide(42, OVERTURNED)
 VS -> DB : A commits (version 3 → 4)
 VS -> DB : B UPDATE … WHERE version = 3 → 0 rows
-VS --> B : OptimisticLockingFailureException → 409
+VS --> B : OptimisticLockingFailureException → attempt() → 302 + flash (stale edit message)
 
 == Other refusals ==
 A -> VS : decide(own violation) → AccessDeniedException 403
@@ -511,7 +512,9 @@ note=Worker wore a hard hat; the model misread a cap    # optional, ≤ 4000; be
 
 **Response — 403:** own violation, or no `VIOLATION_REVIEW`.
 
-**Response — 409:** another officer decided first.
+**Response — 302 with flash error (Conflict):** another officer decided first; `attempt()` shows the stale-edit message on the violation page.
+
+**Response — 302 with flash error (Bad value):** `decision` that isn't a `DisputeStatus` (e.g. `BOGUS`) goes back to the Referer with "One of the values isn't valid. Check the form and try again."; with no Referer, a 400 error page.
 
 ---
 
@@ -529,7 +532,8 @@ note=Worker wore a hard hat; the model misread a cap    # optional, ≤ 4000; be
 | `PPE-008` | 302 + flash | A description is required | Vui lòng nhập mô tả | Empty dispute reason |
 | `PPE-009` | 403 | This is someone else's violation / You can only dispute your own violation | *(generic 403)* | Not own |
 | `PPE-010` | 404 | Page not found | Không tìm thấy trang | Unknown violation; worker page for a non-WORKER |
-| `PPE-011` | 409 | Someone else changed this | Người khác đã thay đổi nội dung này | Concurrent decision |
+| `PPE-011` | 302 + flash | Someone else changed this while you were editing. Reload the page, check their changes and try again. | Người khác đã thay đổi nội dung này trong lúc bạn đang sửa. Hãy tải lại trang, xem các thay đổi đó và thử lại. | Concurrent decision |
+| `PPE-012` | 302 + flash (400 without a Referer) | One of the values isn't valid. Check the form and try again. | Có giá trị không hợp lệ. Hãy kiểm tra biểu mẫu và thử lại. | `decision` not a `DisputeStatus`, or another unreadable form value |
 | `PPE-DB-01` | — (SQL error to detection) | `violation user % does not match vest link user %` | — | `violation_set_worker()` |
 
 ---

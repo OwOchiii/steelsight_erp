@@ -22,7 +22,11 @@ final class PhotoFormat {
         return name != null && name.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,99}") && !name.contains("..");
     }
 
+    /** Checks the size first, then works out the type from the file's own bytes. */
     static String extensionOf(MultipartFile photo) throws IOException {
+        if (photo.getSize() > PhotoStorage.MAX_BYTES) {
+            throw new BusinessRuleException("The photo must be 5 MB or smaller");
+        }
         byte[] head;
         try (InputStream in = photo.getInputStream()) {
             head = in.readNBytes(12);

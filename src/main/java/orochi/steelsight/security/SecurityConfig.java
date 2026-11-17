@@ -1,5 +1,6 @@
 package orochi.steelsight.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +11,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
@@ -58,6 +60,12 @@ public class SecurityConfig {
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?signedOut")
                         .permitAll())
+                // Spring's default handler doesn't say why it refused. Keeping the reason lets the error page
+                // tell a form whose session ran out (a CSRF failure) apart from a page the person can't open.
+                .exceptionHandling(failures -> failures.accessDeniedHandler((request, response, e) -> {
+                    request.setAttribute(WebAttributes.ACCESS_DENIED_403, e);
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                }))
                 // No limit on sign-ins per person. The registry is what lets UserSessions end them.
                 .sessionManagement(session -> session
                         .maximumSessions(-1)

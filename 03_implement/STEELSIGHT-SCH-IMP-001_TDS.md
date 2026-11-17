@@ -4,7 +4,7 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | `STEELSIGHT-SCH-IMP-001` |
-| **Version** | `1.0` |
+| **Version** | `1.1` |
 | **Date** | `2026-11-06` |
 | **Status** | `Draft` |
 | **Document Owner** | `Nguyen Vu An` |
@@ -12,7 +12,7 @@
 | **Reviewed by** | `[ ] Pending — Tech Lead` |
 | **DPO Sign-off** | `[ ] Pending` *(working-time records are personal data)* |
 | **Approved by** | `[ ] Pending — Principal Architect` |
-| **Last Review** | `2026-11-06` |
+| **Last Review** | `2026-11-16` |
 | **Based on EDS** | `v2.0` |
 
 ---
@@ -24,6 +24,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code as built (V1, V3, V6, V11) |
+| 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: SCH-016 now keeps the form, with the longer stale-edit message. Old value kept here: 409 error page "Someone else changed this" |
 
 ---
 
@@ -319,7 +320,7 @@ Ctl --> C : 403 error page
 == Stale edit ==
 C -> Ctl : POST /shifts/7 version=3 (current 4)
 S --> Ctl : StaleEditException
-Ctl --> C : 409 "Someone else changed this"
+Ctl --> C : 409, same form + typed values + "Someone else changed this while you were editing…"
 @enduml
 ```
 
@@ -512,7 +513,7 @@ DB: shift(status='SCHEDULED', duration_hours=9, start_at='2026-11-10 01:00:00+00
 | `SCH-013` | 400 | A team name is required | Vui lòng nhập tên tổ | Blank name |
 | `SCH-014` | 403 | Not allowed | Không được phép | Scope check false; "This is another manager's team" |
 | `SCH-015` | 404 | Page not found | Không tìm thấy trang | Unknown shift/team/zone; malformed `week` |
-| `SCH-016` | 409 | Someone else changed this | Người khác đã thay đổi nội dung này | Stale version |
+| `SCH-016` | 409 | Someone else changed this while you were editing. Reload the page, check their changes and try again. | Người khác đã thay đổi nội dung này trong lúc bạn đang sửa. Hãy tải lại trang, xem các thay đổi đó và thử lại. | Stale version; the form is shown again with what was typed |
 
 ---
 

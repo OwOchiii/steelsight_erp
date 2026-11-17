@@ -4,7 +4,7 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | `STEELSIGHT-IAM-IMP-001` |
-| **Version** | `1.0` |
+| **Version** | `1.1` |
 | **Date** | `2026-11-06` |
 | **Status** | `Draft` |
 | **Document Owner** | `Nguyen Vu An` |
@@ -12,7 +12,7 @@
 | **Reviewed by** | `[ ] Pending — Tech Lead` |
 | **DPO Sign-off** | `[ ] Pending` *(required: module holds PII and controls access to biometric data)* |
 | **Approved by** | `[ ] Pending — Principal Architect` |
-| **Last Review** | `2026-11-06` |
+| **Last Review** | `2026-11-16` |
 | **Based on EDS** | `v2.0` |
 
 ---
@@ -24,6 +24,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code as built (V1–V11) |
+| 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: IAM-015 now keeps the form. Old value kept here: "Someone else changed this — Go back, reload the page and try again." on the error page |
 
 ---
 
@@ -645,7 +646,7 @@ error = "That employee code or email is already in use"     # the stored photo i
 | `IAM-012` | 400 | Choose a role | Vui lòng chọn vai trò | Blank `roleName` |
 | `IAM-013` | 403 | Not allowed — You don't have access to this page. | Không được phép — Bạn không có quyền truy cập trang này. | `AccessDeniedException` |
 | `IAM-014` | 404 | Page not found — We couldn't find what you were looking for. | Không tìm thấy trang — Không tìm thấy nội dung bạn cần. | Unknown/deleted user, role or team |
-| `IAM-015` | 409 | Someone else changed this — Go back, reload the page and try again. | Người khác đã thay đổi nội dung này — Hãy quay lại, tải lại trang và thử lại. | Stale profile version |
+| `IAM-015` | 409 | Someone else changed this while you were editing. Reload the page, check their changes and try again. | Người khác đã thay đổi nội dung này trong lúc bạn đang sửa. Hãy tải lại trang, xem các thay đổi đó và thử lại. | Stale profile version; the form is shown again with what was typed |
 | `IAM-016` | 302 → `/login?locked` | Too many failed sign-ins. Try again in 15 minutes. | Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút. | Sign-in limiter |
 | `IAM-017` | 302 → `/login?error` | The employee code or password is wrong. | Mã nhân viên hoặc mật khẩu không đúng. | Wrong password, unknown code or disabled account (same answer) |
 

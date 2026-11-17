@@ -14,6 +14,7 @@ import orochi.steelsight.attendance.model.CheckIn;
 import orochi.steelsight.attendance.model.CheckInMethod;
 import orochi.steelsight.attendance.model.EmbeddingStatus;
 import orochi.steelsight.attendance.model.FaceEmbedding;
+import orochi.steelsight.attendance.model.FacePose;
 import orochi.steelsight.attendance.repository.CheckInRepository;
 import orochi.steelsight.attendance.repository.FaceEmbeddingRepository;
 import orochi.steelsight.identity.model.AppUser;
@@ -45,6 +46,7 @@ import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -241,7 +243,7 @@ class RepositoryIntegrationTest {
 
         embeddings.queueForEnrolment(worker.getId(), "second.jpg");
 
-        FaceEmbedding row = embeddings.findByUserId(worker.getId()).orElseThrow();
+        FaceEmbedding row = embeddings.findFrontByUserId(worker.getId()).orElseThrow();
         assertThat(row.getSourceFilePath()).isEqualTo("second.jpg");
         assertThat(row.getStatus()).isEqualTo(EmbeddingStatus.PENDING);
         assertThat(row.getModelName()).isNull();
@@ -251,14 +253,34 @@ class RepositoryIntegrationTest {
     }
 
     @Test
+    void eachAngleIsItsOwnRowAndReplacingOneLeavesTheOthers() {
+        embeddings.queueForEnrolment(worker.getId(), "front.jpg");
+        embeddings.queueForEnrolment(worker.getId(), "LEFT", "left-1.jpg");
+        embeddings.queueForEnrolment(worker.getId(), "RIGHT", "right.jpg");
+        jdbc.update("""
+                UPDATE face_embedding SET status = 'READY', model_name = 'buffalo_l',
+                       embedding = array_fill(0.1, ARRAY[512])::vector WHERE user_id = ?""", worker.getId());
+
+        embeddings.queueForEnrolment(worker.getId(), "LEFT", "left-2.jpg");
+
+        assertThat(embeddings.findAllByUserIdOrderByPose(worker.getId()))
+                .extracting(FaceEmbedding::getPose, FaceEmbedding::getSourceFilePath, FaceEmbedding::getStatus)
+                .containsExactlyInAnyOrder(
+                        tuple(FacePose.FRONT, "front.jpg", EmbeddingStatus.READY),
+                        tuple(FacePose.LEFT, "left-2.jpg", EmbeddingStatus.PENDING),
+                        tuple(FacePose.RIGHT, "right.jpg", EmbeddingStatus.READY));
+    }
+
+    @Test
     void softDeletingAWorkerErasesTheirEmbedding() {
         embeddings.queueForEnrolment(worker.getId(), "face.jpg");
+        embeddings.queueForEnrolment(worker.getId(), "LEFT", "left.jpg");
 
         AppUser reloaded = users.findById(worker.getId()).orElseThrow();
         reloaded.setDeletedAt(OffsetDateTime.now());
         users.saveAndFlush(reloaded);
 
-        assertThat(embeddings.findByUserId(worker.getId())).isEmpty();
+        assertThat(embeddings.findAllByUserIdOrderByPose(worker.getId())).isEmpty();
         assertThat(users.findByIdAndDeletedAtIsNull(worker.getId())).isEmpty();
     }
 

@@ -2,7 +2,7 @@
 # Mẫu Đặc tả Kiểm thử Hướng Phát triển
 
 **Document ID:** `STEELSIGHT-STO-TDD-001`
-**Version:** `1.0`
+**Version:** `1.1`
 **Date:** `2026-11-06`
 **Status:** `Draft`
 **Standard:** ISO/IEC/IEEE 29119-3:2021 — Software Testing Part 3: Test Documentation
@@ -31,6 +31,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | `2026-11-06` | `Claude Code (Opus 5.5)` | Khởi tạo tài liệu — TDD spec cho Photo Storage |
+| `2026-11-16` | `Claude Code (Opus 5.5) — ADR-025` | ADR-025: STO-TC-032 written. Old value kept here: planned as "5 MB + 1 byte → 413 Photo too large", LOW, 🔴; it is now 400 with the form kept, MEDIUM, 🟢V |
 
 ---
 
@@ -342,7 +343,7 @@ assertThat(jdbc.queryForObject("SELECT count(*) FROM face_embedding WHERE user_i
 | STO-TC-021 | `PhotoStorageSelectionTest` — `usesLocalDiskByDefault` | COND-007 | MEDIUM | 🟢V |
 | STO-TC-022 | `PhotoStorageSelectionTest` — `usesSupabaseWhenAskedTo` | COND-007 | MEDIUM | 🟢V |
 | STO-TC-024 | `FacePhotoCleanupTest` — (see STO-TC-INT-001) | COND-008 | HIGH | 🟢L |
-| STO-TC-032 | *(new)* A 5 MB + 1 byte upload → 413 "Photo too large" | COND-003 | LOW | 🔴 |
+| STO-TC-032 | ~~*(new)* A 5 MB + 1 byte upload → 413 "Photo too large"~~ Written 2026-11-16 with the ADR-025 behaviour: `ErrorPagesTest` — `aPhotoOverTheLimitShowsTheTicketFormAgainWithWhatWasTyped` (400, form kept, "The photo must be 5 MB or smaller") and `thePhotoInputsKnowTheLimitSoTheBrowserCanCheckFirst`. Over the 20 MB ceiling → 413 page: `MultipartLimitFilterTest`, `ErrorPagesTest.anUploadOverTheCeilingGetsTheErrorPageNotJson` (see PLT-TC-035…042) | COND-003 | MEDIUM | 🟢V |
 | STO-TC-033 | *(new)* A face-photo change that rolls back leaves the old file in place | COND-008 | HIGH | 🔴 |
 
 ---

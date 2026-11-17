@@ -4,7 +4,7 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | `STEELSIGHT-RPT-IMP-001` |
-| **Version** | `1.0` |
+| **Version** | `1.1` |
 | **Date** | `2026-11-06` |
 | **Status** | `Draft` |
 | **Document Owner** | `Nguyen Vu An` |
@@ -12,7 +12,7 @@
 | **Reviewed by** | `[ ] Pending — Tech Lead` |
 | **DPO Sign-off** | `[ ] Pending` *(the export is pay-relevant personal data leaving the system)* |
 | **Approved by** | `[ ] Pending — Principal Architect` |
-| **Last Review** | `2026-11-06` |
+| **Last Review** | `2026-11-16` |
 | **Based on EDS** | `v2.0` |
 
 ---
@@ -24,6 +24,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code as built (commit 94a2c3c, V11 permissions) |
+| 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: a month that can't be exported goes back to `/team` (303 + flash). Old value kept here: RPT-001…003 were 400 error pages |
 
 ---
 
@@ -357,7 +358,7 @@ Cache-Control: no-store
 <xlsx bytes: Summary, Violations, Attendance, No-shows>
 ```
 
-**Response — 400 (Validation Error):** error page, `message = "Choose a month to export"` (unparseable) or `"Choose a month that has already started"`.
+**Response — 303 (Validation Error):** `Location: /team`, flash `error = "Choose a month to export"` (unparseable), `"Choose a month that has already started"` or `"You don't lead a team yet"`, shown on the Team page where the month was chosen. Firefox desktop shows the month field as plain text, so a typed month is a normal mistake.
 
 **Response — 403:** error page "Not allowed".
 
@@ -367,9 +368,9 @@ Cache-Control: no-store
 
 | Code | HTTP Status | Message (EN) | Message (VI) | Trigger Condition |
 |------|-------------|--------------|--------------|-------------------|
-| `RPT-001` | 400 | Choose a month to export | Hãy chọn tháng cần xuất | `month` not `YYYY-MM` |
-| `RPT-002` | 400 | Choose a month that has already started | Hãy chọn một tháng đã bắt đầu | Future month |
-| `RPT-003` | 400 | You don't lead a team yet | Bạn chưa làm tổ trưởng của tổ nào | Leader without a team |
+| `RPT-001` | 303 → `/team` + flash | Choose a month to export | Hãy chọn tháng cần xuất | `month` not `YYYY-MM` |
+| `RPT-002` | 303 → `/team` + flash | Choose a month that has already started | Hãy chọn một tháng đã bắt đầu | Future month |
+| `RPT-003` | 303 → `/team` + flash | You don't lead a team yet | Bạn chưa làm tổ trưởng của tổ nào | Leader without a team |
 | `RPT-004` | 403 | Not allowed | Không được phép | No export permission |
 
 ---

@@ -1,11 +1,11 @@
 # AI usage log
 
-How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md) and [9 November](../transcript/9-11-2026.md).
+How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md), [9 November](../transcript/9-11-2026.md) and [16 November](../transcript/16-11-2026.md).
 
 | | |
 |---|---|
 | Tool | Claude Code (Opus 5.5) |
-| Dates | 2026-11-04 to 2026-11-09 (one session ran past midnight) |
+| Dates | 2026-11-04 to 2026-11-16 (one session ran past midnight) |
 | Branch | `feature/erp-backend` |
 
 ## Summary by request
@@ -61,13 +61,23 @@ The developer committed all of this day's work together at 23:47.
 
 ### 2026-11-09
 
+The developer committed this day's work, with their own attendance and report changes, as `23e5929` on 12 November, then added `8f9d2f1` (sign-ins that race a password change are refused) without Claude.
+
 | Time | What the developer asked for | What was produced | Commit |
 |---|---|---|---|
 | 16:34 | Find the API the detection server calls for violation alerts, and suggest how to secure it | Located `DetectionAlertController`, found it was already guarded by an API key, and listed the remaining ways to abuse it | None |
-| 16:39 | Add rate limiting and stop fake alerts silencing real ones; suggest JWT and other security | `ApiLimiter`, a quiet period per registered camera, delayed or future alerts kept without notifying, upper limits on counts; advice against JWT | Not committed |
+| 16:39 | Add rate limiting and stop fake alerts silencing real ones; suggest JWT and other security | `ApiLimiter`, a quiet period per registered camera, delayed or future alerts kept without notifying, upper limits on counts; advice against JWT | `23e5929` |
 | 16:46 | Run a full security review of the pages and permissions | Review of every route and its service checks, plus a temporary test of routes as a worker: no critical or high findings, 2 medium, 5 low | None |
-| 16:51 | Fix the three top findings | Password changes end other sessions, `check_in_correction` history table (`V12`), Swagger library removed | Not committed |
-| 16:59 | Add the history section, and write the log and today's transcript | Change history on the visit edit page in both languages, this update and `transcript/9-11-2026.md` | Not committed |
+| 16:51 | Fix the three top findings | Password changes end other sessions, `check_in_correction` history table (`V12`), Swagger library removed | `23e5929` |
+| 16:59 | Add the history section, and write the log and today's transcript | Change history on the visit edit page in both languages, this update and `transcript/9-11-2026.md` | `23e5929` |
+
+### 2026-11-16
+
+| Time | What the developer asked for | What was produced | Commit |
+|---|---|---|---|
+| 21:12 | An oversized photo upload opens a JSON page instead of showing the error; check every error a user can make by breaking a rule | Found the cause (Tomcat refused the upload, the CSRF check then failed, and Spring Boot's `/error` answered JSON to htmx). The 5 MB rule moved into the app with a browser check first; `PageErrorController`, `MultipartLimitFilter`, `SamePage`; failed POSTs go back to their page; stale edits keep the form; report refusals go back to the Team page; line breaks counted once; `ErrorPagesTest`, `MultipartLimitFilterTest`, `TextTest` | Not committed |
+| 21:38 | Docker is running, check it | Full suite run: 2 test expectations corrected, then 282 tests passed | Not committed |
+| 21:48 | Write the log, today's transcript, and the design, implementation and testing documents for anything new | `ADR-025`, ADR-006 amended, `MODULE-MAP.md` (BR-PLT-009 and updated rules), 8 TDS and 4 Test-Specs updated with changelog entries, this update and `transcript/16-11-2026.md` | Not committed |
 
 ## Decisions made by the developer
 
@@ -194,6 +204,24 @@ From the deployment plan the developer approved on 6 November:
 - A password change ends the person's other sessions, and an admin reset ends all of them, including the admin's own if they reset themselves.
 - The attendance history can be seen only by people who can correct visits (`CHECKIN_EDIT`). It starts with this change, because older corrections had already overwritten their values.
 
+### 2026-11-16
+
+These came from the request to check every user error, and the developer hasn't reviewed them yet.
+
+- The 5 MB photo rule is checked by the app, so the form shows the problem with what was typed. The container limit became a 20 MB ceiling (25 MB per request), and Tomcat discards up to 100 MB of a refused body instead of dropping the connection.
+- The browser checks the photo size as soon as one is chosen, using the same limit in a `data-max-bytes` attribute.
+- Uploads over the ceiling get the "Photo too large" error page, not the form. Sending them back to the form would need flash handling outside Spring MVC, and the browser check already catches them.
+- Spring Boot's error controller is replaced, so no page can show JSON again; only addresses under `/api/` get JSON.
+- A form whose security token no longer matches says "This page has expired" instead of "Not allowed", because that almost always means the session ended while the page was open.
+- A failed POST goes back to the page it came from, using only the path and query of the Referer. Without a Referer it shows the error page.
+- A form value that can't be read is a mistake (400), not a missing page. A bad id in the address, or in a GET filter such as `?week=nonsense`, is still 404.
+- A stale edit keeps the form and what was typed. This amends ADR-006, which had accepted losing it.
+- The report download sends a month that can't be exported back to the Team page with the reason, because Firefox desktop shows the month field as plain text.
+- Line breaks count once when checking text length, as the browser counts them for `maxlength`.
+- The language switch now keeps the page's query, such as the week shown, because it shares the new back-to-page helper.
+- Recorded these as a new `ADR-025` rather than rewriting ADR-006, and recorded old values in each document's changelog, following the documents' immutable history rule.
+- Not changed, and reported instead: ids that don't exist (only reachable by editing the HTML) still show "Page not found"; shifts have no maximum length; any database conflict when saving a check-in is reported as "already checked in".
+
 ## How the work was checked
 
 ### 2026-11-04
@@ -234,6 +262,13 @@ From the deployment plan the developer approved on 6 November:
 - The security review read every page controller with its service and the SQL permission functions. A temporary test requested 15 routes as a worker: 13 returned 403 and the 2 Swagger routes returned 200. That test was then deleted.
 - **Not checked in a browser:** the history section.
 - **Not reviewed:** dependency vulnerabilities, the real Render and Supabase settings, and the detection codebase. No live attack test was done.
+
+### 2026-11-16
+
+- The app couldn't start against the database in `.env`, which points at the remote Supabase project, and the local Postgres needed credentials Claude didn't have. Instead the app was started against an empty throwaway Postgres in a temporary folder, with Flyway off, to test the paths that run before sign-in on a real Tomcat. 30 MB and 60 MB uploads got the 413 "Photo too large" page as HTML, a form without its CSRF token got 403 "This page has expired", a broken upload got the 400 page, and a failing `/api/` call got JSON. The first version of the fix gave a 500 on a broken upload, which was fixed and checked again.
+- Once the developer started Docker, the full suite ran on the uncommitted working tree: 282 tests in 33 classes, 0 failures, 0 errors. The first run had 2 failures, both wrong test expectations (see below).
+- The case of a 5–20 MB photo on the form needs a signed-in user and the full schema, so it was checked by `ErrorPagesTest` only, not on a real Tomcat.
+- **Not checked in a browser:** the browser's size message on the photo inputs, the redirect-back notices, and the expired-form page.
 
 ## Problems during the work
 
@@ -285,12 +320,31 @@ From the deployment plan the developer approved on 6 November:
 | A test helper used the wrong `zone` column | Replaced with the helpers in `PageTestSupport` |
 | A missing `AppUser` import stopped the first build of the fixes | Added the import |
 
+### 2026-11-16
+
+| Problem | Outcome |
+|---|---|
+| `./mvnw` failed in WSL because `JAVA_HOME` wasn't set | Ran with the Linux JDK 17 |
+| `.env` points at the remote Supabase database, and its URL didn't resolve | Not used. Ran against an empty throwaway Postgres instead |
+| The local Postgres needed credentials Claude didn't have, and pgvector isn't installed for the system Postgres, so migrations can't run locally | Tested only what runs before sign-in on a real Tomcat; the rest by the test suite in Docker |
+| Docker wasn't reachable at first | Ran only the tests that need no database, then the full suite once the developer started Docker |
+| The filter sent 413, but the `DispatcherServlet` read the broken upload again while showing the error page, which gave a 500 for a broken upload | The filter records the failure, so Spring doesn't read it again |
+| Spring Security's default handler doesn't record why it refused, so the expired-form message never showed | `SecurityConfig` sets a handler that records the reason |
+| Stopping the app with `pkill -f` matched Claude's own shell and ended it | Stopped it by process id instead |
+| A new test expected `https://evil.example//x` to be refused, but Spring 7 reads it as the local path `/x` | Safe; the test now checks for `/x` |
+| An existing test expected `decision=BOGUS` to give 404 | Updated to the new 400 on purpose |
+| A start-up error printed the `.env` database URL, including its password, in a command's output during the session | Command output isn't part of the transcript. The transcript and this log were searched for the password and the Supabase host, with no matches. The password has been seen in this session's output, so consider changing it |
+
 ## Open items
 
-- Today's security work isn't committed. `V12` runs on the next deploy.
+- ~~Today's security work isn't committed.~~ Committed as `23e5929` on 12 November. `V12` and `V13` run on the next deploy.
+- The 16 November error handling work (ADR-025) isn't committed.
+- Check in a browser: the photo size message when choosing a large photo, a notice after a failed button, a stale edit keeping the form, and the expired-form page, in both languages.
+- Decide whether a shift needs a maximum length.
+- The `.env` database URL looks malformed (it didn't resolve as a host); check it if the app is meant to run locally against Supabase.
 - The detection service must retry on 429, keep its clock accurate, and send camera codes that exactly match the `camera` table.
 - Sign the detection API's requests with HMAC, which needs a matching change in the detection codebase.
-- Remaining low findings from the review: no Content-Security-Policy, no second login factor for admins and the first admin isn't forced to change the password, sign-in lockouts can be triggered by anyone and reset on restart, and no limit on photo uploads.
+- Remaining low findings from the review: no Content-Security-Policy, no second login factor for admins and the first admin isn't forced to change the password, sign-in lockouts can be triggered by anyone and reset on restart, and ~~no limit on photo uploads~~ (photos are limited to 5 MB by the app since 16 November, with a 20 MB ceiling).
 - Run a dependency vulnerability scan; the app is on Spring Boot 4.0.0.
 - Check the attendance change history in a browser, in both languages.
 - The database password default was removed from `application.yaml`, but it stays in git history on GitHub through `0f3611f` and older commits. Change it anywhere it's used, and don't reuse it for Supabase.

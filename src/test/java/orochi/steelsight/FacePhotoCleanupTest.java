@@ -42,8 +42,25 @@ class FacePhotoCleanupTest extends PageTestSupport {
         assertThat(FACES.resolve(first)).doesNotExist();
         assertThat(FACES.resolve(second)).exists();
 
+        // Extra angles: replacing one removes its old file; deleting the account removes the rest.
+        mvc.perform(multipart("/team/" + worker + "/face/left").file(photo()).with(as(admin)).with(csrf()));
+        String left1 = textColumn("SELECT source_file_path FROM face_embedding WHERE user_id = ? AND pose = 'LEFT'", worker);
+        mvc.perform(multipart("/team/" + worker + "/face/left").file(photo()).with(as(admin)).with(csrf()));
+        String left2 = textColumn("SELECT source_file_path FROM face_embedding WHERE user_id = ? AND pose = 'LEFT'", worker);
+        assertThat(left2).isNotEqualTo(left1);
+        assertThat(FACES.resolve(left1)).doesNotExist();
+        assertThat(FACES.resolve(left2)).exists();
+
+        mvc.perform(multipart("/team/" + worker + "/face/right").file(photo()).with(as(admin)).with(csrf()));
+        String right = textColumn("SELECT source_file_path FROM face_embedding WHERE user_id = ? AND pose = 'RIGHT'", worker);
+        mvc.perform(post("/team/" + worker + "/face/right/delete").with(as(admin)).with(csrf()));
+        assertThat(FACES.resolve(right)).doesNotExist();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM face_embedding WHERE user_id = ? AND pose = 'RIGHT'",
+                Integer.class, worker)).isZero();
+
         mvc.perform(post("/team/" + worker + "/delete").param("confirm", "true").with(as(admin)).with(csrf()));
         assertThat(FACES.resolve(second)).doesNotExist();
+        assertThat(FACES.resolve(left2)).doesNotExist();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM face_embedding WHERE user_id = ?", Integer.class, worker)).isZero();
     }
 
