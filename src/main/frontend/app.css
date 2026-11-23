@@ -364,6 +364,11 @@
     .add-shift:hover, .add-shift:focus { text-decoration: none; color: var(--accent); border-color: var(--accent); }
     @media (max-width: 639px) { .shift-grid tbody th { width: 104px; min-width: 104px; max-width: 104px; } }
 
+    /* QR code of the Zalo bot (inline SVG) */
+    .qr-box { margin: 12px 0; }
+    .qr-box svg { display: block; width: 176px; height: 176px; border: 1px solid var(--line); border-radius: 4px; }
+    .qr-box figcaption { margin-top: 6px; max-width: 260px; }
+
     /* Sign-in and error pages */
     .center-screen { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
     .auth-card { width: 100%; max-width: 380px; padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 2px 10px rgb(0 0 0 / 0.08); }

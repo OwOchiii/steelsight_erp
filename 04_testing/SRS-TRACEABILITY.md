@@ -95,7 +95,7 @@ repo can't test them; see `docs/detection-app-contract.md`.
 | CR-07 Score and levels, `monthly_score` | Done |
 | CR-08 Site/Office group, reminders | Done |
 | CR-09 Every ticket to the Admin | Done |
-| CR-10 Zalo bot, delivery table, retries | Done |
+| CR-10 Zalo bot: link code and QR code, webhook, delivery table, retries | Done (`ZaloNoticesTest.cr10_…`, `QrCodesTest`); not yet tried against the real Zalo service |
 | CR-11 Alert routing by duty | Done |
 | CR-12 Scheduled jobs with run log and catch-up | Done (`job_run`, `SrsShiftsAndJobsTest`) |
 | CR-13 Uptime monitor | Deployment: set up outside the code |

@@ -246,6 +246,10 @@
                     <p th:text="#{zalo.sendCode}">Send this code to the SteelSight bot on Zalo:</p>
                     <p><strong class="text-2xl tracking-widest" th:text="${zaloCode}">ABCD2345</strong></p>
                     <p class="quiet small" th:text="#{zalo.codeExpires}">The code works once, for 30 minutes.</p>
+                    <figure class="qr-box" th:if="${zaloBotQr != null}">
+                        <div th:utext="${zaloBotQr}"></div>
+                        <figcaption class="quiet small" th:text="#{zalo.scanQr}">Scan with Zalo to open the SteelSight bot, then send the code.</figcaption>
+                    </figure>
                     <a class="btn" th:href="${zaloBotLink}" target="_blank" rel="noopener" th:text="#{zalo.openBot}">Open the bot on Zalo</a>
                 </div>
                 <form th:unless="${zaloLinked or zaloCode != null}" th:action="@{/account/zalo/link}" method="post" hx-boost="false">

@@ -322,6 +322,7 @@ public class TeamController extends PageController {
             model.addAttribute("zaloCodeNow", zaloLinks.currentCode(member.getId()).orElse(null));
             model.addAttribute("zaloLinked", zaloLinks.isLinked(member.getId()));
             model.addAttribute("zaloBotLink", zaloBot.botLink());
+            model.addAttribute("zaloBotQr", QrCodes.svg(zaloBot.botLink()));
         }
         return "team/edit";
     }

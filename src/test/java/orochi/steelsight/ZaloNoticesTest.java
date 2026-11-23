@@ -27,7 +27,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -277,6 +281,30 @@ class ZaloNoticesTest extends PageTestSupport {
         return Math.round(jdbc.queryForObject("""
                 SELECT extract(epoch FROM d.next_attempt_at - now()) / 60 FROM notification_delivery d
                 JOIN notification n ON n.id = d.notification_id WHERE n.user_id = ? ORDER BY n.id DESC LIMIT 1""", Double.class, user));
+    }
+
+
+    /** CR-10, workflow 1.2.2: the account page shows the code and a QR code that opens the bot. */
+    @Test
+    void cr10_theAccountPageShowsTheCodeWithAQrCodeOfTheBot() throws Exception {
+        mvc.perform(post("/team/" + worker + "/zalo-code").with(as(admin)).with(csrf()));
+
+        mvc.perform(get("/team/" + worker + "/edit").with(as(admin)))
+                .andExpect(content().string(containsString(code(worker))))
+                .andExpect(content().string(containsString("<svg xmlns=\"http://www.w3.org/2000/svg\"")))
+                .andExpect(content().string(containsString("Scan with Zalo to open the SteelSight bot")));
+    }
+
+    /** CR-10: the worker's own code on the Dashboard comes with the same QR code; none without a bot link. */
+    @Test
+    void cr10_theWorkersCodeComesWithTheQrCode() throws Exception {
+        mvc.perform(get("/").with(as(worker)).flashAttr("zaloCode", "123456"))
+                .andExpect(content().string(containsString("123456")))
+                .andExpect(content().string(containsString("class=\"qr\"")));
+
+        when(bot.botLink()).thenReturn("");
+        mvc.perform(get("/").with(as(worker)).flashAttr("zaloCode", "123456"))
+                .andExpect(content().string(not(containsString("class=\"qr\""))));
     }
 
     private void makeDue(Long user) {

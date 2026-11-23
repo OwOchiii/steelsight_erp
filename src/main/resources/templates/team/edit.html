@@ -109,6 +109,10 @@
             <div th:if="${zaloCodeNow != null and !zaloLinked}">
                 <p><strong class="text-2xl tracking-widest" th:text="${zaloCodeNow.code}">123456</strong></p>
                 <p class="quiet small" th:text="#{zalo.validUntil(${@display.dateTime(zaloCodeNow.expiresAt)})}">Valid until</p>
+                <figure class="qr-box" th:if="${zaloBotQr != null}">
+                    <div th:utext="${zaloBotQr}"></div>
+                    <figcaption class="quiet small" th:text="#{zalo.scanQr}">Scan with Zalo to open the SteelSight bot, then send the code.</figcaption>
+                </figure>
                 <a th:if="${zaloBotLink != null and !zaloBotLink.isBlank()}" class="btn secondary" th:href="${zaloBotLink}" target="_blank" rel="noopener" th:text="#{zalo.openBot}">Open the bot</a>
             </div>
             <div class="actions">

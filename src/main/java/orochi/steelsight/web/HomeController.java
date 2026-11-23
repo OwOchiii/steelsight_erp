@@ -57,6 +57,7 @@ public class HomeController {
             if (zalo.enabled()) {
                 model.addAttribute("zaloLinked", zaloLinks.isLinked(user.getUserId()));
                 model.addAttribute("zaloBotLink", zalo.botLink());
+                model.addAttribute("zaloBotQr", QrCodes.svg(zalo.botLink()));
             }
         }
         if (user.can(Permissions.TICKET_READ_OWN)) {

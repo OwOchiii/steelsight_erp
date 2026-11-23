@@ -118,7 +118,8 @@ An admin can also use every team leader page in section 4 for any team, and the 
 The Zalo bot is set up once on the server; see `deployment.md` for `ZALO_BOT_TOKEN`, `ZALO_BOT_LINK`,
 `ZALO_WEBHOOK_SECRET` and `ZALO_WEBHOOK_URL`. Without them, notices stay in the web ERP only.
 - To link someone who can't use the page, open **Team**, click **Edit** next to the person, and click
-  **New link code**. Give them the 6 digits to send to the bot. A new code makes the old one stop working.
+  **New link code**. They scan the QR code on that page with Zalo and send the 6 digits to the bot. A new
+  account gets its first code automatically, so you can do this right after creating it. A new code makes the old one stop working.
 - To stop Zalo for someone, click **Stop Zalo notices** on the same page.
 - On **Notifications**, each notice shows its Zalo state: waiting, sent, failed (after 3 retries), or not
   linked.
@@ -238,7 +239,8 @@ minutes after your shift starts counts as on time.
 Zalo is optional. Every notice is also on the bell in this app.
 1. On your **Dashboard**, under **Zalo notices**, click **Link Zalo**. A 6-digit code appears. It
    works once, for 24 hours.
-2. Click **Open the bot on Zalo**, or find the SteelSight bot in the Zalo app, and send it the code.
+2. Scan the QR code next to it with Zalo (or click **Open the bot on Zalo** on your phone), and send the
+   code to the SteelSight bot.
 3. The bot replies that your account is linked. Reload the page: it shows **On**.
 
 To stop, click **Stop Zalo notices**, or send `/stop` to the bot. If you can't use the page, the Admin
