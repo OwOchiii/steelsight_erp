@@ -2,8 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{tickets.ticket}, ${ownTicket} ? 'tickets' : 'queue', ~{::main})}">
 <main class="page">
     <nav class="crumbs">
-        <a th:if="${ownTicket}" th:href="@{/tickets}" th:text="#{tickets.mine}">My tickets</a>
-        <a th:unless="${ownTicket}" th:href="@{/tickets/queue}" th:text="#{queue.title}">Ticket queue</a>
+        <a th:if="${ownTicket or !canHandle}" th:href="@{/tickets}" th:text="#{tickets.mine}">My tickets</a>
+        <a th:unless="${ownTicket or !canHandle}" th:href="@{/tickets/queue}" th:text="#{queue.title}">Ticket queue</a>
     </nav>
     <div class="page-head"><h1 th:text="${ticket.subject}">Subject</h1></div>
     <div th:replace="~{fragments/layout :: messages}"></div>
@@ -19,25 +19,37 @@
                 <dl class="facts">
                     <dt th:text="#{field.category}">Category</dt><dd th:text="${@display.category(ticket.category.categoryName)}">Category</dd>
                     <dt th:text="#{field.opened}">Opened</dt><dd th:text="#{common.atBy(${@display.dateTime(ticket.createdAt)}, ${ticket.createdBy.fullName})}">When</dd>
+                    <th:block th:if="${ticket.shift}"><dt th:text="#{tickets.dayAndShift}">Shift</dt><dd th:text="|${@display.dateTime(ticket.shift.startAt)} - ${@display.time(ticket.shift.endAt)} · ${ticket.shift.zone.name}|">Shift</dd></th:block>
+                    <th:block th:if="${ticket.direction}"><dt th:text="#{tickets.direction}">Direction</dt><dd th:text="#{${'enum.DIRECTION_' + ticket.direction.name()}}">IN</dd></th:block>
+                    <th:block th:if="${ticket.gateTime}"><dt th:text="#{tickets.gateTime}">Time at the gate</dt><dd th:text="${@display.time(ticket.gateTime)}">09:00</dd></th:block>
+                    <th:block th:if="${ticket.checkIn}"><dt th:text="#{tickets.visitToExplain}">Visit</dt><dd th:text="${@display.dateTime(ticket.checkIn.checkInAt)}">Visit</dd></th:block>
+                    <th:block th:if="${ticket.leaveType}"><dt th:text="#{tickets.leaveType}">Leave</dt><dd th:text="|${@display.label(ticket.leaveType)}, ${@display.time(ticket.leaveFrom)} - ${@display.time(ticket.leaveTo)}|">Leave</dd></th:block>
                     <th:block th:if="${ticket.zone}"><dt th:text="#{field.zone}">Zone</dt><dd th:text="${ticket.zone.name}">Zone</dd></th:block>
                     <th:block th:if="${ticket.assignee}"><dt th:text="#{field.assignedTo}">Assigned to</dt><dd th:text="${ticket.assignee.fullName}">Name</dd></th:block>
-                    <th:block th:if="${ticket.resolvedAt}"><dt th:text="#{field.resolved}">Resolved</dt><dd th:text="#{common.atBy(${@display.dateTime(ticket.resolvedAt)}, ${ticket.resolver.fullName})}">When</dd></th:block>
                     <th:block th:if="${ticket.violation}"><dt th:text="#{field.violation}">Violation</dt><dd><a th:href="@{/violations/{id}(id=${ticket.violation.id})}" th:text="#{tickets.viewViolation}">View the violation</a></dd></th:block>
+                    <th:block th:unless="${participants.isEmpty()}"><dt th:text="#{tickets.asked}">Asked</dt><dd th:text="${#strings.listJoin(participants.![fullName], ', ')}">HSE</dd></th:block>
+                    <th:block th:if="${ticket.hseFacts}"><dt th:text="#{tickets.hseFacts}">HSE facts</dt><dd class="body-text" th:text="${ticket.hseFacts}">Facts</dd></th:block>
+                    <th:block th:if="${ticket.resolvedAt}"><dt th:text="#{field.resolved}">Resolved</dt><dd th:text="#{common.atBy(${@display.dateTime(ticket.resolvedAt)}, ${ticket.resolver.fullName})}">When</dd></th:block>
+                    <th:block th:if="${ticket.outcome}"><dt th:text="#{tickets.outcome}">Outcome</dt><dd><span class="badge" th:classappend="${@display.badge(ticket.outcome)}" th:text="${@display.label(ticket.outcome)}">Approved</span></dd></th:block>
+                    <th:block th:if="${ticket.decisionNote != null and !ticket.unresolved}"><dt th:text="#{tickets.decisionNote}">Note</dt><dd class="body-text" th:text="${ticket.decisionNote}">Note</dd></th:block>
                 </dl>
                 <div class="divider">
                     <p class="body-text" th:text="${ticket.description}">Details</p>
                     <img class="photo mt-3" th:if="${ticket.photoPath}" th:src="@{/tickets/{id}/photo(id=${ticket.id})}" th:attr="alt=#{tickets.photoAlt}">
                 </div>
+                <form class="divider" method="post" th:if="${canCancel}" th:action="@{/tickets/{id}/cancel(id=${ticket.id})}">
+                    <button type="submit" class="btn secondary" th:text="#{tickets.cancel}"
+                            th:attr="onclick=|return confirm('#{tickets.cancelConfirm}')|">Cancel this ticket</button>
+                </form>
             </section>
 
-            <section class="sheet" th:if="${canHandle and !ticket.resolved and ticket.dispute}">
-                <h2 class="mb-1" th:text="#{tickets.handleDispute}">Handle this dispute</h2>
-                <p class="quiet" th:text="#{tickets.handleDisputeHint}">Deciding the violation resolves this ticket.</p>
-                <div class="actions"><a class="btn" th:href="@{/violations/{id}(id=${ticket.violation.id})}" th:text="#{tickets.goToDecision}">Go to the decision</a></div>
-            </section>
+            <p class="notice" th:if="${ownAsAdmin}" th:text="#{tickets.ownTicket}">You cannot decide your own request. Another Admin will handle it.</p>
 
-            <section class="sheet" th:if="${canHandle and !ticket.resolved and !ticket.dispute}">
+            <section class="sheet" th:if="${canHandle}">
                 <h2 th:text="#{tickets.handle}">Handle this ticket</h2>
+                <form method="post" th:action="@{/tickets/{id}/take(id=${ticket.id})}" th:if="${ticket.assignee == null}">
+                    <div class="actions mt-0!"><button type="submit" class="btn secondary" th:text="#{tickets.take}">Take</button></div>
+                </form>
                 <form method="post" th:action="@{/tickets/{id}/assignee(id=${ticket.id})}">
                     <label for="assigneeId" th:text="#{tickets.assignTo}">Assign to</label>
                     <select id="assigneeId" name="assigneeId" required>
@@ -47,10 +59,33 @@
                     </select>
                     <div class="actions"><button type="submit" class="btn secondary" th:text="#{tickets.assign}">Assign</button></div>
                 </form>
-                <form class="divider" method="post" th:action="@{/tickets/{id}/resolve(id=${ticket.id})}">
-                    <label class="mt-0!" for="note"><span th:text="#{tickets.whatWasDone}">What was done?</span> <span class="optional" th:text="#{tickets.whatWasDoneHint}">optional, shown to the reporter</span></label>
-                    <textarea id="note" name="note" rows="3" maxlength="4000"></textarea>
-                    <div class="actions"><button type="submit" class="btn" th:text="#{tickets.resolve}">Resolve ticket</button></div>
+                <form class="divider" method="post" th:action="@{/tickets/{id}/ask(id=${ticket.id})}">
+                    <label class="mt-0!" for="officerId" th:text="#{tickets.askHse}">Ask an HSE Officer</label>
+                    <select id="officerId" name="officerId" required>
+                        <option value="" th:text="#{tickets.choosePerson}">Choose a person</option>
+                        <option th:each="person : ${hseToAsk}" th:value="${person.id}" th:text="${person.fullName}">Name</option>
+                    </select>
+                    <div class="actions"><button type="submit" class="btn secondary" th:text="#{tickets.ask}">Ask</button></div>
+                </form>
+                <form class="divider" method="post" th:action="@{/tickets/{id}/facts(id=${ticket.id})}"
+                      th:if="${ticket.category.code != null and (ticket.category.code.name() == 'PPE_APPEAL' or ticket.category.code.name() == 'ATTENDANCE_ERROR')}">
+                    <label class="mt-0!" for="hseFacts" th:text="#{tickets.hseFacts}">What the HSE Officer of that shift said</label>
+                    <textarea id="hseFacts" name="hseFacts" rows="3" minlength="10" maxlength="1000" required th:text="${ticket.hseFacts}"></textarea>
+                    <div class="actions"><button type="submit" class="btn secondary" th:text="#{common.save}">Save</button></div>
+                </form>
+                <div class="divider" th:if="${ticket.dispute}">
+                    <p class="quiet" th:text="#{tickets.handleDisputeHint}">Deciding the violation resolves this ticket.</p>
+                    <div class="actions"><a class="btn" th:href="@{/violations/{id}(id=${ticket.violation.id})}" th:text="#{tickets.goToDecision}">Go to the decision</a></div>
+                </div>
+                <form class="divider" method="post" th:unless="${ticket.dispute}" th:action="@{/tickets/{id}/decide(id=${ticket.id})}">
+                    <label class="mt-0!" for="note" th:text="#{tickets.decisionNote}">Note to the employee</label>
+                    <textarea id="note" name="note" rows="3" minlength="10" maxlength="500" required th:text="${ticket.decisionNote}"></textarea>
+                    <p class="hint" th:if="${ticket.category.code != null and ticket.category.code.name() == 'ATTENDANCE_ERROR'}" th:text="#{tickets.approveErrorHint}">Approve opens the Attendance Form; the ticket is resolved when it is saved.</p>
+                    <div class="actions">
+                        <button type="submit" class="btn" name="outcome" value="APPROVED" th:text="#{tickets.approve}">Approve</button>
+                        <button type="submit" class="btn secondary" name="outcome" value="REJECTED" th:text="#{tickets.reject}"
+                                th:attr="onclick=|return confirm('#{tickets.rejectConfirm}')|">Reject</button>
+                    </div>
                 </form>
             </section>
         </div>
@@ -58,9 +93,9 @@
         <aside class="panel" th:attr="aria-label=#{tickets.comments}">
             <div class="panel-head"><h2 th:text="#{tickets.comments}">Comments</h2></div>
             <div class="panel-body">
-                <form class="mb-4" method="post" th:unless="${ticket.resolved}" th:action="@{/tickets/{id}/comments(id=${ticket.id})}">
+                <form class="mb-4" method="post" th:if="${canComment and ticket.unresolved}" th:action="@{/tickets/{id}/comments(id=${ticket.id})}">
                     <label class="mt-0!" for="body" th:text="#{tickets.addComment}">Add a comment</label>
-                    <textarea id="body" name="body" rows="3" maxlength="4000" required></textarea>
+                    <textarea id="body" name="body" rows="3" maxlength="1000" required></textarea>
                     <div class="actions mt-2!"><button type="submit" class="btn" th:text="#{tickets.postComment}">Post comment</button></div>
                 </form>
                 <p class="quiet" th:if="${comments.isEmpty()}" th:text="#{tickets.noComments}">No comments yet.</p>

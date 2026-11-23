@@ -13,8 +13,8 @@
         </a>
     </div>
 
-    <th:block th:if="${safety != null and safety.level.name() != 'SAFE'}">
-        <section th:replace="~{fragments/safety :: notice(${safety.level.name()}, ${safety.value}, true)}"></section>
+    <th:block th:if="${safety != null and safety.level.name() != 'LEVEL_0'}">
+        <section th:replace="~{fragments/safety :: notice(${safety.level}, ${safety.value}, true)}"></section>
     </th:block>
 
     <section class="kpis" th:attr="aria-label=#{home.summary}">
@@ -29,7 +29,7 @@
             <strong class="kpi-value" th:text="${shiftsToday}">0</strong>
             <span class="kpi-note" th:if="${missingToday != null}" th:text="#{home.rosterNote(${missingToday}, ${lateToday})}">Missing, late</span>
         </a>
-        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review(view='ALL')}">
+        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/all}">
             <span class="kpi-label"><span th:text="#{home.violations7}">Violations, last 7 days</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#shield-alert}"/></svg></span>
             <strong class="kpi-value" th:text="${violationsThisWeek}">0</strong>
             <span class="kpi-note" th:with="change=${violationsThisWeek - violationsWeekBefore}">
@@ -38,13 +38,22 @@
                 <span th:text="#{home.weekBefore(${violationsWeekBefore})}">Week before</span>
             </span>
         </a>
-        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review}" th:classappend="${disputesToDecide > 0} ? 'attention'">
+        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_ALL') and hasAuthority('TICKET_UPDATE_ALL')" th:href="@{/tickets/queue}" th:classappend="${disputesToDecide > 0} ? 'attention'">
             <span class="kpi-label"><span th:text="#{home.disputes}">Disputes to decide</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#shield-check}"/></svg></span>
             <strong class="kpi-value" th:text="${disputesToDecide}">0</strong>
         </a>
-        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review(view='UNIDENTIFIED')}" th:classappend="${unidentified > 0} ? 'attention'">
-            <span class="kpi-label"><span th:text="#{home.unidentified}">Violations with no worker</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#user-x}"/></svg></span>
+        <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_ALL')" th:href="@{/violations/review}" th:classappend="${unidentified > 0} ? 'attention'">
+            <span class="kpi-label"><span th:text="#{home.unidentified}">Violations to review</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#user-x}"/></svg></span>
             <strong class="kpi-value" th:text="${unidentified}">0</strong>
+            <span class="kpi-note" th:if="${overdueViolations != null and overdueViolations > 0}" th:text="#{home.overdueNote(${overdueViolations})}">Overdue</span>
+        </a>
+        <a class="kpi" sec:authorize="hasAuthority('USER_MANAGE')" th:href="@{/team}" th:classappend="${failedFaces != null and failedFaces > 0} ? 'alert'">
+            <span class="kpi-label"><span th:text="#{home.failedFaces}">Failed face photos</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#user-x}"/></svg></span>
+            <strong class="kpi-value" th:text="${failedFaces}">0</strong>
+        </a>
+        <a class="kpi" sec:authorize="hasAuthority('USER_MANAGE')" th:href="@{/notifications}" th:classappend="${failedZalo != null and failedZalo > 0} ? 'alert'">
+            <span class="kpi-label"><span th:text="#{home.failedZalo}">Failed Zalo messages</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#message-square}"/></svg></span>
+            <strong class="kpi-value" th:text="${failedZalo}">0</strong>
         </a>
         <a class="kpi" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL')" th:href="@{/tickets/queue}" th:classappend="${queueCount > 0} ? 'attention'">
             <span class="kpi-label"><span th:text="#{home.queue}">Tickets to handle</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#inbox}"/></svg></span>
@@ -62,10 +71,10 @@
             <span class="kpi-label"><span th:text="#{home.openTickets}">Open tickets</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#ticket}"/></svg></span>
             <strong class="kpi-value" th:text="${openTickets}">0</strong>
         </a>
-        <a class="kpi" th:if="${safety != null}" th:href="@{/violations}" th:classappend="${safety.level.name() == 'DANGER'} ? 'alert' : (${safety.level.name() == 'WARNING'} ? 'attention')">
+        <a class="kpi" th:if="${safety != null}" th:href="@{/violations}" th:classappend="${safety.level.number() >= 2} ? 'alert' : (${safety.level.number() == 1} ? 'attention')">
             <span class="kpi-label"><span th:text="#{safety.score}">Safety score</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#shield-check}"/></svg></span>
             <strong class="kpi-value" th:text="${safety.value}">100</strong>
-            <span class="kpi-note" th:text="#{safety.resets}">Back to 100 on the 1st of next month</span>
+            <span class="kpi-note" th:text="${@display.label(safety.level)}">Level 0</span>
         </a>
         <a class="kpi" sec:authorize="hasAuthority('VIOLATION_READ_OWN')" th:href="@{/violations}">
             <span class="kpi-label"><span th:text="#{home.myViolations}">PPE violations</span><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#hard-hat}"/></svg></span>
@@ -175,7 +184,7 @@
                         <tr th:each="violation : ${oldestDisputes}">
                             <td>
                                 <a class="row-title" th:href="@{/violations/{id}(id=${violation.id})}" th:text="${@display.label(violation.violationType)}">Type</a>
-                                <span class="row-sub" th:text="|${violation.identified ? violation.user.fullName : #messages.msg('violations.workerUnknown')}, ${violation.camera.zone.name}|">Worker</span>
+                                <span class="row-sub" th:text="|${violation.identified ? violation.user.fullName : #messages.msg('violations.workerUnknown')}, ${violation.zone.name}|">Worker</span>
                             </td>
                             <td class="cell-end whitespace-nowrap quiet" th:text="${@display.waiting(violation.detectedAt)}">3 d</td>
                         </tr>
@@ -225,6 +234,29 @@
             </div>
         </section>
 
+
+        <section class="panel" th:if="${zaloLinked != null}">
+            <div class="panel-head">
+                <h2 th:text="#{zalo.title}">Zalo notices</h2>
+                <span class="quiet small" th:text="${zaloLinked} ? #{zalo.on} : #{zalo.off}">Off</span>
+            </div>
+            <div class="panel-body">
+                <p class="quiet" th:text="${zaloLinked} ? #{zalo.linkedNote} : #{zalo.optionalNote}">Optional</p>
+                <div th:if="${zaloCode != null and !zaloLinked}">
+                    <p th:text="#{zalo.sendCode}">Send this code to the SteelSight bot on Zalo:</p>
+                    <p><strong class="text-2xl tracking-widest" th:text="${zaloCode}">ABCD2345</strong></p>
+                    <p class="quiet small" th:text="#{zalo.codeExpires}">The code works once, for 30 minutes.</p>
+                    <a class="btn" th:href="${zaloBotLink}" target="_blank" rel="noopener" th:text="#{zalo.openBot}">Open the bot on Zalo</a>
+                </div>
+                <form th:unless="${zaloLinked or zaloCode != null}" th:action="@{/account/zalo/link}" method="post" hx-boost="false">
+                    <button class="btn" type="submit" th:text="#{zalo.link}">Link Zalo</button>
+                </form>
+                <form th:if="${zaloLinked}" th:action="@{/account/zalo/unlink}" method="post" hx-boost="false">
+                    <button class="btn secondary" type="submit" th:text="#{zalo.unlink}">Stop Zalo notices</button>
+                </form>
+            </div>
+        </section>
+
         <div class="grid gap-4 xl:grid-cols-2" th:if="${myTickets != null or myViolations != null}">
             <section class="panel" th:if="${myTickets != null}">
                 <div class="panel-head">
@@ -258,7 +290,7 @@
                         <tr th:each="violation : ${myViolations}">
                             <td>
                                 <a class="row-title" th:href="@{/violations/{id}(id=${violation.id})}" th:text="${@display.label(violation.violationType)}">Type</a>
-                                <span class="row-sub" th:text="|${@display.dateTime(violation.detectedAt)}, ${violation.camera.zone.name}|">When</span>
+                                <span class="row-sub" th:text="|${@display.dateTime(violation.detectedAt)}, ${violation.zone.name}|">When</span>
                             </td>
                             <td class="cell-end"><span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span></td>
                         </tr>

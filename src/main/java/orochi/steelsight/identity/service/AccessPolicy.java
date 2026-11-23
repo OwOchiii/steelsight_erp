@@ -57,8 +57,21 @@ public class AccessPolicy {
         allow(canUpdateTicket(actorId, ticketId));
     }
 
+    public boolean canReadTicket(Long actorId, Long ticketId) {
+        return ask("SELECT can_read_ticket(?, ?)", actorId, ticketId);
+    }
+
     public void requireCanReadTicket(Long actorId, Long ticketId) {
-        allow(ask("SELECT can_read_ticket(?, ?)", actorId, ticketId));
+        allow(canReadTicket(actorId, ticketId));
+    }
+
+    /** The person who opened it, whoever may handle it, and the team leader of the person who opened it. */
+    public boolean canCommentTicket(Long actorId, Long ticketId) {
+        return ask("SELECT can_comment_ticket(?, ?)", actorId, ticketId);
+    }
+
+    public void requireCanCommentTicket(Long actorId, Long ticketId) {
+        allow(canCommentTicket(actorId, ticketId));
     }
 
     public void requireCanDeleteTicket(Long actorId, Long ticketId) {

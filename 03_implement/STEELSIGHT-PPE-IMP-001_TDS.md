@@ -10,6 +10,15 @@
 | **Document Owner** | `Nguyen Vu An` |
 | **Author** | `Claude Code (Opus 5.5) — reverse-engineered from commit f005861` |
 | **Reviewed by** | `[ ] Pending — Tech Lead` |
+
+> **Outdated in parts since V21 (SRS of 23/11/2026).** This document describes the earlier design. What
+> changed: the detection app no longer reads vest numbers or writes `ppe_vest`/`ppe_linking` (CR-01); a
+> violation starts `PENDING_REVIEW` with no person and only a `suggested_user_id` with
+> `suggestion_similarity` (BR-47, BR-48); both items missing is one `NO_HARD_HAT_AND_VEST` row (BR-45);
+> `NO_GLOVES`/`NO_HARNESS` are out of scope (OR-04); the zone comes from the camera, and a zone belongs to a
+> team; each violation alerts the HSE Officer on duty by trigger, with no burst alerts (BR-54, CR-02).
+> Current sources: `V21__violation_review_zones_and_score.sql`, `docs/detection-app-contract.md`,
+> `04_testing/SRS-TRACEABILITY.md`.
 | **DPO Sign-off** | `[ ] Pending` *(camera snapshots of identifiable workers; scores affect pay)* |
 | **Approved by** | `[ ] Pending — Principal Architect` |
 | **Last Review** | `2026-11-16` |

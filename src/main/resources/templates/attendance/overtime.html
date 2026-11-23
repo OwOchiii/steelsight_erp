@@ -1,0 +1,52 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{overtime.title}, 'overtime', ~{::main})}">
+<main class="page">
+    <div class="page-head"><h1 th:text="#{overtime.title}">Pending overtime</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <form class="filters" method="get" th:action="@{/overtime}">
+        <div>
+            <label for="teamId" th:text="#{field.team}">Team</label>
+            <select id="teamId" name="teamId">
+                <option value="" th:text="#{common.all}">All</option>
+                <option th:each="team : ${teams}" th:value="${team.id}" th:selected="${team.id == teamId}" th:text="${team.name}">Team</option>
+            </select>
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{common.show}">Show</button>
+    </form>
+    <p class="empty panel-less-empty" th:if="${rows.isEmpty()}" th:text="#{overtime.none}">No pending overtime.</p>
+    <form method="post" th:action="@{/overtime/cancel}" th:unless="${rows.isEmpty()}">
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th scope="col"><span class="sr-only" th:text="#{common.select}">Select</span></th>
+                    <th scope="col" th:text="#{field.worker}">Worker</th>
+                    <th scope="col" th:text="#{field.day}">Day</th>
+                    <th scope="col" th:text="#{overtime.from}">From</th>
+                    <th scope="col" th:text="#{overtime.to}">To</th>
+                    <th scope="col" th:text="#{shifts.hours}">Hours</th>
+                    <th scope="col" th:text="#{overtime.endsIn}">Ends</th>
+                    <th scope="col" th:text="#{overtime.note}">Leader's note</th>
+                    <th scope="col"><span class="sr-only" th:text="#{common.actions}">Actions</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${rows}">
+                    <td><input type="checkbox" name="ids" th:value="${row.id}" th:attr="aria-label=${row.name}"></td>
+                    <td th:text="|${row.name} (${row.code})|">Name</td>
+                    <td th:text="${@display.date(row.start)}">Day</td>
+                    <td th:text="${@display.time(row.start)}">17:50</td>
+                    <td th:text="${@display.time(row.end)}">19:00</td>
+                    <td th:text="${row.hours}">1.17</td>
+                    <td th:classappend="${row.endsSoon()} ? 'overdue-text'" th:text="${@display.dateTime(row.expiresAt)}">Ends</td>
+                    <td th:text="${row.leaderNote}">Note</td>
+                    <td class="row-action"><a th:href="@{/shifts/new(pendingOvertimeId=${row.id})}" th:text="#{overtime.addShift}">Add overtime shift</a></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="actions"><button type="submit" class="btn secondary" th:text="#{overtime.cancelSelected}"
+                                     th:attr="onclick=|return confirm('#{overtime.cancelConfirm}')|">Cancel selected</button></div>
+    </form>
+</main>
+</html>

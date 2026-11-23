@@ -48,4 +48,16 @@ public class AppUser extends SoftDeletableModel implements Versioned {
     /** Set when an admin chose the password; the person must pick their own at the next sign-in. */
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "staff_group", nullable = false)
+    private StaffGroup staffGroup = StaffGroup.SITE;
+
+    /** When the Admin confirmed the signed consent form for face data (SRS BR-10). */
+    @Column(name = "face_consent_at")
+    private java.time.OffsetDateTime faceConsentAt;
+
+    public boolean isOffice() {
+        return staffGroup == StaffGroup.OFFICE;
+    }
 }

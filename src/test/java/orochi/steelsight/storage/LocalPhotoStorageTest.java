@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LocalPhotoStorageTest {
 
-    private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    private static final byte[] JPEG = orochi.steelsight.TestImages.FACE_JPEG;
 
     @TempDir Path dir;
 

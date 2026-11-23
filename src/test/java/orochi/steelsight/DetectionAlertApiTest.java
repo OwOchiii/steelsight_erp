@@ -37,113 +37,30 @@ class DetectionAlertApiTest extends PageTestSupport {
         assertThat(alerts()).isZero();
     }
 
+    /**
+     * SRS CR-02: burst alerts are gone; every violation alerts the HSE Officers on its own. The current
+     * detection app still sends them, so they are kept (its outbox stops retrying) but tell nobody.
+     */
     @Test
-    void anAlertTellsEveryActiveHseOfficerAndNobodyElse() throws Exception {
+    void aBurstAlertIsKeptButTellsNobody() throws Exception {
         Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
-        Long hse2 = userWithRole("API-H2", "Hai Hse", "HSE_OFFICER");
-        Long inactive = userWithRole("API-H3", "Ina Hse", "HSE_OFFICER");
-        jdbc.update("UPDATE app_user SET is_active = false WHERE id = ?", inactive);
-        Long worker = userWithRole("API-W", "Wanda Worker", "WORKER");
+        Long admin = userWithRole("API-A1", "Ada Admin", "ADMIN");
 
         send(UUID.randomUUID()).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("created"));
 
-        assertThat(notices(hse)).isEqualTo(1);
-        assertThat(notices(hse2)).isEqualTo(1);
-        assertThat(notices(inactive)).isZero();
-        assertThat(notices(worker)).isZero();
-        mvc.perform(get("/notifications").with(as(hse)))
-                .andExpect(content().string(containsString("Too many PPE violations")))
-                .andExpect(content().string(containsString("7 violations in 60 seconds")))
-                .andExpect(content().string(containsString("CAM-B2")));
+        assertThat(alerts()).isEqualTo(1);
+        assertThat(notices(hse)).isZero();
+        assertThat(notices(admin)).isZero();
     }
 
     @Test
     void aRetryOfTheSameEventChangesNothing() throws Exception {
-        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
         UUID event = UUID.randomUUID();
 
         send(event).andExpect(status().isCreated());
         send(event).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("duplicate"));
 
         assertThat(alerts()).isEqualTo(1);
-        assertThat(notices(hse)).isEqualTo(1);
-    }
-
-    @Test
-    void anotherAlertSoonAfterIsKeptWithoutTellingHseAgain() throws Exception {
-        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
-
-        send(UUID.randomUUID()).andExpect(status().isCreated());
-        send(UUID.randomUUID()).andExpect(status().isCreated());
-
-        assertThat(alerts()).isEqualTo(2);
-        assertThat(notices(hse)).isEqualTo(1);
-    }
-
-    @Test
-    void aSteadyStreamOfAlertsStillTellsHseAgainAfterTheQuietTime() throws Exception {
-        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
-        send(UUID.randomUUID()).andExpect(status().isCreated());
-        jdbc.update("UPDATE safety_alert SET received_at = received_at - interval '20 minutes'");
-        // This one arrives in the quiet time of nothing, but a silent alert must not restart the clock.
-        jdbc.update("""
-                INSERT INTO safety_alert (event_id, violation_count, window_seconds, detected_at, notified, received_at)
-                VALUES (?, 3, 60, now(), false, now())""", UUID.randomUUID());
-
-        send(UUID.randomUUID()).andExpect(status().isCreated());
-
-        assertThat(notices(hse)).isEqualTo(2);
-    }
-
-    @Test
-    void anAlertFromOneRegisteredCameraDoesNotSilenceAnother() throws Exception {
-        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
-        camera("API-CAM-1");
-        camera("API-CAM-2");
-
-        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now()).andExpect(status().isCreated());
-        send(UUID.randomUUID(), "API-CAM-2", OffsetDateTime.now()).andExpect(status().isCreated());
-        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now()).andExpect(status().isCreated());
-
-        assertThat(alerts()).isEqualTo(3);
-        assertThat(notices(hse)).isEqualTo(2);
-    }
-
-    @Test
-    void anAlertFromAnUnknownCameraDoesNotSilenceARegisteredOne() throws Exception {
-        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
-        camera("API-CAM-1");
-
-        send(UUID.randomUUID(), "MADE-UP", OffsetDateTime.now()).andExpect(status().isCreated());
-        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now()).andExpect(status().isCreated());
-
-        assertThat(notices(hse)).isEqualTo(2);
-    }
-
-    @Test
-    void inventingCameraCodesCannotFloodHse() throws Exception {
-        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
-
-        send(UUID.randomUUID(), "MADE-UP-1", OffsetDateTime.now()).andExpect(status().isCreated());
-        send(UUID.randomUUID(), "MADE-UP-2", OffsetDateTime.now()).andExpect(status().isCreated());
-        send(UUID.randomUUID(), "MADE-UP-3", OffsetDateTime.now()).andExpect(status().isCreated());
-
-        assertThat(alerts()).isEqualTo(3);
-        assertThat(notices(hse)).isEqualTo(1);
-    }
-
-    @Test
-    void anAlertTooOldOrTooFarAheadIsKeptSilentlyAndStartsNoQuietTime() throws Exception {
-        Long hse = userWithRole("API-H1", "Hana Hse", "HSE_OFFICER");
-        camera("API-CAM-1");
-
-        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now().minusHours(2)).andExpect(status().isCreated());
-        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now().plusMinutes(10)).andExpect(status().isCreated());
-        assertThat(alerts()).isEqualTo(2);
-        assertThat(notices(hse)).isZero();
-
-        send(UUID.randomUUID(), "API-CAM-1", OffsetDateTime.now()).andExpect(status().isCreated());
-        assertThat(notices(hse)).isEqualTo(1);
     }
 
     @Test

@@ -13,4 +13,7 @@ public class NewAccountForm {
     private String roleName;
     private Long teamId;
     private String password;
+    private orochi.steelsight.identity.model.StaffGroup staffGroup;
+    /** BR-10, BR-11: the employee signed the consent form for face data. */
+    private boolean consent;
 }

@@ -55,6 +55,15 @@ public class CheckInCorrection extends IdentifiedModel {
     @Column(name = "new_note", updatable = false)
     private String newNote;
 
+    /** The ticket that asked for the change, if any (SRS 3.2.14). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ticket_id", updatable = false)
+    private orochi.steelsight.ticketing.model.Ticket ticket;
+
+    public void setTicket(orochi.steelsight.ticketing.model.Ticket ticket) {
+        this.ticket = ticket;
+    }
+
     protected CheckInCorrection() {
     }
 

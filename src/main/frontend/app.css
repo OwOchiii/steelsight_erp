@@ -278,6 +278,19 @@
     .badge-upheld, .badge-missing, .badge-danger { color: var(--bad); background: var(--bad-soft); }
     .badge-warning { color: var(--warn); background: var(--warn-soft); }
     .badge-safe { color: var(--good); background: var(--good-soft); }
+    .badge-pending_review, .badge-incomplete, .badge-pending_ot, .badge-level_1, .badge-early, .badge-half_day { color: var(--warn); background: var(--warn-soft); }
+    .badge-overdue, .badge-absent, .badge-rejected, .badge-to_review, .badge-level_2, .badge-level_3, .badge-failed { color: var(--bad); background: var(--bad-soft); }
+    .badge-confirmed, .badge-approved, .badge-level_0, .badge-valid_ot, .badge-sent { color: var(--good); background: var(--good-soft); }
+    .badge-reminder, .badge-on_site, .badge-paid_leave, .badge-unpaid_leave { color: var(--accent); background: var(--accent-soft); }
+    .badge-dismissed, .badge-cancelled, .badge-stranger, .badge-skipped, .badge-cancelled_ot { color: var(--muted); background: var(--neutral-soft); }
+
+    /* A row of filters above a list: each field keeps its label, and the button sits on the same line. */
+    .filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin-bottom: 12px; }
+    .filters label { margin: 0 0 2px; font-size: 0.8125rem; }
+    .filters > div { display: flex; flex-direction: column; min-width: 140px; }
+    .counts { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 12px; font-size: 0.875rem; }
+    .evidence { display: block; width: 100%; max-height: 420px; object-fit: contain; background: var(--raised); border-radius: 4px; }
+    .overdue-text { color: var(--bad); font-weight: 600; }
 
     .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
     .tabs a { padding: 8px 12px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -343,6 +356,7 @@
     .chip-cancelled { color: var(--muted); background: var(--raised); border-left-color: var(--mark-idle); }
     .chip-cancelled strong { text-decoration: line-through; }
     .chip-status { font-weight: 600; }
+    .chip-overtime { background: var(--warn-soft); border-left-color: var(--warn); }
     /* One person's own week: no name column, and chips that aren't links */
     .shift-grid.personal th:first-child { position: static; }
     .shift-grid.personal .shift-chip:not(.chip-cancelled):hover strong { text-decoration: none; }

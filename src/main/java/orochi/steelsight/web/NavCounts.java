@@ -23,7 +23,8 @@ public class NavCounts {
         return tickets.countUnresolvedInQueue(userId);
     }
 
-    public long disputes(Long userId) {
-        return violations.countDisputed(userId);
+    /** Violations waiting for review: PENDING_REVIEW or OVERDUE (SRS 3.2.16). Appeals count in the ticket queue. */
+    public long review(Long userId) {
+        return violations.countOpen(userId);
     }
 }

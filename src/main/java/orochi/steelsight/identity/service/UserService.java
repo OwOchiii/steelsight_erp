@@ -20,6 +20,7 @@ import orochi.steelsight.exception.BusinessRuleException;
 import orochi.steelsight.exception.NotFoundException;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.identity.model.Role;
+import orochi.steelsight.identity.model.StaffGroup;
 import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.identity.repository.RoleRepository;
 import orochi.steelsight.scheduling.model.Team;
@@ -48,8 +49,7 @@ public class UserService {
     private static final String MANAGER_ROLE = "MANAGER";
     private static final String WORKER_ROLE = "WORKER";
     private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+");
-    private static final int PHONE_LENGTH = 30;
-    private static final Pattern EMPLOYEE_CODE = Pattern.compile("[A-Za-z0-9._-]{1,50}");
+    private static final Pattern EMPLOYEE_CODE = Pattern.compile("[A-Z0-9-]{3,20}");   // SRS BR-06, MSG12
     private static final int SHORTEST_PASSWORD = 8;
     private static final int LONGEST_PASSWORD_BYTES = 72;   // BCrypt can't use any more than this
 
@@ -60,9 +60,16 @@ public class UserService {
     private final FaceEmbeddingRepository embeddings;
     private final PasswordEncoder passwordEncoder;
     private final PhotoStorage photos;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
+    /** consent: the Admin ticked that the employee signed the consent form for face data (BR-10, BR-11). */
     public record NewUser(String employeeCode, String fullName, String email, String phoneNumber,
-                          String rawPassword, String roleName, Long teamId) {
+                          String rawPassword, String roleName, Long teamId, StaffGroup staffGroup, boolean consent) {
+
+        public NewUser(String employeeCode, String fullName, String email, String phoneNumber,
+                       String rawPassword, String roleName, Long teamId) {
+            this(employeeCode, fullName, email, phoneNumber, rawPassword, roleName, teamId, null, true);
+        }
     }
 
     public record Profile(String fullName, String email, String phoneNumber) {
@@ -78,22 +85,29 @@ public class UserService {
      */
     public AppUser create(Long actorId, NewUser details, String facePhotoPath) {
         access.require(actorId, Permissions.USER_MANAGE);
-        String code = details.employeeCode() == null ? "" : details.employeeCode().strip();
+        String code = details.employeeCode() == null ? "" : details.employeeCode().strip().toUpperCase(java.util.Locale.ROOT);
         if (!EMPLOYEE_CODE.matcher(code).matches()) {
-            throw new BusinessRuleException("An employee code can use letters, numbers, dots, dashes and underscores, up to 50 characters");
+            throw new BusinessRuleException("Employee code: 3 to 20 characters, letters A-Z, digits and dashes.");
+        }
+        if (users.existsByEmployeeCodeIgnoreCase(code)) {
+            throw new BusinessRuleException("This employee code already exists.");
         }
         if (details.roleName() == null || details.roleName().isBlank()) {
             throw new BusinessRuleException("Choose a role");
         }
+        if (!details.consent()) {
+            throw new BusinessRuleException("Confirm that the employee has signed the consent form for face data.");
+        }
         AppUser user = new AppUser();
         user.setEmployeeCode(code);
-        user.setFullName(Text.required("A name", details.fullName(), Text.SHORT));
+        user.setFullName(Text.sized("A name", details.fullName(), 2, 100));
         user.setEmail(email(details.email()));
-        user.setPhoneNumber(Text.optional("A phone number", details.phoneNumber(), PHONE_LENGTH));
+        user.setPhoneNumber(phone(details.phoneNumber(), null));
         user.setPasswordHash(passwordEncoder.encode(checkedPassword(details.rawPassword())));
         user.setMustChangePassword(true);
         user.setRole(role(details.roleName()));
-        user.setTeam(details.teamId() == null ? null : team(details.teamId()));
+        user.setFaceConsentAt(OffsetDateTime.now());
+        placeInGroup(user, details.staffGroup(), details.teamId());
         AppUser saved = saveUnique(user);
         if (facePhotoPath == null) {
             return saved;
@@ -171,7 +185,20 @@ public class UserService {
         return users.findTeamMembers(actorId).stream().filter(AppUser::isActive).toList();
     }
 
-    /** Who HSE can name on an unidentified violation. Cameras catch anyone, not only the WORKER role. */
+    /** The members of the team this user leads, for Team Attendance (SRS 3.2.13). */
+    @Transactional(readOnly = true)
+    public List<AppUser> listTeamMembers(Long actorId) {
+        access.require(actorId, Permissions.CHECKIN_READ_TEAM);
+        return users.findTeamMembers(actorId);
+    }
+
+    /** For the Admin's Home: face photos the detection app could not use (SRS 3.2.3). */
+    @Transactional(readOnly = true)
+    public long countFailedFacePhotos(Long actorId) {
+        access.require(actorId, Permissions.USER_MANAGE);
+        return embeddings.countFailed();
+    }
+
     @Transactional(readOnly = true)
     public List<AppUser> listForViolationReview(Long actorId) {
         access.require(actorId, Permissions.VIOLATION_REVIEW);
@@ -189,10 +216,54 @@ public class UserService {
         access.requireCanUpdateUser(actorId, userId);
         AppUser user = users.require(userId);
         user.requireVersion(expectedVersion);
-        user.setFullName(Text.required("A name", profile.fullName(), Text.SHORT));
+        user.setFullName(Text.sized("A name", profile.fullName(), 2, 100));
         user.setEmail(email(profile.email()));
-        user.setPhoneNumber(Text.optional("A phone number", profile.phoneNumber(), PHONE_LENGTH));
+        user.setPhoneNumber(phone(profile.phoneNumber(), userId));
         return saveUnique(user);
+    }
+
+    /** A WORKER is Site or Office; a MANAGER is always Site; HSE and the Admin are always Office (SRS 3.2.6 #4). */
+    public AppUser changeGroup(Long actorId, Long userId, StaffGroup group) {
+        access.require(actorId, Permissions.USER_MANAGE);
+        AppUser user = users.require(userId);
+        placeInGroup(user, group, user.getTeam() == null ? null : user.getTeam().getId());
+        return user;
+    }
+
+    /**
+     * BR-06, BR-20: the role decides the group where it can; a site WORKER needs a team (MSG16); office
+     * staff and HSE Officers belong to no team. A MANAGER gets his team on the Teams page.
+     */
+    private void placeInGroup(AppUser user, StaffGroup chosen, Long teamId) {
+        String role = user.getRole().getRoleName();
+        StaffGroup group = switch (role) {
+            case MANAGER_ROLE -> StaffGroup.SITE;
+            case "HSE_OFFICER", "ADMIN" -> StaffGroup.OFFICE;
+            default -> chosen == null ? StaffGroup.SITE : chosen;
+        };
+        user.setStaffGroup(group);
+        if (group == StaffGroup.OFFICE) {
+            user.setTeam(null);
+        } else if ("WORKER".equals(role)) {
+            if (teamId == null) {
+                throw new BusinessRuleException("Choose the team of this site worker.");
+            }
+            user.setTeam(team(teamId));
+        }
+    }
+
+    /** BR-06, MSG14, MSG15: 10 digits starting with 0, unique among active accounts. */
+    private String phone(String value, Long exceptUserId) {
+        String digits = value == null ? "" : value.strip().replace(" ", "");
+        if (!digits.matches("0\\d{9}")) {
+            throw new BusinessRuleException("Phone number: 10 digits starting with 0.");
+        }
+        boolean used = users.findAllByDeletedAtIsNull().stream()
+                .anyMatch(other -> digits.equals(other.getPhoneNumber()) && !other.getId().equals(exceptUserId));
+        if (used) {
+            throw new BusinessRuleException("This phone number is used by another employee.");
+        }
+        return digits;
     }
 
     public AppUser changeRole(Long actorId, Long userId, String roleName) {
@@ -205,6 +276,11 @@ public class UserService {
             throw new BusinessRuleException("Give this user's teams a new manager first");
         }
         user.setRole(role(roleName));
+        if (!"WORKER".equals(roleName)) {
+            placeInGroup(user, null, null);
+        } else if (user.getStaffGroup() == StaffGroup.SITE && user.getTeam() == null) {
+            user.setStaffGroup(StaffGroup.OFFICE);   // a worker without a team works in the office until one is chosen
+        }
         return user;
     }
 
@@ -348,6 +424,10 @@ public class UserService {
         user.setDeletedAt(OffsetDateTime.now());
         user.setActive(false);
         user.setFaceFilePath(null);
+        // BR-07: the Zalo link goes and future shifts are cancelled; history stays.
+        jdbc.update("UPDATE app_user SET zalo_chat_id = NULL WHERE id = ?", userId);
+        jdbc.update("DELETE FROM zalo_link_code WHERE user_id = ?", userId);
+        jdbc.update("UPDATE shift SET status = 'CANCELLED' WHERE user_id = ? AND status = 'SCHEDULED' AND start_at > now()", userId);
         if (photo != null) {
             removeFacePhotoAfterCommit(photo);
         }

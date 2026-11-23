@@ -1,6 +1,6 @@
 # ADR-013 — Unclosed visits are auto-closed by a database function the detection service calls
 
-**Status:** `Accepted` *(replaces the V1 grace-period version of the same function)*
+**Status:** `Accepted`, amended by V15 *(replaces the V1 grace-period version of the same function)*
 **Date:** 2026-11-04
 **Deciders:** Nguyen Vu An — Developer; Claude Code (Opus 5.5) — AI pair programmer
 **Context tags:** #attendance #scheduling #ha
@@ -8,6 +8,8 @@
 **BR References:** `BR-ATT-001`, `BR-ATT-006` ⭐ *CASE 2.0*
 
 > Recorded retrospectively from `V1` and `V7__auto_close_after_the_day_ends.sql`, `AutoCloseCheckInTest`.
+
+> **Amendment (2026-11-21, V15 `auto_close_two_hours_after_the_shift.sql`):** the close moment now follows SRS BR-33. A visit with a shift closes once 2 hours have passed since the later of shift end and check-in; the recorded check-out is still the shift's end (or check-in + 1 minute). Visits with no shift, or a cancelled one, still close at site midnight once their day has passed. This brings back option B's cut-off for overtime: someone working more than 2 hours past their shift gets an estimated check-out and must be corrected by hand. Everything else in this ADR stands.
 
 ---
 

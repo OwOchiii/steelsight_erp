@@ -48,6 +48,8 @@ public class TeamController extends PageController {
     private final PhotoStorage photos;
     private final SiteTime siteTime;
     private final UserSessions sessions;
+    private final orochi.steelsight.notification.zalo.ZaloLinks zaloLinks;
+    private final orochi.steelsight.notification.zalo.ZaloBot zaloBot;
 
     @GetMapping("/team")
     public String list(@AuthenticationPrincipal AuthenticatedUser user,
@@ -94,13 +96,6 @@ public class TeamController extends PageController {
         return attempt(redirect, "/team", "The team was deleted.", () -> teams.delete(user.getUserId(), id));
     }
 
-    @PostMapping("/teams/{id}/late-after")
-    public String setLateAfter(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
-                               @RequestParam(required = false) Integer minutes, RedirectAttributes redirect) {
-        return attempt(redirect, "/team", "The late check-in rule was saved.",
-                () -> teams.setLateAfterMinutes(user.getUserId(), id, minutes));
-    }
-
     // --- new account ----------------------------------------------------------------------------
 
     @GetMapping("/team/new")
@@ -120,7 +115,11 @@ public class TeamController extends PageController {
             try {
                 AppUser created = users.create(user.getUserId(), new UserService.NewUser(
                         form.getEmployeeCode(), form.getFullName(), form.getEmail(), form.getPhoneNumber(),
-                        form.getPassword(), form.getRoleName(), form.getTeamId()), storedPhoto);
+                        form.getPassword(), form.getRoleName(), form.getTeamId(), form.getStaffGroup(), form.isConsent()),
+                        storedPhoto);
+                if (zaloLinks.canMakeCodes()) {
+                    redirect.addFlashAttribute("zaloCode", zaloLinks.newCodeFor(created.getId()));
+                }
                 redirect.addFlashAttribute("success", "The account was created.");
                 return "redirect:/team/" + created.getId() + "/edit";
             } catch (RuntimeException e) {
@@ -136,6 +135,7 @@ public class TeamController extends PageController {
     private String showNewAccount(AuthenticatedUser user, Model model) {
         model.addAttribute("roles", users.listRoles(user.getUserId()));
         model.addAttribute("teams", teams.listManaged(user.getUserId()));
+        model.addAttribute("groups", orochi.steelsight.identity.model.StaffGroup.values());
         return "team/new";
     }
 
@@ -177,6 +177,28 @@ public class TeamController extends PageController {
                              @RequestParam(required = false) Long teamId, RedirectAttributes redirect) {
         return attempt(redirect, editPage(id), "The team was changed.",
                 () -> users.assignTeam(user.getUserId(), id, teamId));
+    }
+
+    @PostMapping("/team/{id}/group")
+    public String changeGroup(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
+                              @RequestParam(required = false) orochi.steelsight.identity.model.StaffGroup staffGroup,
+                              RedirectAttributes redirect) {
+        return attempt(redirect, editPage(id), "Saved successfully.",
+                () -> users.changeGroup(user.getUserId(), id, staffGroup));
+    }
+
+    /** SRS 3.2.7 #5: a new link code; the old one stops working (MSG20). */
+    @PostMapping("/team/{id}/zalo-code")
+    public String newZaloCode(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, RedirectAttributes redirect) {
+        requireAdmin(user);
+        return attempt(redirect, editPage(id), "A new link code was made. The old code no longer works.",
+                () -> zaloLinks.newCodeFor(id));
+    }
+
+    @PostMapping("/team/{id}/zalo-unlink")
+    public String unlinkZalo(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, RedirectAttributes redirect) {
+        requireAdmin(user);
+        return attempt(redirect, editPage(id), "Zalo was unlinked.", () -> zaloLinks.unlink(id));
     }
 
     @PostMapping("/team/{id}/deactivate")
@@ -295,6 +317,12 @@ public class TeamController extends PageController {
         model.addAttribute("angles", users.faceAngles(user.getUserId(), member.getId()));
         model.addAttribute("extraPoses", FacePose.EXTRA);
         model.addAttribute("self", member.getId().equals(user.getUserId()));
+        model.addAttribute("groups", orochi.steelsight.identity.model.StaffGroup.values());
+        if (user.can(Permissions.USER_MANAGE)) {
+            model.addAttribute("zaloCodeNow", zaloLinks.currentCode(member.getId()).orElse(null));
+            model.addAttribute("zaloLinked", zaloLinks.isLinked(member.getId()));
+            model.addAttribute("zaloBotLink", zaloBot.botLink());
+        }
         return "team/edit";
     }
 

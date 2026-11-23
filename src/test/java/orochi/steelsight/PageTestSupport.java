@@ -28,10 +28,12 @@ abstract class PageTestSupport {
         return transaction.execute(status -> user(new AuthenticatedUser(users.findById(userId).orElseThrow())));
     }
 
+    /** HSE Officers and Admins are office staff; workers and team leaders work on site (BR-06). */
     Long userWithRole(String code, String name, String role) {
+        String group = role.equals("HSE_OFFICER") || role.equals("ADMIN") ? "OFFICE" : "SITE";
         return jdbc.queryForObject("""
-                INSERT INTO app_user (role_id, employee_code, full_name, password_hash)
-                SELECT id, ?, ?, 'x' FROM role WHERE role_name = ? RETURNING id""", Long.class, code, name, role);
+                INSERT INTO app_user (role_id, employee_code, full_name, password_hash, staff_group)
+                SELECT id, ?, ?, 'x', ? FROM role WHERE role_name = ? RETURNING id""", Long.class, code, name, group, role);
     }
 
     Long team(String name, Long manager) {
@@ -65,10 +67,23 @@ abstract class PageTestSupport {
                 + start + ", " + end + ", ?) RETURNING id", Long.class, user, zone, user);
     }
 
+    /** A violation as the detection app saves it; with a person, also confirmed for them as HSE would (BR-48). */
     Long violation(Long user, Long camera, String type) {
-        return jdbc.queryForObject("""
-                INSERT INTO violation (user_id, camera_id, violation_type, detected_at, snapshot_path)
-                VALUES (?, ?, ?, now(), 'page.jpg') RETURNING id""", Long.class, user, camera, type);
+        Long id = jdbc.queryForObject("""
+                INSERT INTO violation (camera_id, violation_type, detected_at, snapshot_path)
+                VALUES (?, ?, now(), 'page.jpg') RETURNING id""", Long.class, camera, type);
+        if (user != null) {
+            confirmFor(id, user);
+        }
+        return id;
+    }
+
+    /** CONFIRMED for a site employee, REMINDER for an office one (BR-51). */
+    void confirmFor(Long violation, Long user) {
+        jdbc.update("""
+                UPDATE violation SET user_id = ?, subject = 'EMPLOYEE', reviewed_at = now(),
+                       review_status = CASE WHEN (SELECT staff_group FROM app_user WHERE id = ?) = 'OFFICE' THEN 'REMINDER' ELSE 'CONFIRMED' END
+                WHERE id = ?""", user, user, violation);
     }
 
     String textColumn(String sql, Object... args) {

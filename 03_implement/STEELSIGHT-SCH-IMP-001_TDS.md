@@ -766,7 +766,7 @@ Theo TDS STEELSIGHT-SCH-IMP-001 và các ADR liên quan (ADR-001, 006, 017, 018)
    (and requireCanEditShift for existing shifts) before touching the repository.
 2. Do NOT add a Java overlap query as the guard. Catch DataIntegrityViolationException from saveAndFlush and
    throw BusinessRuleException("This worker already has a shift at that time").
-3. Only SCHEDULED shifts may change (ShiftService.scheduled()); COMPLETED/CANCELLED are final; no delete.
+3. Only SCHEDULED shifts may change (ShiftService.scheduled()); COMPLETED/CANCELLED are final; no delete. The hourly and 23:00 jobs (SiteJobs.completeEndedShifts) mark every ended SCHEDULED shift COMPLETED, except in a locked month; there is no manual "Mark completed".
 4. Convert form LocalDateTime with SiteTime.toInstant; query weeks as [SiteTime.startOf(monday),
    SiteTime.startOf(monday+7)) with ...StartAtGreaterThanEqual...StartAtLessThan methods.
 5. Team leader = AppUser with role MANAGER who leads no other team; assign via TeamService.create/changeManager;

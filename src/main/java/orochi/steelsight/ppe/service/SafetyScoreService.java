@@ -21,14 +21,18 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Reads safety scores. The rules live in the SQL functions of V8, because a database trigger uses them too. */
+/**
+ * Reads safety scores: 100 - 5 x confirmed violations for Site employees, and the bonus level (SRS BR-56
+ * to BR-58). The rules live in safety_scores() (V21) so the report and every page agree; a locked month
+ * reads the frozen monthly_score row.
+ */
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class SafetyScoreService {
 
-    private static final RowMapper<Score> SCORE =
-            (row, number) -> new Score(row.getInt("score"), SafetyLevel.valueOf(row.getString("level")));
+    private static final RowMapper<Score> SCORE = (row, number) ->
+            new Score(row.getInt("score"), SafetyLevel.of(row.getInt("level")), row.getInt("violations"));
 
     private static final RowMapper<TimeSlot> TIME_SLOT = (row, number) -> new TimeSlot(
             row.getObject("start_at", OffsetDateTime.class), row.getObject("end_at", OffsetDateTime.class),
@@ -38,7 +42,8 @@ public class SafetyScoreService {
     private final JdbcTemplate jdbc;
     private final AppUserRepository users;
 
-    public record Score(int value, SafetyLevel level) {
+    /** @param violations the confirmed violations that cost points this month */
+    public record Score(int value, SafetyLevel level, int violations) {
     }
 
     public record WorkerScore(AppUser worker, Score score) {
@@ -49,15 +54,25 @@ public class SafetyScoreService {
                            int violations, BigDecimal per100Hours) {
     }
 
-    /** The actor's own score, or null if they aren't a worker. */
+    /** The actor's own score this month, or null for office staff, who have none (BR-56). */
     public Score own(Long actorId) {
         access.require(actorId, Permissions.VIOLATION_READ_OWN);
-        return find(actorId);
+        return find(actorId, OffsetDateTime.now());
+    }
+
+    public Score own(Long actorId, OffsetDateTime inMonth) {
+        access.require(actorId, Permissions.VIOLATION_READ_OWN);
+        return find(actorId, inMonth);
+    }
+
+    /** For the services that tell a person their new score; no permission check. */
+    public Score current(Long userId) {
+        return find(userId, OffsetDateTime.now());
     }
 
     public Score of(Long actorId, Long workerId) {
         access.require(actorId, Permissions.USER_READ_ALL);
-        return find(workerId);
+        return find(workerId, OffsetDateTime.now());
     }
 
     /** Every worker, lowest score first, whichever team they are on. */
@@ -72,7 +87,7 @@ public class SafetyScoreService {
         Long total = jdbc.queryForObject("SELECT count(*) " + matching, Long.class, like, like);
         record Row(Long id, Score score) {
         }
-        List<Row> rows = jdbc.query("SELECT u.id, s.score, s.level " + matching + "ORDER BY s.score, u.full_name, u.id LIMIT ? OFFSET ?",
+        List<Row> rows = jdbc.query("SELECT u.id, s.score, s.level, s.violations " + matching + "ORDER BY s.score, u.full_name, u.id LIMIT ? OFFSET ?",
                 (row, number) -> new Row(row.getLong("id"), SCORE.mapRow(row, number)),
                 like, like, page.getPageSize(), page.getOffset());
         Map<Long, AppUser> found = users.findAllById(rows.stream().map(Row::id).toList()).stream()
@@ -87,8 +102,8 @@ public class SafetyScoreService {
         return jdbc.query("SELECT * FROM safety_time_slots(?, ?)", TIME_SLOT, from, to);
     }
 
-    private Score find(Long userId) {
-        return jdbc.query("SELECT score, level FROM safety_scores(now()) WHERE user_id = ?", SCORE, userId)
+    private Score find(Long userId, OffsetDateTime inMonth) {
+        return jdbc.query("SELECT score, level, violations FROM safety_scores(?) WHERE user_id = ?", SCORE, inMonth, userId)
                 .stream().findFirst().orElse(null);
     }
 }

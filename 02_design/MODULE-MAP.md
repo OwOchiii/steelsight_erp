@@ -82,11 +82,11 @@ Every module also depends on `IAM.AccessPolicy` for permission and scope checks 
 
 Seeded by `V1__init_schema.sql`, changed by V9–V11. Admin holds every permission.
 
-| Role | Holds (after V11) |
+| Role | Holds (after V20) |
 |------|-------------------|
 | `WORKER` | `TICKET_CREATE`, `TICKET_READ_OWN`, `SHIFT_READ_OWN`, `VIOLATION_READ_OWN`, `CHECKIN_READ_OWN` |
-| `HSE_OFFICER` | `TICKET_CREATE`, `TICKET_READ_OWN`, `TICKET_READ_HANDLED`, `TICKET_UPDATE_HANDLED`, `TICKET_DELETE_HANDLED`, `SHIFT_READ_OWN`, `VIOLATION_READ_ALL`, `VIOLATION_REVIEW`, `CHECKIN_READ_OWN`, `CHECKIN_READ_ALL`, `CHECKIN_EDIT`, `USER_READ_ALL` |
-| `MANAGER` (team leader) | `TICKET_CREATE`, `TICKET_READ_OWN`, `SHIFT_READ_OWN`, `SHIFT_READ_TEAM`, `SHIFT_UPDATE_TEAM`, `CHECKIN_READ_OWN`, `CHECKIN_READ_TEAM`, `USER_READ_ALL`, `REPORT_EXPORT_TEAM` |
+| `HSE_OFFICER` | `TICKET_CREATE`, `TICKET_READ_OWN`, `SHIFT_READ_OWN`, `VIOLATION_READ_ALL`, `VIOLATION_REVIEW`, `CHECKIN_READ_OWN`, `CHECKIN_READ_ALL`, `CHECKIN_EDIT`, `USER_READ_ALL` |
+| `MANAGER` (team leader) | `TICKET_CREATE`, `TICKET_READ_OWN`, `TICKET_READ_TEAM` (read and comment only), `SHIFT_READ_OWN`, `SHIFT_READ_TEAM`, `SHIFT_UPDATE_TEAM`, `CHECKIN_READ_OWN`, `CHECKIN_READ_TEAM`, `USER_READ_ALL`, `REPORT_EXPORT_TEAM` |
 | `ADMIN` | All of the above plus `TICKET_READ_ALL`, `TICKET_UPDATE_ALL`, `TICKET_DELETE_ALL`, `SHIFT_READ_ALL`, `SHIFT_UPDATE_ALL`, `USER_MANAGE`, `ROLE_MANAGE`, `REPORT_EXPORT_ALL` |
 | `steelsight_detection` *(DB role, not an app role)* | Column-level grants on `app_user`, `check_in`, `ppe_linking`, `violation`, `face_embedding`; read on `zone`, `camera`, `ppe_vest`, `shift`; execute `close_stale_check_ins(text)` |
 | `detection-software` *(API caller)* | Authenticated by `X-Api-Key` on `/api/**` only; no authorities |
@@ -140,8 +140,9 @@ Format: **ID** — rule — *enforced at*.
 | BR-ATT-006 | A visit nobody checked out of closes once its day has ended: at the shift's end, or at site midnight when it has no shift (cancelled shifts count as none). It is marked `auto_closed`. | `close_stale_check_ins(text)` (V7), called by detection |
 | BR-ATT-007 | Only `CHECKIN_EDIT` (HSE, Admin) adds or corrects a visit by hand. A correction clears `auto_closed` and records the old and new values in `check_in_correction`. A stale form fails, even when only plain SQL changed the visit. | `CheckInService.recordManual/correct`, `bump_check_in_version()` (V5), `check_in_correction` (V12) |
 | BR-ATT-008 | Visits are visible as own (`CHECKIN_READ_OWN`), team (`CHECKIN_READ_TEAM`, the team you lead) or all (`CHECKIN_READ_ALL`). | `CheckInService.list*` |
-| BR-ATT-009 | A worker has one enrolment row. A new face photo resets it to PENDING and clears the old vector and model, in the same transaction as the photo path. | `FaceEmbeddingRepository.queueForEnrolment()` |
+| BR-ATT-009 | A worker has one enrolment row per angle (FRONT, and optionally LEFT and RIGHT, since V14). A new photo for an angle resets that row to PENDING and clears its old vector and model, in the same transaction as the photo path. | `FaceEmbeddingRepository.queueForEnrolment()` |
 | BR-ATT-010 | Soft-deleting a user erases their face embedding in the same transaction; the old photo file is removed only after commit. | `trg_user_erase_embedding`, `UserService.removeFacePhotoAfterCommit()` |
+| BR-ATT-011 | Extra LEFT and RIGHT face photos need a FRONT photo first and are for Admin only. Changing or removing one, and deleting the account, lock the worker's row so they run one after another. The list status comes from the FRONT photo. | `UserService.changeFaceAngle/removeFaceAngle/softDelete`, `AppUserRepository.requireForUpdate` |
 
 ### 3.4 PPE — PPE & Safety
 
@@ -278,6 +279,7 @@ Format: **ID** — rule — *enforced at*.
 | [ADR-023](adr/ADR-023_hosting-render-and-supabase.md) | Host on Render (container) and Supabase (database, storage) | PLT |
 | [ADR-024](adr/ADR-024_request-id-logging-without-personal-data.md) | One log line per request with a request ID and no personal data | PLT |
 | [ADR-025](adr/ADR-025_mistakes-shown-where-they-were-made.md) | A mistake is shown on the page where it was made, and never as raw JSON | PLT, STO (all) |
+| [ADR-026](adr/ADR-026_face-photos-from-several-angles.md) | A worker can have face photos from several angles, one queue row per angle | ATT, IAM |
 
 ---
 

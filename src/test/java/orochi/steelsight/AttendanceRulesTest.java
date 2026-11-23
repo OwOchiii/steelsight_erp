@@ -15,10 +15,13 @@ import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** The 08:00 to 17:00 shift from the requirement, for a worker with no team: 15 minutes before a late tag. */
+/**
+ * SRS BR-31, BR-32, BR-33 for one visit: a 5-minute grace with no make-up time, early leave against the
+ * shift end, and the 10-minute minimum visit. The 08:00 to 17:00 shift is the fixture.
+ */
 class AttendanceRulesTest {
 
-    private final AttendanceRules rules = new AttendanceRules(15, 10);
+    private final AttendanceRules rules = new AttendanceRules();
 
     @Test
     void arrivingAndLeavingOnTimeHasNoTags() {
@@ -29,84 +32,49 @@ class AttendanceRulesTest {
     }
 
     @Test
-    void arrivingEarlyDoesNotAllowLeavingEarly() {
-        VisitStatus status = assess("07:30", "16:30");
+    void br31_upToFiveMinutesLateIsOnTime() {
+        assertThat(assess("08:05", "17:00").isLate()).isFalse();
+        assertThat(assess("08:05", "17:00").isOnTime()).isTrue();
+    }
 
-        assertThat(status.isLate()).isFalse();
-        assertThat(status.minutesEarly()).isEqualTo(30);
+    @Test
+    void br31_sixMinutesLateIsLateWithTheWholeMinutesRecorded() {
+        VisitStatus status = assess("08:06", "17:00");
+
+        assertThat(status.isLate()).isTrue();
+        assertThat(status.minutesLate()).isEqualTo(6);
+    }
+
+    @Test
+    void br31_thereIsNoMakeUpTimeAtTheEnd() {
+        VisitStatus status = assess("09:00", "17:00");
+
+        assertThat(status.minutesLate()).isEqualTo(60);
+        assertThat(status.isEarly()).isFalse();
         assertThat(status.requiredCheckOut()).isEqualTo(at("17:00"));
     }
 
     @Test
-    void comingAt0815MeansWorkingUntil1715WithoutALateTag() {
-        VisitStatus status = assess("08:15", "17:15");
+    void br32_leavingBeforeTheShiftEndIsEarly() {
+        VisitStatus status = assess("07:30", "16:30");
 
         assertThat(status.isLate()).isFalse();
-        assertThat(status.isEarly()).isFalse();
-        assertThat(status.isOnTime()).isTrue();
-        assertThat(status.requiredCheckOut()).isEqualTo(at("17:15"));
+        assertThat(status.minutesEarly()).isEqualTo(30);
     }
 
     @Test
-    void leavingAtTheUsualTimeAfterComing15MinutesLateIsEarly() {
-        VisitStatus status = assess("08:15", "17:00");
-
-        assertThat(status.isLate()).isFalse();
-        assertThat(status.minutesEarly()).isEqualTo(15);
-    }
-
-    @Test
-    void lateTimeWithinTheGracePeriodIsMadeUpMinuteForMinute() {
-        VisitStatus status = assess("08:10", "17:10");
-
-        assertThat(status.isOnTime()).isTrue();
-        assertThat(status.requiredCheckOut()).isEqualTo(at("17:10"));
-    }
-
-    @Test
-    void theRequiredCheckOutStopsAtTheGracePeriodHoweverLateTheArrival() {
-        VisitStatus status = assess("09:00", "17:15");
-
-        assertThat(status.minutesLate()).isEqualTo(60);
-        assertThat(status.isEarly()).isFalse();
-        assertThat(status.requiredCheckOut()).isEqualTo(at("17:15"));
-    }
-
-    @Test
-    void oneMinutePastTheGracePeriodIsLate() {
-        VisitStatus status = assess("08:16", "17:15");
-
-        assertThat(status.minutesLate()).isEqualTo(16);
-        assertThat(status.isEarly()).isFalse();
-        assertThat(status.requiredCheckOut()).isEqualTo(at("17:15"));
-    }
-
-    @Test
-    void someoneTaggedLateWhoLeavesBeforeTheRequiredTimeIsAlsoEarly() {
-        VisitStatus status = assess("09:00", "17:00");
-
-        assertThat(status.minutesLate()).isEqualTo(60);
-        assertThat(status.minutesEarly()).isEqualTo(15);
-    }
-
-    @Test
-    void theWorkersTeamSetsTheGracePeriod() {
+    void theTeamNoLongerChangesTheGrace() {
         Team relaxed = new Team();
         relaxed.setLateAfterMinutes(30);
-        Team strict = new Team();
-        strict.setLateAfterMinutes(0);
-
-        CheckIn visit = visit(at("08:20"), at("17:20"), shift());
+        CheckIn visit = visit(at("08:20"), at("17:00"), shift());
         visit.getUser().setTeam(relaxed);
-        assertThat(rules.assess(visit).isLate()).isFalse();
 
-        visit.getUser().setTeam(strict);
         assertThat(rules.assess(visit).minutesLate()).isEqualTo(20);
     }
 
     @Test
     void secondsDoNotCount() {
-        VisitStatus status = rules.assess(visit(at("08:15").plusSeconds(40), at("17:15").plusSeconds(10), shift()));
+        VisitStatus status = rules.assess(visit(at("08:05").plusSeconds(40), at("17:00").plusSeconds(10), shift()));
 
         assertThat(status.isLate()).isFalse();
         assertThat(status.isEarly()).isFalse();
@@ -119,13 +87,12 @@ class AttendanceRulesTest {
         assertThat(status.isOnSite()).isTrue();
         assertThat(status.isEarly()).isFalse();
         assertThat(status.isLate()).isTrue();
-        assertThat(status.requiredCheckOut()).isEqualTo(at("17:15"));
         assertThat(status.isOnTime()).isFalse();
     }
 
     @Test
-    void anEstimatedCheckOutIsNotJudgedAsEarly() {
-        CheckIn visit = visit(at("08:30"), at("17:00"), shift());
+    void aVisitClosedByTheSystemIsNotJudgedAsEarly() {
+        CheckIn visit = visit(at("08:00"), at("21:00"), shift());
         visit.setAutoClosed(true);
 
         VisitStatus status = rules.assess(visit);
@@ -150,49 +117,27 @@ class AttendanceRulesTest {
     }
 
     @Test
-    void aRecordedVisitUnderTheMinimumIsTooShort() {
+    void br33_aRecordedVisitUnderTenMinutesIsTooShort() {
         assertThat(assess("08:00", "08:09").tooShort()).isTrue();
         assertThat(assess("08:00", "08:10").tooShort()).isFalse();
     }
 
     @Test
-    void aVisitStillOpenOrWithAnEstimatedCheckOutIsNotTooShort() {
+    void aVisitStillOpenOrClosedByTheSystemIsNotTooShort() {
         assertThat(assess("08:00", null).tooShort()).isFalse();
 
-        CheckIn estimated = visit(at("08:00"), at("08:01"), shift());
-        estimated.setAutoClosed(true);
-        assertThat(rules.assess(estimated).tooShort()).isFalse();
+        CheckIn closed = visit(at("08:00"), at("08:01"), shift());
+        closed.setAutoClosed(true);
+        assertThat(rules.assess(closed).tooShort()).isFalse();
     }
 
     @Test
-    void anAutoClosedGateVisitWithNoVestNeedsReview() {
-        CheckIn visit = visit(at("08:00"), at("17:00"), shift());
-        visit.setAutoClosed(true);
+    void br35_anIncompleteVisitNeedsReview() {
+        CheckIn visit = visit(at("08:00"), null, shift());
+        visit.flagIncomplete(at("23:00"));
 
         assertThat(rules.assess(visit).isNeedsReview()).isTrue();
-    }
-
-    @Test
-    void anAutoClosedGateVisitWithAVestDoesNotNeedReview() {
-        CheckIn visit = visit(at("08:00"), at("17:00"), shift());
-        visit.setAutoClosed(true);
-        visit.setPpeLinking(new PpeLinking());
-
-        assertThat(rules.assess(visit).isNeedsReview()).isFalse();
-    }
-
-    @Test
-    void aRecordedCheckOutWithNoVestDoesNotNeedReview() {
         assertThat(assess("08:00", "17:00").isNeedsReview()).isFalse();
-    }
-
-    @Test
-    void aManualEntryNeverHasAVestSoItDoesNotNeedReview() {
-        CheckIn visit = visit(at("08:00"), at("17:00"), shift());
-        visit.setAutoClosed(true);
-        visit.setMethod(CheckInMethod.MANUAL);
-
-        assertThat(rules.assess(visit).isNeedsReview()).isFalse();
     }
 
     private VisitStatus assess(String in, String out) {

@@ -31,8 +31,10 @@
             </div>
         </div>
 
-        <label for="note"><span th:text="#{field.note}">Note</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
-        <textarea id="note" th:field="*{note}" rows="3" maxlength="4000"></textarea>
+        <label for="note" th:text="#{attendance.reason}">Reason</label>
+        <textarea id="note" th:field="*{note}" rows="3" minlength="10" maxlength="500" required></textarea>
+        <input type="hidden" th:field="*{ticketId}">
+        <p class="notice" th:if="${form.ticketId != null}" th:text="#{attendance.fromTicket(${form.ticketId})}">From ticket</p>
 
         <div class="actions"><button type="submit" class="btn" th:text="${visit} ? #{attendance.saveCorrection} : #{attendance.add}">Save</button></div>
     </form>

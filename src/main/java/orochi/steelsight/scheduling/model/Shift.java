@@ -43,6 +43,18 @@ public class Shift extends BaseModel implements Versioned {
     @Column(nullable = false)
     private ShiftStatus status = ShiftStatus.SCHEDULED;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ShiftKind kind = ShiftKind.REGULAR;
+
+    /** Why the overtime is needed; required for OVERTIME (SRS BR-23, MSG29). */
+    @Column
+    private String reason;
+
+    public boolean isOvertime() {
+        return kind == ShiftKind.OVERTIME;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false)
     private AppUser createdBy;
@@ -53,6 +65,11 @@ public class Shift extends BaseModel implements Versioned {
 
     public boolean isScheduled() {
         return status == ShiftStatus.SCHEDULED;
+    }
+
+    /** Planned or done: every shift that wasn't cancelled. Ended shifts become COMPLETED by the hourly job. */
+    public boolean isActive() {
+        return status != ShiftStatus.CANCELLED;
     }
 
     public boolean isUpcoming(OffsetDateTime now) {

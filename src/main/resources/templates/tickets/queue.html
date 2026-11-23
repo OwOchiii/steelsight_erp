@@ -1,17 +1,59 @@
 <!doctype html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{fragments/layout :: app(#{queue.title}, 'queue', ~{::main})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{queue.title}, 'queue', ~{::main})}">
 <main class="page">
     <div class="page-head"><h1 th:text="#{queue.title}">Ticket queue</h1></div>
-    <nav class="tabs" th:attr="aria-label=#{queue.tabs}">
-        <a th:href="@{/tickets/queue(all=${all} ? true : null)}" th:attr="aria-current=${resolved} ? null : 'page'" th:text="#{queue.toHandle}">To handle</a>
-        <a th:href="@{/tickets/queue(resolved=true, all=${all} ? true : null)}" th:attr="aria-current=${resolved} ? 'page' : null" th:text="#{queue.resolved}">Resolved</a>
-    </nav>
-    <nav class="tabs" sec:authorize="hasAuthority('TICKET_READ_ALL')" th:attr="aria-label=#{queue.scope}">
-        <a th:href="@{/tickets/queue(resolved=${resolved} ? true : null)}" th:attr="aria-current=${all} ? null : 'page'" th:text="#{queue.mine}">My categories</a>
-        <a th:href="@{/tickets/queue(resolved=${resolved} ? true : null, all=true)}" th:attr="aria-current=${all} ? 'page' : null" th:text="#{queue.all}">All tickets</a>
-    </nav>
-    <p class="empty panel-less-empty" th:if="${tickets.totalElements == 0}" th:text="${resolved} ? #{queue.emptyResolved} : #{queue.emptyOpen}">Empty</p>
-    <th:block th:unless="${tickets.isEmpty()}"><div th:replace="~{fragments/lists :: tickets(${tickets}, true)}"></div></th:block>
+    <form class="filters" method="get" th:action="@{/tickets/queue}">
+        <div>
+            <label for="categoryId" th:text="#{field.category}">Category</label>
+            <select id="categoryId" name="categoryId">
+                <option value="" th:text="#{common.all}">All</option>
+                <option th:if="${appealCategory}" th:value="${appealCategory.id}" th:selected="${appealCategory.id == categoryId}" th:text="${@display.category(appealCategory.categoryName)}">PPE appeal</option>
+                <option th:each="c : ${categories}" th:value="${c.id}" th:selected="${c.id == categoryId}" th:text="${@display.category(c.categoryName)}">Category</option>
+            </select>
+        </div>
+        <div>
+            <label for="status" th:text="#{field.status}">Status</label>
+            <select id="status" name="status">
+                <option value="" th:text="#{queue.toHandle}">Open and in progress</option>
+                <option value="RESOLVED" th:selected="${status != null and status.name() == 'RESOLVED'}" th:text="#{enum.RESOLVED}">Resolved</option>
+                <option value="CANCELLED" th:selected="${status != null and status.name() == 'CANCELLED'}" th:text="#{enum.CANCELLED}">Cancelled</option>
+            </select>
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{common.show}">Show</button>
+    </form>
+    <p class="empty panel-less-empty" th:if="${tickets.totalElements == 0}" th:text="${status == null} ? #{queue.emptyOpen} : #{queue.emptyResolved}">Empty</p>
+    <div class="table-wrap" th:unless="${tickets.isEmpty()}">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{field.subject}">Subject</th>
+                <th scope="col" class="hidden md:table-cell" th:text="#{field.category}">Category</th>
+                <th scope="col" class="hidden lg:table-cell" th:text="#{field.from}">Creator</th>
+                <th scope="col" class="hidden lg:table-cell" th:text="#{field.team}">Team</th>
+                <th scope="col" class="hidden md:table-cell" th:text="#{field.assignedTo}">Assignee</th>
+                <th scope="col" th:text="#{queue.age}">Age</th>
+                <th scope="col" th:text="#{field.status}">Status</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="ticket : ${tickets}" th:with="age=${ticketService.ageInWorkingDays(ticket)}">
+                <td>
+                    <a class="row-title" th:href="@{/tickets/{id}(id=${ticket.id})}" th:text="${ticket.subject}">Subject</a>
+                    <span class="row-sub lg:hidden" th:text="|${ticket.createdBy.fullName} (${ticket.createdBy.employeeCode})|">From</span>
+                </td>
+                <td class="hidden md:table-cell" th:text="${@display.category(ticket.category.categoryName)}">Category</td>
+                <td class="hidden lg:table-cell" th:text="|${ticket.createdBy.fullName} (${ticket.createdBy.employeeCode})|">Name</td>
+                <td class="hidden lg:table-cell" th:text="${ticket.createdBy.team != null} ? ${ticket.createdBy.team.name} : #{tickets.office}">Team</td>
+                <td class="hidden md:table-cell" th:text="${ticket.assignee != null} ? ${ticket.assignee.fullName}">Name</td>
+                <td th:classappend="${ticket.unresolved and age > 3} ? 'overdue-text'" th:text="#{queue.days(${age})}">0 d</td>
+                <td>
+                    <span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span>
+                    <span class="badge" th:if="${ticket.outcome}" th:classappend="${@display.badge(ticket.outcome)}" th:text="${@display.label(ticket.outcome)}">Outcome</span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
     <nav th:replace="~{fragments/lists :: pager(${tickets})}"></nav>
 </main>
 </html>

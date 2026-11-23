@@ -10,5 +10,9 @@ public interface TicketCategoryRepository extends BaseRepository<TicketCategory,
 
     Optional<TicketCategory> findByCategoryName(String categoryName);
 
+    Optional<TicketCategory> findByCode(orochi.steelsight.ticketing.model.CategoryCode code);
+
+    java.util.List<TicketCategory> findAllByActiveTrueOrderByIdAsc();
+
     List<TicketCategory> findAllByHandlerRoleId(Long roleId);
 }

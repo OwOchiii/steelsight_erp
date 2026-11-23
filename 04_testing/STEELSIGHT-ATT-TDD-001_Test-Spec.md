@@ -31,6 +31,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | `2026-11-06` | `Claude Code (Opus 5.5)` | Khởi tạo tài liệu — TDD spec cho Attendance |
+| `2026-11-17` | `Claude Code (Opus 5.5)` | ADR-026: added ATT-TC-044 for one queue row per angle |
 
 ---
 
@@ -228,15 +229,15 @@ class AttendanceRulesTest {
 ### ATT-TC-021 — A visit to a shift that ended yesterday closes at the shift's end
 
 **Severity:** `HIGH`
-**Feature Under Test:** `close_stale_check_ins('Asia/Ho_Chi_Minh')` (V7)
-**Test File:** `AutoCloseCheckInTest.java` — `aVisitToAShiftThatEndedYesterdayClosesAtTheShiftsEnd`, `aVisitToAShiftThatEndedTodayStaysOpen`, `aVisitWithoutAShiftClosesAtMidnightOnceItsDayHasPassed`, `aCheckInAfterTheShiftEndedStillClosesAfterItStarted`, `aCancelledShiftCountsAsNoShift`
+**Feature Under Test:** `close_stale_check_ins('Asia/Ho_Chi_Minh')` (V15, was V7)
+**Test File:** `AutoCloseCheckInTest.java` — `aVisitClosesAtTheShiftsEndOnceTwoHoursHavePassed`, `aVisitStaysOpenUntilTwoHoursAfterItsShiftEnds`, `aVisitWithoutAShiftClosesAtMidnightOnceItsDayHasPassed`, `aCheckInAfterTheShiftEndedGetsTwoHoursFromCheckIn`, `aCheckInAfterTheShiftEndedStillClosesAfterItStarted`, `aCancelledShiftCountsAsNoShift`
 **TDD Phase:** 🟢 GREEN
 **Condition Ref:** `TC-COND-004`
 **Oracle Source:** `BR-ATT-006`, `ADR-013 §Decision`
 
 **Test Steps:** FX-004 rows; run the function; read rows
-**Expected Result (PASS):** yesterday's → `check_out_at = shift end`, `auto_closed = true`; today's stays open; no shift → next site midnight; late check-in → `check_in + 1 min` floor; cancelled → treated as no shift
-**Expected Result (FAIL):** a worker blocked from checking in next morning (open visit kept), or overtime cut off today
+**Expected Result (PASS):** shift ended over 2 h ago → `check_out_at = shift end`, `auto_closed = true`; ended under 2 h ago stays open; no shift → next site midnight; check-in after the shift ended → open for 2 h, then `check_in + 1 min` floor; cancelled → treated as no shift
+**Expected Result (FAIL):** a visit still open more than 2 h after its shift ended, or closed sooner
 **Current Status:** 🟢L
 
 ---
@@ -396,6 +397,7 @@ assertThat(row.get("recorded_by")).isEqualTo(hse);
 | ATT-TC-040 | *(new)* A manual check-in links the worker's overlapping SCHEDULED shift so tags apply (gap G1) | COND-001 | HIGH | 🔴 |
 | ATT-TC-041 | *(new)* A worker sees their own visits (`CHECKIN_READ_OWN`), or the permission is removed (gap G12) | COND-008 | LOW | 🔴 |
 | ATT-TC-043 | *(new)* The ERP closes stale visits when detection hasn't (gap G7), e.g. on `/attendance` load | COND-004 | MEDIUM | 🔴 |
+| ATT-TC-044 | `RepositoryIntegrationTest` — `eachAngleIsItsOwnRowAndReplacingOneLeavesTheOthers`; `softDeletingAWorkerErasesTheirEmbedding` (with a LEFT row) | COND-009 (ADR-026) | HIGH | 🟢L |
 
 ---
 

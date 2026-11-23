@@ -12,7 +12,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface TicketRepository extends SoftDeletableRepository<Ticket, Long> {
+public interface TicketRepository extends SoftDeletableRepository<Ticket, Long>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<Ticket> {
 
     List<Ticket> findAllByCreatedByIdAndDeletedAtIsNull(Long userId);
 
@@ -34,6 +35,16 @@ public interface TicketRepository extends SoftDeletableRepository<Ticket, Long> 
     long countByStatusInAndDeletedAtIsNull(Collection<TicketStatus> statuses);
 
     long countByCategoryHandlerRoleIdAndStatusInAndDeletedAtIsNull(Long roleId, Collection<TicketStatus> statuses);
+
+    /** Tickets opened by the members of the team this person leads, newest first. */
+    @Query("""
+            SELECT t FROM Ticket t
+            WHERE t.createdBy.team.manager.id = :leaderId
+            AND t.createdBy.id <> :leaderId
+            AND t.deletedAt IS NULL
+            ORDER BY t.createdAt DESC, t.id DESC
+            """)
+    Page<Ticket> findTeamTickets(@Param("leaderId") Long leaderId, Pageable page);
 
     @Query("""
             SELECT t FROM Ticket t

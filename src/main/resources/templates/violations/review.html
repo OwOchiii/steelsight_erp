@@ -1,15 +1,58 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{review.title}, 'review', ~{::main})}">
 <main class="page">
-    <div class="page-head"><h1 th:text="#{review.title}">PPE review</h1></div>
-    <nav class="tabs" th:attr="aria-label=#{review.tabs}">
-        <a th:href="@{/violations/review}" th:attr="aria-current=${view == 'DISPUTED'} ? 'page' : null" th:text="#{review.disputed}">Disputed</a>
-        <a th:href="@{/violations/review(view='UNIDENTIFIED')}" th:attr="aria-current=${view == 'UNIDENTIFIED'} ? 'page' : null" th:text="#{review.noWorker}">No worker</a>
-        <a th:href="@{/violations/review(view='ALL')}" th:attr="aria-current=${view == 'ALL'} ? 'page' : null" th:text="#{review.all}">All</a>
-    </nav>
-    <p class="empty panel-less-empty" th:if="${violations.totalElements == 0}"
-       th:text="${view == 'DISPUTED'} ? #{review.emptyDisputed} : (${view == 'UNIDENTIFIED'} ? #{review.emptyNoWorker} : #{review.emptyAll})">Empty</p>
-    <th:block th:unless="${violations.isEmpty()}"><div th:replace="~{fragments/lists :: violations(${violations}, true)}"></div></th:block>
+    <div class="page-head">
+        <h1 th:text="#{review.title}">Review queue</h1>
+        <a class="btn secondary" th:href="@{/violations/all}" th:text="#{review.list}">Violation list</a>
+    </div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <p class="notice" th:if="${disputes > 0}">
+        <span th:text="#{review.disputesWaiting(${disputes})}">Appeals waiting</span>
+        <a th:href="@{/violations/all(status='CONFIRMED')}" th:text="#{review.seeAppeals}">See them</a>
+    </p>
+    <form class="filters" method="get" th:action="@{/violations/review}">
+        <div>
+            <label for="zoneId" th:text="#{field.zone}">Zone</label>
+            <select id="zoneId" name="zoneId">
+                <option value="" th:text="#{common.all}">All</option>
+                <option th:each="zone : ${zones}" th:value="${zone.id}" th:selected="${zone.id == zoneId}" th:text="${zone.name}">Zone</option>
+            </select>
+        </div>
+        <div>
+            <label for="day" th:text="#{field.day}">Day</label>
+            <input id="day" name="day" type="date" th:value="${day}">
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{common.show}">Show</button>
+    </form>
+    <p class="empty panel-less-empty" th:if="${violations.totalElements == 0}" th:text="#{review.empty}">Nothing waiting for review.</p>
+    <div class="table-wrap" th:unless="${violations.isEmpty()}" hx-get="" hx-trigger="every 30s" hx-select="main" hx-target="main" hx-swap="outerHTML">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{field.detected}">Time</th>
+                <th scope="col" th:text="#{field.zone}">Zone</th>
+                <th scope="col" th:text="#{field.missing}">Missing</th>
+                <th scope="col" class="hidden md:table-cell" th:text="#{field.suggested}">Suggested</th>
+                <th scope="col" th:text="#{field.status}">Status</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="violation : ${violations}" th:with="suggested=${violationService.suggestion(violation).orElse(null)}">
+                <td><a class="row-title" th:href="@{/violations/{id}(id=${violation.id})}" th:text="${@display.dateTime(violation.detectedAt)}">When</a></td>
+                <td th:text="|${violation.zone.name} · ${violation.camera.cameraCode}|">Zone</td>
+                <td th:text="${@display.label(violation.violationType)}">Hard hat</td>
+                <td class="hidden md:table-cell">
+                    <span th:if="${suggested}" th:text="${violation.suggestionSimilarity} ? |${suggested.fullName} (${violation.suggestionSimilarity})| : ${suggested.fullName}">Name</span>
+                    <span class="quiet" th:unless="${suggested}" th:text="#{review.noSuggestion}">No suggestion</span>
+                </td>
+                <td>
+                    <span class="badge" th:classappend="${@display.badge(violation.reviewStatus)}" th:text="${@display.label(violation.reviewStatus)}">Pending</span>
+                    <span class="row-sub" th:if="${violation.takenBy}" th:text="#{review.takenBy(${violation.takenBy.fullName})}">Taken by</span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
     <nav th:replace="~{fragments/lists :: pager(${violations})}"></nav>
 </main>
 </html>

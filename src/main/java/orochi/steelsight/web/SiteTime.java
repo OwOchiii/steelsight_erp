@@ -32,6 +32,10 @@ public class SiteTime {
         return date.atStartOfDay(zone).toOffsetDateTime();
     }
 
+    public ZoneId zoneId() {
+        return zone;
+    }
+
     public LocalDate today() {
         return LocalDate.now(zone);
     }

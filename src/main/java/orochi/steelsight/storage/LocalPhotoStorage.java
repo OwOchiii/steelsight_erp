@@ -36,6 +36,9 @@ public class LocalPhotoStorage implements PhotoStorage {
         }
         try {
             String name = UUID.randomUUID() + PhotoFormat.extensionOf(photo);
+            if (album == PhotoAlbum.FACE) {
+                PhotoFormat.checkFace(photo);
+            }
             Path folder = folder(album);
             Files.createDirectories(folder);
             try (InputStream in = photo.getInputStream()) {
@@ -69,16 +72,20 @@ public class LocalPhotoStorage implements PhotoStorage {
     }
 
     private Path folder(PhotoAlbum album) {
-        return album == PhotoAlbum.FACE ? root.resolve("faces") : root;
+        return switch (album) {
+            case FACE -> root.resolve("faces");
+            case EVIDENCE -> root.resolve("evidence");
+            case TICKET -> root;
+        };
     }
 
     private Path resolve(PhotoAlbum album, String storedName) {
-        if (!PhotoFormat.isStoredName(storedName)) {
+        if (!PhotoFormat.isAllowed(album, storedName)) {
             throw new NotFoundException("Photo", storedName);
         }
         Path folder = folder(album);
         Path file = folder.resolve(storedName).normalize();
-        if (!file.getParent().equals(folder)) {
+        if (album == PhotoAlbum.EVIDENCE ? !file.startsWith(folder) : !file.getParent().equals(folder)) {
             throw new NotFoundException("Photo", storedName);
         }
         return file;

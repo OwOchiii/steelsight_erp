@@ -8,7 +8,7 @@
             <th scope="col" th:text="#{field.subject}">Subject</th>
             <th scope="col" class="hidden md:table-cell" th:text="#{field.category}">Category</th>
             <th scope="col" class="hidden lg:table-cell" th:if="${forHandler}" th:text="#{field.from}">From</th>
-            <th scope="col" class="hidden xl:table-cell" th:if="${forHandler}" th:text="#{field.zone}">Zone</th>
+            <th scope="col" class="hidden xl:table-cell" th:if="${forHandler}" th:text="#{field.team}">Team</th>
             <th scope="col" class="hidden lg:table-cell" th:if="${forHandler}" th:text="#{field.assignedTo}">Assigned to</th>
             <th scope="col" class="hidden sm:table-cell" th:text="#{field.opened}">Opened</th>
             <th scope="col" th:text="#{field.status}">Status</th>
@@ -23,10 +23,13 @@
             </td>
             <td class="hidden md:table-cell" th:text="${@display.category(ticket.category.categoryName)}">Category</td>
             <td class="hidden lg:table-cell" th:if="${forHandler}" th:text="${ticket.createdBy.fullName}">Name</td>
-            <td class="hidden xl:table-cell" th:if="${forHandler}" th:text="${ticket.zone != null} ? ${ticket.zone.name}">Zone</td>
+            <td class="hidden xl:table-cell" th:if="${forHandler}" th:text="${ticket.createdBy.team != null} ? ${ticket.createdBy.team.name} : #{tickets.office}">Team</td>
             <td class="hidden lg:table-cell" th:if="${forHandler}" th:text="${ticket.assignee != null} ? ${ticket.assignee.fullName}">Name</td>
             <td class="hidden whitespace-nowrap sm:table-cell" th:text="${@display.date(ticket.createdAt)}">Date</td>
-            <td><span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span></td>
+            <td>
+                <span class="badge" th:classappend="${@display.badge(ticket.status)}" th:text="${@display.label(ticket.status)}">Status</span>
+                <span class="badge" th:if="${ticket.outcome}" th:classappend="${@display.badge(ticket.outcome)}" th:text="${@display.label(ticket.outcome)}">Outcome</span>
+            </td>
         </tr>
         </tbody>
     </table>
@@ -39,21 +42,27 @@
             <th scope="col" th:text="#{field.violation}">Violation</th>
             <th scope="col" class="hidden md:table-cell" th:text="#{field.detected}">Detected</th>
             <th scope="col" class="hidden md:table-cell" th:text="#{field.zone}">Zone</th>
-            <th scope="col" class="hidden sm:table-cell" th:if="${forReviewer}" th:text="#{field.worker}">Worker</th>
-            <th scope="col" th:text="#{field.dispute}">Dispute</th>
+            <th scope="col" class="hidden sm:table-cell" th:if="${forReviewer}" th:text="#{field.person}">Person</th>
+            <th scope="col" th:text="#{field.status}">Status</th>
+            <th scope="col" class="hidden sm:table-cell" th:text="#{field.appeal}">Appeal</th>
         </tr>
         </thead>
         <tbody>
         <tr th:each="violation : ${violations}">
             <td>
                 <a class="row-title" th:href="@{/violations/{id}(id=${violation.id})}" th:text="${@display.label(violation.violationType)}">Type</a>
-                <span class="row-sub md:hidden" th:text="|${@display.dateTime(violation.detectedAt)}, ${violation.camera.zone.name}|">When</span>
-                <span class="row-sub sm:hidden" th:if="${forReviewer}" th:text="${violation.identified} ? ${violation.user.fullName} : #{violations.workerUnknown}">Worker</span>
+                <span class="row-sub md:hidden" th:text="|${@display.dateTime(violation.detectedAt)}, ${violation.zone.name}|">When</span>
             </td>
             <td class="hidden whitespace-nowrap md:table-cell" th:text="${@display.dateTime(violation.detectedAt)}">When</td>
-            <td class="hidden md:table-cell" th:text="${violation.camera.zone.name}">Zone</td>
-            <td class="hidden sm:table-cell" th:if="${forReviewer}" th:text="${violation.identified} ? ${violation.user.fullName} : #{violations.workerUnknown}">Worker</td>
-            <td><span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Status</span></td>
+            <td class="hidden md:table-cell" th:text="|${violation.zone.name} · ${violation.camera.cameraCode}|">Zone</td>
+            <td class="hidden sm:table-cell" th:if="${forReviewer}"
+                th:text="${violation.identified} ? |${violation.user.fullName} (${violation.user.employeeCode})| : (${violation.stranger} ? #{violations.stranger} : '')">Person</td>
+            <td>
+                <span class="badge" th:classappend="${violation.stranger} ? 'badge-stranger' : ${@display.badge(violation.reviewStatus)}"
+                      th:text="${violation.stranger} ? #{violations.stranger} : ${@display.label(violation.reviewStatus)}">Status</span>
+                <span class="row-sub" th:if="${violation.dismissReason}" th:text="${@display.label(violation.dismissReason)}">Reason</span>
+            </td>
+            <td class="hidden sm:table-cell"><span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Appeal</span></td>
         </tr>
         </tbody>
     </table>

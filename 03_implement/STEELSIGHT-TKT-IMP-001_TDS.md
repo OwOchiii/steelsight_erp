@@ -249,8 +249,11 @@ CREATE TABLE ticket_comment (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- can_read_ticket(u, t)   : live ticket AND (TICKET_READ_ALL OR (TICKET_READ_OWN AND creator) OR (TICKET_READ_HANDLED AND role = handler))
--- can_update_ticket(u, t) : live ticket AND (TICKET_UPDATE_ALL OR (TICKET_UPDATE_HANDLED AND role = handler))
+-- Since V20 every category is handled by ADMIN (SRS BR-61).
+-- can_read_ticket(u, t)   : live ticket AND (TICKET_READ_ALL OR (TICKET_READ_OWN AND creator) OR (TICKET_READ_HANDLED AND role = handler)
+--                           OR (TICKET_READ_TEAM AND u leads the creator's team))
+-- can_update_ticket(u, t) : live ticket AND u is not the creator AND (TICKET_UPDATE_ALL OR (TICKET_UPDATE_HANDLED AND role = handler))
+-- can_comment_ticket(u, t): creator OR can_update_ticket OR (TICKET_READ_TEAM AND u leads the creator's team)
 -- can_delete_ticket(u, t) : live ticket AND (TICKET_DELETE_ALL OR (TICKET_DELETE_HANDLED AND role = handler))
 -- The detection role has no access to ticket tables.
 ```

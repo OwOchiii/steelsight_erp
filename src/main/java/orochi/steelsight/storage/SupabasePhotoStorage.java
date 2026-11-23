@@ -35,23 +35,30 @@ public class SupabasePhotoStorage implements PhotoStorage {
     private final RestClient client;
     private final String ticketBucket;
     private final String faceBucket;
+    private final String evidenceBucket;
 
     @Autowired
     public SupabasePhotoStorage(RestClient.Builder builder,
                                 @Value("${steelsight.storage.supabase-url:}") String url,
                                 @Value("${steelsight.storage.supabase-key:}") String key,
                                 @Value("${steelsight.storage.supabase-bucket:ticket-photos}") String ticketBucket,
-                                @Value("${steelsight.storage.supabase-face-bucket:face-photos}") String faceBucket) {
-        this(configured(builder.requestFactory(timeouts()), url, key), ticketBucket, faceBucket);
+                                @Value("${steelsight.storage.supabase-face-bucket:face-photos}") String faceBucket,
+                                @Value("${steelsight.storage.supabase-evidence-bucket:evidence-photos}") String evidenceBucket) {
+        this(configured(builder.requestFactory(timeouts()), url, key), ticketBucket, faceBucket, evidenceBucket);
     }
 
     SupabasePhotoStorage(RestClient client, String ticketBucket, String faceBucket) {
+        this(client, ticketBucket, faceBucket, "evidence-photos");
+    }
+
+    SupabasePhotoStorage(RestClient client, String ticketBucket, String faceBucket, String evidenceBucket) {
         if (ticketBucket.equals(faceBucket)) {
             throw new IllegalStateException("Face photos need their own bucket, apart from ticket photos");
         }
         this.client = client;
         this.ticketBucket = ticketBucket;
         this.faceBucket = faceBucket;
+        this.evidenceBucket = evidenceBucket;
     }
 
     /** Also used by tests, so they exercise the same URL and headers as the real thing. */
@@ -80,6 +87,9 @@ public class SupabasePhotoStorage implements PhotoStorage {
         }
         try {
             String name = UUID.randomUUID() + PhotoFormat.extensionOf(photo);
+            if (album == PhotoAlbum.FACE) {
+                PhotoFormat.checkFace(photo);
+            }
             client.post().uri(OBJECT, bucket(album), name)
                     .contentType(MediaType.parseMediaType(contentType(name)))
                     .body(photo.getBytes())
@@ -93,11 +103,13 @@ public class SupabasePhotoStorage implements PhotoStorage {
 
     @Override
     public Resource load(PhotoAlbum album, String storedPath) {
-        if (!PhotoFormat.isStoredName(storedPath)) {
+        if (!PhotoFormat.isAllowed(album, storedPath)) {
             throw new NotFoundException("Photo", storedPath);
         }
         try {
-            byte[] bytes = client.get().uri(OBJECT, bucket(album), storedPath).retrieve().body(byte[].class);
+            // Built by path so that the folders of an evidence path stay folders, not %2F.
+            byte[] bytes = client.get().uri(uri -> uri.path("/storage/v1/object/" + bucket(album) + "/").path(storedPath).build())
+                    .retrieve().body(byte[].class);
             if (bytes == null) {
                 throw new NotFoundException("Photo", storedPath);
             }
@@ -125,6 +137,10 @@ public class SupabasePhotoStorage implements PhotoStorage {
     }
 
     private String bucket(PhotoAlbum album) {
-        return album == PhotoAlbum.FACE ? faceBucket : ticketBucket;
+        return switch (album) {
+            case FACE -> faceBucket;
+            case EVIDENCE -> evidenceBucket;
+            case TICKET -> ticketBucket;
+        };
     }
 }

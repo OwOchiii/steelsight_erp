@@ -7,6 +7,8 @@ public final class Permissions {
     public static final String TICKET_READ_OWN = "TICKET_READ_OWN";
     public static final String TICKET_READ_HANDLED = "TICKET_READ_HANDLED";
     public static final String TICKET_READ_ALL = "TICKET_READ_ALL";
+    /** Read and comment on tickets opened by the team the user leads; never decide them. */
+    public static final String TICKET_READ_TEAM = "TICKET_READ_TEAM";
     public static final String TICKET_UPDATE_HANDLED = "TICKET_UPDATE_HANDLED";
     public static final String TICKET_UPDATE_ALL = "TICKET_UPDATE_ALL";
     public static final String SHIFT_READ_OWN = "SHIFT_READ_OWN";

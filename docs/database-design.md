@@ -2,7 +2,7 @@
 
 ## 1. Overall
 
-The Steelsight database has 20 tables in 6 logical domains, stored in PostgreSQL 17 with the pgvector extension. It is the shared record for the ERP web app and the Python detection service.
+The Steelsight database has 22 tables in 6 logical domains, stored in PostgreSQL 17 with the pgvector extension. It is the shared record for the ERP web app and the Python detection service.
 
 ```mermaid
 erDiagram
@@ -43,6 +43,8 @@ erDiagram
     app_user ||--o{ ticket_comment : "author_id"
     app_user ||--o{ notification : "user_id"
     safety_alert |o--o{ notification : "safety_alert_id"
+    app_user ||--o| zalo_link_code : "user_id"
+    app_user ||--o{ schedule_notice : "user_id"
     safety_policy {
         boolean id PK
     }
@@ -57,7 +59,7 @@ The schema is grouped into 6 logical domains:
 | 1.3 | Shift Management | zone, shift | Holds the timetable: which worker is in which site zone, and when. |
 | 1.4 | PPE and Safety Monitoring | ppe_vest, ppe_linking, camera, violation | Records vests, cameras and the PPE violations the detection service finds, including dispute decisions. |
 | 1.5 | Ticket Management | ticket_category, ticket, ticket_comment | Handles requests, hazard reports and PPE disputes, each routed to the role that handles its category. |
-| 1.6 | Safety Score and Notifications | safety_policy, safety_alert, notification | Sets the rules of each worker's monthly safety score, records detection alerts, and holds in-app notifications. |
+| 1.6 | Safety Score and Notifications | safety_policy, safety_alert, notification, zalo_link_code, schedule_notice | Sets the rules of each worker's monthly safety score, records detection alerts, holds in-app notifications, and links workers' Zalo chats for check-in and schedule messages. |
 
 In the entity tables, Field Size gives bytes for fixed-size types and precision,scale for numeric, and Variable means no declared limit. Unique says Partial when uniqueness applies only to some rows, and the description gives the condition.
 
@@ -102,6 +104,7 @@ erDiagram
         timestamptz updated_at
         timestamptz deleted_at
         boolean must_change_password
+        text zalo_chat_id UK
     }
 ```
 
@@ -156,6 +159,7 @@ Every person who uses the system.
 | 13 | updated_at | timestamptz | 8 bytes |  | No | No | When the row last changed; set by a trigger |
 | 14 | deleted_at | timestamptz | 8 bytes |  | Yes | No | When the user was soft-deleted; a trigger then erases their face embedding |
 | 15 | must_change_password | boolean | 1 byte |  | No | No | True when an admin chose the password, on a new account or a reset; they must pick their own at the next sign-in. Defaults to false |
+| 16 | zalo_chat_id | text | Variable |  | Yes | Partial | The user's own Zalo chat, linked from their home page; unique when set. Empty for anyone who hasn't linked Zalo, who then gets no Zalo messages. The detection service may read it, to send gate check-in messages (V18) |
 
 ### 1.2 Worker Management
 
@@ -258,7 +262,7 @@ One visit to site, from check-in to check-out.
 | 11 | snapshot_path | text | Variable |  | Yes | No | Path of the face image taken at the gate |
 | 12 | recorded_by | bigint | 8 bytes | FK → app_user(id) | Yes | No | Who entered or corrected the visit; required for MANUAL |
 | 13 | note | text | Variable |  | Yes | No | Free-text note |
-| 14 | auto_closed | boolean | 1 byte |  | No | No | True when check-out is an estimate because the worker never checked out; defaults to false |
+| 14 | auto_closed | boolean | 1 byte |  | No | No | True when check-out is an estimate because the worker never checked out: the visit closes 2 hours after its shift ends, at the shift's end (V15). Defaults to false |
 | 15 | created_at | timestamptz | 8 bytes |  | No | No | When the row was created |
 | 16 | updated_at | timestamptz | 8 bytes |  | No | No | When the row last changed; set by a trigger |
 | 17 | event_id | uuid | 16 bytes |  | Yes | Yes | Outbox event ID from the detection service; makes retries safe |
@@ -471,7 +475,7 @@ One PPE violation detected by a camera.
 
 ### 1.5 Ticket Management
 
-This domain handles requests and reports raised by users. Each category names the role that handles it, and that link sets who can see and resolve its tickets. HSE officers handle PPE disputes and safety concerns, and see no other tickets. Admin handles every other category, such as leave requests, and can also open HSE's tickets. Managers only open and read their own tickets. A PPE dispute ticket links to one violation and closes only when that dispute is decided, in the same transaction.
+This domain handles requests and reports raised by users. Each category names the role that handles it, and that link sets who can see and resolve its tickets. As the requirements say (SRS BR-61), every category is handled by Admin (V20), and an admin can't handle a ticket they opened. HSE officers see no tickets but their own. A team leader can read and comment on the tickets of their team, but not decide them. A PPE dispute ticket links to one violation and closes only when that dispute is decided, in the same transaction.
 
 ```mermaid
 erDiagram
@@ -518,7 +522,7 @@ erDiagram
 
 #### 1.5.1 ticket_category
 
-A type of ticket and the role that handles it. The categories are PPE dispute and Safety concern (HSE_OFFICER), and Shift or timetable issue, Equipment request, Leave request and Account or access (ADMIN).
+A type of ticket and the role that handles it. The categories are PPE dispute, Safety concern, Shift or timetable issue, Equipment request, Leave request, Account or access, Attendance correction, Personal information update and Other, all handled by ADMIN since V20. The last three came from the requirements' category list (V16).
 
 | No. | Field Name | Data Type | Field Size | P/F Key | Nullable | Unique | Description |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -571,10 +575,14 @@ A trigger on `violation` sends the warning or danger notification. It's a trigge
 
 The detection service reports a burst of violations through the ERP's alert API, which stores a `safety_alert` and notifies every active HSE officer. `safety_time_slots()` ranks shift time slots by violations per 100 worker-hours for the HSE view.
 
+Zalo is the only chat channel (V18; V19 removed Telegram, as the requirements send every notice through Zalo). It is optional for each worker. A Zalo bot link can't carry a code, so the home page shows a short one-time code from `zalo_link_code` that the worker sends to the bot, and the chat is kept in `app_user.zalo_chat_id` (text, since Zalo chat ids are strings). The detection service sends each gate check-in and check-out, and the ERP sends visits entered or corrected by hand. A manager sends a month's schedule from the shift page, which records it in `schedule_notice`; after that each change to that worker's shifts in the month is sent on its own. Messages themselves aren't stored.
+
 ```mermaid
 erDiagram
     app_user ||--o{ notification : "user_id"
     safety_alert |o--o{ notification : "safety_alert_id"
+    app_user ||--o| zalo_link_code : "user_id"
+    app_user ||--o{ schedule_notice : "user_id"
     safety_policy {
         boolean id PK
         integer points_per_violation
@@ -592,6 +600,16 @@ erDiagram
         text camera_code
         boolean notified
         timestamptz received_at
+    }
+    zalo_link_code {
+        bigint user_id PK,FK
+        text code UK
+        timestamptz expires_at
+    }
+    schedule_notice {
+        bigint user_id PK,FK
+        date month PK
+        timestamptz sent_at
     }
     notification {
         bigint id PK
@@ -647,3 +665,23 @@ One in-app notification. Its words aren't stored, so each reader sees it in thei
 | 6 | safety_alert_id | bigint | 8 bytes | FK → safety_alert(id) | Yes | No | The alert behind an HSE notice; set exactly for HSE_VIOLATION_ALERT |
 | 7 | read_at | timestamptz | 8 bytes |  | Yes | No | When the reader marked it as read; empty means unread |
 | 8 | created_at | timestamptz | 8 bytes |  | No | No | When it was sent |
+
+#### 1.6.4 zalo_link_code
+
+A one-time code that links a user's Zalo chat. The home page shows it; the user sends it to the SteelSight bot, and Zalo passes it to the ERP's webhook.
+
+| No. | Field Name | Data Type | Field Size | P/F Key | Nullable | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | user_id | bigint | 8 bytes | PK, FK → app_user(id) | No | Yes | Whose chat the code links; one code per user, and a new one replaces the old. Deleted with the user |
+| 2 | code | text | Variable |  | No | Yes | Random 8-character code of letters and digits without look-alikes; used up when the chat is linked |
+| 3 | expires_at | timestamptz | 8 bytes |  | No | No | The code stops working after this, 30 minutes after it was made |
+
+#### 1.6.5 schedule_notice
+
+Which users have been sent which month's work schedule on Zalo. A change to a shift is sent only for a month the user was already sent, so building a month doesn't send a message on every save.
+
+| No. | Field Name | Data Type | Field Size | P/F Key | Nullable | Unique | Description |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | user_id | bigint | 8 bytes | PK, FK → app_user(id) | No | Composite | The worker; deleted with the user |
+| 2 | month | date | 4 bytes | PK | No | Composite | The 1st of the month that was sent |
+| 3 | sent_at | timestamptz | 8 bytes |  | No | No | When it was last sent; defaults to now |

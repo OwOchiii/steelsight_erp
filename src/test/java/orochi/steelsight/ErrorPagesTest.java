@@ -40,13 +40,13 @@ class ErrorPagesTest extends PageTestSupport {
     private static final byte[] LARGE_JPEG = largeJpeg(5 * 1024 * 1024 + 1);
 
     Long worker;
-    Long hse;
+    Long admin;
     Long safetyConcern;
 
     @BeforeEach
     void seed() {
         worker = userWithRole("ERR-W", "Wes Worker", "WORKER");
-        hse = userWithRole("ERR-H", "Hal Hse", "HSE_OFFICER");
+        admin = userWithRole("ERR-A", "Ada Admin", "ADMIN");   // the Admin handles every ticket
         safetyConcern = category("Safety concern");
     }
 
@@ -80,17 +80,17 @@ class ErrorPagesTest extends PageTestSupport {
 
         mvc.perform(post(page + "/assignee").param("assigneeId", "abc")
                         .header("Referer", "http://localhost" + page)
-                        .with(as(hse)).with(csrf()))
+                        .with(as(admin)).with(csrf()))
                 .andExpect(redirectedUrl(page))
                 .andExpect(flash().attribute("error", "One of the values isn't valid. Check the form and try again."));
 
         // Without a page to go back to, the error page says the same
-        mvc.perform(post(page + "/assignee").param("assigneeId", "abc").with(as(hse)).with(csrf()))
+        mvc.perform(post(page + "/assignee").param("assigneeId", "abc").with(as(admin)).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(containsString("One of the values isn&#39;t valid")));
 
         // A bad id in the address is still a page that doesn't exist
-        mvc.perform(post("/tickets/abc/comments").param("body", "x").with(as(hse)).with(csrf()))
+        mvc.perform(post("/tickets/abc/comments").param("body", "x").with(as(admin)).with(csrf()))
                 .andExpect(status().isNotFound());
     }
 
@@ -100,15 +100,15 @@ class ErrorPagesTest extends PageTestSupport {
 
         // Only the path is kept, never the host
         mvc.perform(post(assign).param("assigneeId", "abc").header("Referer", "https://evil.example/tickets?x={y}")
-                        .with(as(hse)).with(csrf()))
+                        .with(as(admin)).with(csrf()))
                 .andExpect(redirectedUrl("/tickets?x=%7By%7D"));
         // The URL parser folds a doubled slash, so this lands on this site's /x
         mvc.perform(post(assign).param("assigneeId", "abc").header("Referer", "https://evil.example//x")
-                        .with(as(hse)).with(csrf()))
+                        .with(as(admin)).with(csrf()))
                 .andExpect(redirectedUrl("/x"));
         // Paths a browser would read as another site get the error page instead
         for (String referer : new String[]{"https://evil.example/\\x", "javascript:alert(1)"}) {
-            mvc.perform(post(assign).param("assigneeId", "abc").header("Referer", referer).with(as(hse)).with(csrf()))
+            mvc.perform(post(assign).param("assigneeId", "abc").header("Referer", referer).with(as(admin)).with(csrf()))
                     .andExpect(status().isBadRequest())
                     .andExpect(header().doesNotExist("Location"));
         }

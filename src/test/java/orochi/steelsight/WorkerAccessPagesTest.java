@@ -14,6 +14,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Managers can look at every worker, but only change things for the teams they run. */
@@ -55,7 +56,7 @@ class WorkerAccessPagesTest extends PageTestSupport {
                     .andExpect(content().string(containsString("Wanda Mine")))
                     .andReturn().getResponse().getContentAsString();
             assertThat(page.indexOf("Tom Theirs")).isLessThan(page.indexOf("Wanda Mine")).isPositive();
-            assertThat(page).contains("90");
+            assertThat(page).contains("95");   // 100 - 5 (BR-57)
         }
     }
 
@@ -81,7 +82,7 @@ class WorkerAccessPagesTest extends PageTestSupport {
         mvc.perform(get("/workers/" + theirs).with(as(manager)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Tom Theirs")))
-                .andExpect(content().string(containsString("No vest")))
+                .andExpect(content().string(containsString("Vest")))
                 .andExpect(content().string(not(containsString("/team/" + theirs + "/edit"))))
                 .andExpect(content().string(not(containsString("/shifts/new?workerId=" + theirs))));
 
@@ -108,14 +109,15 @@ class WorkerAccessPagesTest extends PageTestSupport {
     }
 
     @Test
-    void nonSafetyTicketsGoToAdminWhicheverTeamTheyComeFrom() throws Exception {
-        Long fromMine = ticket(category("Equipment request"), mine, "Boots from mine");
+    void ticketsGoToAdminWhicheverTeamTheyComeFrom() throws Exception {
+        Long fromMine = ticket(category("Other"), mine, "Boots from mine");
         Long loner = userWithRole("WA-W3", "Lone Worker", "WORKER");
-        Long fromNobody = ticket(category("Equipment request"), loner, "Boots from nobody");
+        Long fromNobody = ticket(category("Other"), loner, "Boots from nobody");
 
         mvc.perform(get("/tickets/queue").with(as(manager))).andExpect(status().isForbidden());
+        mvc.perform(get("/tickets/" + fromMine).with(as(manager))).andExpect(status().isOk());       // their own team
+        mvc.perform(get("/tickets/" + fromNobody).with(as(manager))).andExpect(status().isForbidden());
         for (Long ticket : new Long[]{fromMine, fromNobody}) {
-            mvc.perform(get("/tickets/" + ticket).with(as(manager))).andExpect(status().isForbidden());
             mvc.perform(get("/tickets/" + ticket).with(as(admin))).andExpect(status().isOk());
         }
         mvc.perform(post("/tickets/" + fromMine + "/resolve").with(as(manager)).with(csrf())).andExpect(status().isForbidden());
@@ -125,38 +127,40 @@ class WorkerAccessPagesTest extends PageTestSupport {
     }
 
     @Test
-    void hseTicketsDoNotDependOnTheTeam() throws Exception {
-        Long ticket = ticket(category("Safety concern"), theirs, "Loose rail");
-        mvc.perform(get("/tickets/queue").with(as(hse))).andExpect(content().string(containsString("Loose rail")));
-        mvc.perform(post("/tickets/" + ticket + "/resolve").with(as(hse)).with(csrf())).andExpect(status().is3xxRedirection());
+    void safetyConcernsGoToTheAdminNotHse() throws Exception {
+        Long ticket = ticket(category("Other"), theirs, "Loose rail");
+        mvc.perform(get("/tickets/queue").with(as(hse))).andExpect(status().isForbidden());
+        mvc.perform(post("/tickets/" + ticket + "/resolve").with(as(hse)).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post("/tickets/" + ticket + "/resolve").with(as(admin)).with(csrf())).andExpect(status().is3xxRedirection());
         assertThat(textColumn("SELECT status FROM ticket WHERE id = ?", ticket)).isEqualTo("RESOLVED");
     }
 
+    /** BR-58, BR-59: 4 confirmed violations make 80 points, bonus level 1; the worker is told and reminded. */
     @Test
-    void aWorkerAtWarningLevelSeesTheReminderAndTheBell() throws Exception {
-        safetyHits(mine, 3);
+    void aWorkerAtLevelOneSeesTheReminderAndTheBell() throws Exception {
+        safetyHits(mine, 4);
 
         mvc.perform(get("/").with(as(mine)))
-                .andExpect(content().string(containsString("Safety warning")))
+                .andExpect(content().string(containsString("Level 1: bonus -2%")))
                 .andExpect(content().string(containsString("Hard hat")))
                 .andExpect(content().string(containsString("PPE vest")))
-                .andExpect(content().string(containsString("bell-count")))
-                .andExpect(content().string(not(containsString("paycheck"))));
+                .andExpect(content().string(containsString("bell-count")));
     }
 
+    /** BR-59: when the level becomes worse, the notice says so clearly. */
     @Test
-    void aWorkerAtDangerLevelIsToldAboutTheirPay() throws Exception {
-        safetyHits(mine, 6);
+    void aWorkerWhoseLevelGetsWorseIsToldTheReduction() throws Exception {
+        safetyHits(mine, 8);
 
         mvc.perform(get("/notifications").with(as(mine)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Your paycheck may be deducted under company policy")))
-                .andExpect(content().string(containsString("Hard hat")));
+                .andExpect(content().string(containsString("the bonus is reduced by 6%")))
+                .andExpect(content().string(containsString("Violation confirmed")));
     }
 
     @Test
     void notificationsAreYourOwnAndCanBeMarkedRead() throws Exception {
-        safetyHits(mine, 3);
+        safetyHits(mine, 1);
         Long notification = jdbc.queryForObject("SELECT id FROM notification WHERE user_id = ?", Long.class, mine);
 
         mvc.perform(post("/notifications/" + notification + "/read").with(as(theirs)).with(csrf())).andExpect(status().isForbidden());
@@ -193,13 +197,18 @@ class WorkerAccessPagesTest extends PageTestSupport {
     }
 
     /** Violations a block apart, so each counts, from the start of the current month in site time. */
-    private void safetyHits(Long user, int count) {
+    /** Violations of this month that HSE confirms for the person on the review page, one by one. */
+    private void safetyHits(Long user, int count) throws Exception {
         for (int i = 0; i < count; i++) {
-            jdbc.update("""
-                    INSERT INTO violation (user_id, camera_id, violation_type, detected_at, snapshot_path)
-                    VALUES (?, ?, 'NO_VEST',
+            Long id = jdbc.queryForObject("""
+                    INSERT INTO violation (camera_id, violation_type, detected_at, snapshot_path)
+                    VALUES (?, 'NO_VEST',
                             date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh'
-                                + interval '1 minute' + make_interval(mins => ?), 'x.jpg')""", user, camera, i * 30);
+                                + interval '1 minute' + make_interval(mins => ?), 'x.jpg') RETURNING id""", Long.class, camera, i * 30);
+            mvc.perform(post("/violations/" + id + "/confirm").param("personId", user.toString()).param("version", "0")
+                            .with(as(hse)).with(csrf()))
+                    .andExpect(flash().attribute("success", "The violation was confirmed."));
         }
+        jdbc.update("DELETE FROM notification WHERE user_id <> ?", user);
     }
 }

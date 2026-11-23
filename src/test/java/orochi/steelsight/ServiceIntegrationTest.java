@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import orochi.steelsight.attendance.service.CheckInService.ManualCheckIn;
 import orochi.steelsight.exception.BusinessRuleException;
 import orochi.steelsight.exception.StaleEditException;
 import orochi.steelsight.identity.model.AppUser;
+import orochi.steelsight.identity.model.StaffGroup;
 import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.identity.repository.RoleRepository;
 import orochi.steelsight.identity.service.UserService;
@@ -26,6 +28,8 @@ import orochi.steelsight.identity.service.UserService.NewUser;
 import orochi.steelsight.identity.service.UserService.Profile;
 import orochi.steelsight.ppe.model.Camera;
 import orochi.steelsight.ppe.model.DisputeStatus;
+import orochi.steelsight.ticketing.model.TicketOutcome;
+import orochi.steelsight.ppe.model.ReviewStatus;
 import orochi.steelsight.ppe.model.Violation;
 import orochi.steelsight.ppe.model.ViolationType;
 import orochi.steelsight.ppe.repository.CameraRepository;
@@ -60,6 +64,7 @@ class ServiceIntegrationTest {
     @Autowired UserService userService;
     @Autowired TeamService teamService;
     @Autowired ShiftService shiftService;
+    @Autowired orochi.steelsight.jobs.SiteJobs siteJobs;
     @Autowired TicketService ticketService;
     @Autowired ViolationService violationService;
     @Autowired CheckInService checkInService;
@@ -74,21 +79,23 @@ class ServiceIntegrationTest {
     @Autowired PasswordEncoder passwordEncoder;
 
     Long admin;
+    Long otherAdmin;
     Long hse;
-    Long otherHse;
     Long manager;
     Long otherManager;
     Long worker;
     Long otherWorker;
     Long zone;
     Camera camera;
-    OffsetDateTime start = OffsetDateTime.now().plusDays(1);
+    /** 06:00 on the Monday two weeks ahead: a week whose schedule hasn't been sent (BR-23). */
+    OffsetDateTime start = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).plusWeeks(2)
+            .with(java.time.DayOfWeek.MONDAY).atTime(6, 0).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toOffsetDateTime();
 
     @BeforeEach
     void seed() {
         admin = user("A1", "ADMIN", null);
+        otherAdmin = user("A2", "ADMIN", null);
         hse = user("H1", "HSE_OFFICER", null);
-        otherHse = user("H2", "HSE_OFFICER", null);
         manager = user("M1", "MANAGER", null);
         otherManager = user("M2", "MANAGER", null);
         worker = user("W1", "WORKER", team("Team one", manager));
@@ -109,7 +116,7 @@ class ServiceIntegrationTest {
 
     @Test
     void adminCreatesUsersWithAHashedPasswordAndOthersCannot() {
-        NewUser details = new NewUser("W9", "New Worker", "w9@test.local", null, "secret-pw", "WORKER", null);
+        NewUser details = new NewUser("W-9", "New Worker", "w9@test.local", "0900000009", "secret-pw", "WORKER", null, StaffGroup.OFFICE, true);
 
         AppUser created = userService.create(admin, details);
 
@@ -128,7 +135,7 @@ class ServiceIntegrationTest {
     @Test
     void onlyAnAdminEditsDetailsAndAManagerCannotEvenEditTheirOwnTeam() {
         long version = users.findById(worker).orElseThrow().getVersion();
-        Profile profile = new Profile("Renamed", null, "0123");
+        Profile profile = new Profile("Renamed", null, "0912345678");
 
         assertThatThrownBy(() -> userService.updateProfile(manager, worker, profile, version))
                 .isInstanceOf(AccessDeniedException.class);
@@ -192,26 +199,27 @@ class ServiceIntegrationTest {
 
     @Test
     void createChecksWhatTheAdminTyped() {
-        assertThatThrownBy(() -> userService.create(admin, new NewUser("has space", "N", null, null, "long-enough-pw", "WORKER", null)))
-                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("employee code");
-        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", "N", null, null, "short", "WORKER", null)))
+        String phone = "0900000008";
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("has space", "New Person", null, phone, "long-enough-pw", "WORKER", null, StaffGroup.OFFICE, true)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("mployee code");
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W-8", "New Person", null, phone, "short", "WORKER", null, StaffGroup.OFFICE, true)))
                 .isInstanceOf(BusinessRuleException.class).hasMessageContaining("at least 8");
-        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", " ", null, null, "long-enough-pw", "WORKER", null)))
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W-8", " ", null, phone, "long-enough-pw", "WORKER", null, StaffGroup.OFFICE, true)))
                 .isInstanceOf(BusinessRuleException.class).hasMessageContaining("name");
-        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", "N", "nope", null, "long-enough-pw", "WORKER", null)))
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W-8", "New Person", "nope", phone, "long-enough-pw", "WORKER", null, StaffGroup.OFFICE, true)))
                 .isInstanceOf(BusinessRuleException.class).hasMessageContaining("email");
-        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", "N", null, null, "long-enough-pw", "", null)))
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W-8", "New Person", null, phone, "long-enough-pw", "", null, StaffGroup.OFFICE, true)))
                 .isInstanceOf(BusinessRuleException.class).hasMessageContaining("role");
-        assertThatThrownBy(() -> userService.create(admin, new NewUser("W8", "N", null, null, "é".repeat(40), "WORKER", null)))
+        assertThatThrownBy(() -> userService.create(admin, new NewUser("W-8", "New Person", null, phone, "é".repeat(40), "WORKER", null, StaffGroup.OFFICE, true)))
                 .isInstanceOf(BusinessRuleException.class).hasMessageContaining("too long");
     }
 
     @Test
     void createQueuesTheFacePhotoAndTheStartingPasswordMustBeChanged() {
         AppUser created = userService.create(admin,
-                new NewUser(" W8 ", "New Face", null, null, "long-enough-pw", "WORKER", null), "w8.jpg");
+                new NewUser(" w-8 ", "New Face", null, "0900000018", "long-enough-pw", "WORKER", null, StaffGroup.OFFICE, true), "w8.jpg");
 
-        assertThat(created.getEmployeeCode()).isEqualTo("W8");
+        assertThat(created.getEmployeeCode()).isEqualTo("W-8");   // stored in upper case (BR-06)
         assertThat(created.getFaceFilePath()).isEqualTo("w8.jpg");
         assertThat(created.isMustChangePassword()).isTrue();
         assertThat(embeddings.findFrontByUserId(created.getId()).orElseThrow().getStatus()).isEqualTo(EmbeddingStatus.PENDING);
@@ -315,7 +323,16 @@ class ServiceIntegrationTest {
         assertThatThrownBy(() -> shiftService.update(manager, first.getId(), shift(worker, 1, 9), version + 1))
                 .isInstanceOf(StaleEditException.class);
 
-        Shift done = shiftService.complete(manager, first.getId());
+        // A shift becomes COMPLETED by itself once it has ended; nobody marks it.
+        siteJobs.hourly(java.time.LocalDateTime.now());
+        em.clear();
+        assertThat(em.find(Shift.class, first.getId()).getStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        em.createNativeQuery("UPDATE shift SET start_at = now() - interval '9 hours', end_at = now() - interval '1 hour' WHERE id = :id")
+                .setParameter("id", first.getId()).executeUpdate();
+        siteJobs.hourly(java.time.LocalDateTime.now());
+        em.clear();
+
+        Shift done = em.find(Shift.class, first.getId());
         assertThat(done.getStatus()).isEqualTo(ShiftStatus.COMPLETED);
         assertThatThrownBy(() -> shiftService.cancel(manager, first.getId()))
                 .isInstanceOf(BusinessRuleException.class);
@@ -339,88 +356,124 @@ class ServiceIntegrationTest {
     // --- tickets ---------------------------------------------------------------------------
 
     @Test
-    void safetyConcernGoesToHseAndOnlyHandlersCanResolveIt() {
-        Ticket ticket = ticketService.create(worker, category("Safety concern"), "Broken rail", "Level 2 rail is loose");
+    void everyTicketGoesToTheAdminAndOnlyAnAdminCanResolveIt() {
+        Ticket ticket = ticketService.create(worker, category("Other"), "Broken rail", "Level 2 rail is loose");
         em.flush();
 
         assertThat(ticketService.listOwn(worker)).containsExactly(ticket);
-        assertThat(ticketService.listHandled(hse)).containsExactly(ticket);
+        assertThat(ticketService.listHandled(admin)).contains(ticket);
+        assertThatThrownBy(() -> ticketService.listHandled(hse)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> ticketService.listHandled(manager)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> ticketService.resolve(hse, ticket.getId())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> ticketService.resolve(manager, ticket.getId())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> ticketService.resolve(worker, ticket.getId())).isInstanceOf(AccessDeniedException.class);
 
-        Ticket resolved = ticketService.resolve(hse, ticket.getId());
+        Ticket resolved = ticketService.resolve(admin, ticket.getId());
         assertThat(resolved.getStatus()).isEqualTo(TicketStatus.RESOLVED);
-        assertThat(resolved.getResolver().getId()).isEqualTo(hse);
+        assertThat(resolved.getResolver().getId()).isEqualTo(admin);
         assertThat(resolved.getResolvedAt()).isNotNull();
     }
 
     @Test
-    void safetyConcernCanSayWhereTheHazardIsAndShowIt() {
+    void aTicketKeepsItsPhoto() {
         TicketService.NewTicket details = new TicketService.NewTicket(
-                category("Safety concern"), "Broken rail", "Level 2 rail is loose", zone, "tickets/rail.jpg");
+                category("Other"), "Broken rail", "Level 2 rail is loose", "tickets/rail.jpg", null, null, null, null, null, null, null);
 
         Ticket ticket = ticketService.create(worker, details);
 
-        assertThat(ticket.getZone().getId()).isEqualTo(zone);
         assertThat(ticket.getPhotoPath()).isEqualTo("tickets/rail.jpg");
     }
 
     @Test
     void adminCanWorkAnyTicket() {
-        Ticket ticket = ticketService.create(worker, category("Equipment request"), "Gloves", "Need new gloves");
+        Ticket ticket = ticketService.create(worker, category("Other"), "New gloves", "Need new gloves for the steel yard");
 
         assertThat(ticketService.listAll(admin)).contains(ticket);
         assertThat(ticketService.resolve(admin, ticket.getId()).getStatus()).isEqualTo(TicketStatus.RESOLVED);
     }
 
+    /** SRS UC-24 EX-01. */
     @Test
-    void ticketsStayPrivateToTheirCreatorAndHandlers() {
-        Ticket ticket = ticketService.create(worker, category("Equipment request"), "Gloves", "Need new gloves");
+    void anAdminCannotHandleTheirOwnTicket() {
+        Ticket ticket = ticketService.create(admin, category("Other"), "Laptop", "Mine is broken");
+        em.flush();
+
+        assertThat(ticketService.canHandle(admin, ticket.getId())).isFalse();
+        assertThatThrownBy(() -> ticketService.resolve(admin, ticket.getId())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> ticketService.assign(otherAdmin, ticket.getId(), admin))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThat(ticketService.resolve(otherAdmin, ticket.getId()).getStatus()).isEqualTo(TicketStatus.RESOLVED);
+    }
+
+    @Test
+    void ticketsStayPrivateToTheirCreatorTheirTeamLeaderAndTheAdmin() {
+        Ticket ticket = ticketService.create(worker, category("Other"), "New gloves", "Need new gloves for the steel yard");
         em.flush();
 
         assertThat(ticketService.get(worker, ticket.getId())).isEqualTo(ticket);
         assertThat(ticketService.get(admin, ticket.getId())).isEqualTo(ticket);
-        assertThatThrownBy(() -> ticketService.get(manager, ticket.getId())).isInstanceOf(AccessDeniedException.class);
+        assertThat(ticketService.get(manager, ticket.getId())).isEqualTo(ticket);   // leads the worker's team
+        assertThatThrownBy(() -> ticketService.get(otherManager, ticket.getId())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> ticketService.get(otherWorker, ticket.getId())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> ticketService.get(hse, ticket.getId())).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
-    void assigneeMustBeAbleToHandleTheTicket() {
-        Ticket ticket = ticketService.create(worker, category("Safety concern"), "Spill", "Oil on the floor");
+    void theTeamLeaderListsAndCommentsOnTeamTicketsButCannotDecide() {
+        Ticket ticket = ticketService.create(worker, category("Other"), "Friday off", "Family wedding on Friday");
+        em.flush();
 
-        assertThatThrownBy(() -> ticketService.assign(hse, ticket.getId(), manager))
+        assertThat(ticketService.listTeam(manager, PageRequest.of(0, 20)).getContent()).containsExactly(ticket);
+        assertThat(ticketService.listTeam(otherManager, PageRequest.of(0, 20)).getContent()).isEmpty();
+        assertThatThrownBy(() -> ticketService.listTeam(worker, PageRequest.of(0, 20))).isInstanceOf(AccessDeniedException.class);
+
+        ticketService.addComment(manager, ticket.getId(), "He asked me last week");
+        assertThatThrownBy(() -> ticketService.addComment(otherManager, ticket.getId(), "Hi"))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> ticketService.resolve(manager, ticket.getId())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> ticketService.assign(manager, ticket.getId(), manager)).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void assigneeMustBeAbleToHandleTheTicket() {
+        Ticket ticket = ticketService.create(worker, category("Other"), "Oil spill", "Oil on the floor near the gate");
+
+        assertThatThrownBy(() -> ticketService.assign(admin, ticket.getId(), hse))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> ticketService.assign(admin, ticket.getId(), manager))
                 .isInstanceOf(BusinessRuleException.class);
 
-        Ticket assigned = ticketService.assign(hse, ticket.getId(), otherHse);
-        assertThat(assigned.getAssignee().getId()).isEqualTo(otherHse);
+        Ticket assigned = ticketService.assign(admin, ticket.getId(), otherAdmin);
+        assertThat(assigned.getAssignee().getId()).isEqualTo(otherAdmin);
         assertThat(assigned.getStatus()).isEqualTo(TicketStatus.IN_PROGRESS);
     }
 
     @Test
-    void commentsComeFromTheCreatorOrHandlersAndStopWhenResolved() {
-        Ticket ticket = ticketService.create(worker, category("Safety concern"), "Spill", "Oil on the floor");
+    void commentsComeFromTheCreatorTheLeaderOrTheAdminAndStopWhenResolved() {
+        Ticket ticket = ticketService.create(worker, category("Other"), "Oil spill", "Oil on the floor near the gate");
         ticketService.addComment(worker, ticket.getId(), "Still there");
-        ticketService.addComment(hse, ticket.getId(), "On my way");
+        ticketService.addComment(admin, ticket.getId(), "Sending someone");
         em.flush();
 
-        assertThat(ticketService.listComments(hse, ticket.getId())).hasSize(2);
+        assertThat(ticketService.listComments(admin, ticket.getId())).hasSize(2);
         assertThatThrownBy(() -> ticketService.addComment(otherWorker, ticket.getId(), "Hello"))
                 .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> ticketService.addComment(hse, ticket.getId(), "Hello"))
+                .isInstanceOf(AccessDeniedException.class);
 
-        ticketService.resolve(hse, ticket.getId());
+        ticketService.resolve(admin, ticket.getId());
         assertThatThrownBy(() -> ticketService.addComment(worker, ticket.getId(), "Thanks"))
                 .isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
     void softDeletedTicketDisappears() {
-        Ticket ticket = ticketService.create(worker, category("Safety concern"), "Spill", "Oil on the floor");
+        Ticket ticket = ticketService.create(worker, category("Other"), "Oil spill", "Oil on the floor near the gate");
         em.flush();
         assertThatThrownBy(() -> ticketService.softDelete(manager, ticket.getId())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> ticketService.softDelete(hse, ticket.getId())).isInstanceOf(AccessDeniedException.class);
 
-        ticketService.softDelete(hse, ticket.getId());
+        ticketService.softDelete(admin, ticket.getId());
         em.flush();
 
         assertThat(ticketService.listOwn(worker)).isEmpty();
@@ -430,94 +483,103 @@ class ServiceIntegrationTest {
     // --- disputes --------------------------------------------------------------------------
 
     @Test
-    void workerDisputesAndHseDecidesWithTicketResolvedTogether() {
+    void workerAppealsAndTheAdminDecidesWithTicketResolvedTogether() {
         Violation violation = violation(worker);
 
-        Ticket ticket = ticketService.openDispute(worker, violation.getId(), "Not me", "I wore my hard hat");
+        Ticket ticket = ticketService.openDispute(worker, violation.getId(), "Not me", "I wore my hard hat the whole time");
         assertThat(violation.getDisputeStatus()).isEqualTo(DisputeStatus.DISPUTED);
-        assertThat(ticketService.listHandled(hse)).containsExactly(ticket);
+        assertThat(ticketService.listHandled(admin)).contains(ticket);
 
-        Violation decided = violationService.decide(hse, violation.getId(), DisputeStatus.OVERTURNED, "The image is unclear");
+        Violation decided = ticketService.decideAppeal(admin, violation.getId(), DisputeStatus.OVERTURNED,
+                "The officer on duty was not sure who it was.", "The image is unclear, points returned.", null);
         em.flush();
 
         assertThat(decided.getDisputeStatus()).isEqualTo(DisputeStatus.OVERTURNED);
-        assertThat(decided.getReviewedBy().getId()).isEqualTo(hse);
+        assertThat(decided.getAppealDecidedBy().getId()).isEqualTo(admin);
         assertThat(ticket.getStatus()).isEqualTo(TicketStatus.RESOLVED);
-        assertThat(ticket.getResolver().getId()).isEqualTo(hse);
+        assertThat(ticket.getOutcome()).isEqualTo(TicketOutcome.OVERTURNED);
+        assertThat(ticket.getResolver().getId()).isEqualTo(admin);
         assertThat(ticketService.listComments(worker, ticket.getId())).hasSize(1);
     }
 
     @Test
-    void onlyTheOwnerDisputesAndOnlyOnce() {
+    void onlyTheOwnerAppealsAndOnlyOnce() {
         Violation violation = violation(worker);
 
-        assertThatThrownBy(() -> ticketService.openDispute(otherWorker, violation.getId(), "s", "d"))
+        assertThatThrownBy(() -> ticketService.openDispute(otherWorker, violation.getId(), null, "I wore my vest the whole time"))
                 .isInstanceOf(AccessDeniedException.class);
 
-        ticketService.openDispute(worker, violation.getId(), "s", "d");
-        assertThatThrownBy(() -> ticketService.openDispute(worker, violation.getId(), "s", "d"))
+        ticketService.openDispute(worker, violation.getId(), null, "I wore my vest the whole time");
+        assertThatThrownBy(() -> ticketService.openDispute(worker, violation.getId(), null, "I wore my vest the whole time"))
                 .isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
-    void disputeTicketCanOnlyEndThroughADecision() {
+    void anAppealTicketCanOnlyEndThroughADecision() {
         Violation violation = violation(worker);
-        Ticket ticket = ticketService.openDispute(worker, violation.getId(), "s", "d");
+        Ticket ticket = ticketService.openDispute(worker, violation.getId(), null, "I wore my vest the whole time");
         em.flush();
 
-        assertThatThrownBy(() -> ticketService.create(worker, category("PPE dispute"), "s", "d"))
+        assertThatThrownBy(() -> ticketService.create(worker, category("PPE appeal"), "Appeal", "Some details here"))
                 .isInstanceOf(BusinessRuleException.class);
-        assertThatThrownBy(() -> ticketService.resolve(hse, ticket.getId()))
+        assertThatThrownBy(() -> ticketService.resolve(admin, ticket.getId()))
                 .isInstanceOf(BusinessRuleException.class);
-        assertThatThrownBy(() -> ticketService.softDelete(hse, ticket.getId()))
+        assertThatThrownBy(() -> ticketService.softDelete(admin, ticket.getId()))
                 .isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
-    void decisionsNeedReviewRightsAndAValidOutcome() {
+    void onlyTheAdminDecidesAnAppealAndTheOutcomeMustBeValid() {
         Violation violation = violation(worker);
-        ticketService.openDispute(worker, violation.getId(), "s", "d");
+        ticketService.openDispute(worker, violation.getId(), null, "I wore my vest the whole time");
+        String facts = "The officer saw the worker without a hard hat.";
+        String note = "Checked the photo with the officer.";
 
-        assertThatThrownBy(() -> violationService.decide(manager, violation.getId(), DisputeStatus.UPHELD, null))
+        assertThatThrownBy(() -> ticketService.decideAppeal(hse, violation.getId(), DisputeStatus.UPHELD, facts, note, null))
                 .isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> violationService.decide(worker, violation.getId(), DisputeStatus.OVERTURNED, null))
+        assertThatThrownBy(() -> ticketService.decideAppeal(manager, violation.getId(), DisputeStatus.UPHELD, facts, note, null))
                 .isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> violationService.decide(hse, violation.getId(), DisputeStatus.NONE, null))
+        assertThatThrownBy(() -> ticketService.decideAppeal(worker, violation.getId(), DisputeStatus.OVERTURNED, facts, note, null))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> ticketService.decideAppeal(admin, violation.getId(), DisputeStatus.NONE, facts, note, null))
                 .isInstanceOf(BusinessRuleException.class);
 
-        violationService.decide(hse, violation.getId(), DisputeStatus.UPHELD, null);
-        assertThatThrownBy(() -> violationService.decide(otherHse, violation.getId(), DisputeStatus.OVERTURNED, null))
+        ticketService.decideAppeal(admin, violation.getId(), DisputeStatus.UPHELD, facts, note, null);
+        assertThatThrownBy(() -> ticketService.decideAppeal(otherAdmin, violation.getId(), DisputeStatus.OVERTURNED, facts, note, null))
                 .isInstanceOf(BusinessRuleException.class);
     }
 
+    /** BR-51: an office employee's violation is a reminder, which cannot be appealed. */
     @Test
-    void hseCannotDecideTheirOwnViolation() {
-        Violation own = violation(hse);
-        ticketService.openDispute(hse, own.getId(), "s", "d");
+    void anOfficeEmployeesViolationIsAReminderThatCannotBeAppealed() {
+        Violation own = violation(admin);
 
-        assertThatThrownBy(() -> violationService.decide(hse, own.getId(), DisputeStatus.OVERTURNED, null))
-                .isInstanceOf(AccessDeniedException.class);
-        assertThat(violationService.decide(otherHse, own.getId(), DisputeStatus.OVERTURNED, null).getDisputeStatus())
-                .isEqualTo(DisputeStatus.OVERTURNED);
+        assertThat(own.getReviewStatus()).isEqualTo(ReviewStatus.REMINDER);
+        assertThatThrownBy(() -> ticketService.openDispute(admin, own.getId(), null, "I wore my vest the whole time"))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("reminder");
     }
 
+    /** BR-48: HSE confirms the person; the worker sees it only then. */
     @Test
-    void hseAssignsUnidentifiedViolationsThenTheWorkerSeesThem() {
+    void hseConfirmsTheWorkerThenTheWorkerSeesIt() {
         Violation unknown = violation(null);
         em.flush();
 
-        assertThat(violationService.listUnidentified(hse, Pageable.unpaged())).containsExactly(unknown);
-        assertThatThrownBy(() -> violationService.listUnidentified(worker, Pageable.unpaged())).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> violationService.assignWorker(manager, unknown.getId(), worker))
+        assertThat(violationService.queue(hse, null, null, Pageable.unpaged())).containsExactly(unknown);
+        assertThatThrownBy(() -> violationService.queue(worker, null, null, Pageable.unpaged())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> violationService.confirm(manager, unknown.getId(), worker, false, null, unknown.getVersion()))
                 .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> violationService.get(worker, unknown.getId())).isInstanceOf(AccessDeniedException.class);
 
-        violationService.assignWorker(hse, unknown.getId(), worker);
+        violationService.confirm(hse, unknown.getId(), worker, false, null, unknown.getVersion());
+        em.flush();
 
-        assertThat(violationService.listUnidentified(hse, Pageable.unpaged())).isEmpty();
+        assertThat(violationService.queue(hse, null, null, Pageable.unpaged())).isEmpty();
         assertThat(violationService.listOwn(worker)).containsExactly(unknown);
         assertThat(violationService.get(worker, unknown.getId())).isEqualTo(unknown);
         assertThatThrownBy(() -> violationService.get(otherWorker, unknown.getId())).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> violationService.assignWorker(hse, unknown.getId(), otherWorker))
+        assertThatThrownBy(() -> violationService.confirm(hse, unknown.getId(), otherWorker, false, null, unknown.getVersion()))
                 .isInstanceOf(BusinessRuleException.class);
     }
 
@@ -549,30 +611,30 @@ class ServiceIntegrationTest {
     @Test
     void correctionClosesAnAutoClosedVisitProperly() {
         OffsetDateTime in = OffsetDateTime.now().minusHours(9);
-        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, in, in.plusHours(1), null));
+        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, in, in.plusHours(1), "Gate camera was down"));
         visit.setAutoClosed(true);
         em.flush();
 
-        CheckIn fixed = checkInService.correct(hse, visit.getId(), in, in.plusHours(8), "Left at 17:00", visit.getVersion());
+        CheckIn fixed = checkInService.correct(hse, visit.getId(), in, in.plusHours(8), "Left at 17:00 by the side gate", visit.getVersion());
 
         assertThat(fixed.isAutoClosed()).isFalse();
-        assertThat(fixed.getNote()).isEqualTo("Left at 17:00");
+        assertThat(fixed.getNote()).isEqualTo("Left at 17:00 by the side gate");
     }
 
     @Test
     void aCorrectionKeepsTheOldValuesAndWhoChangedThem() {
         OffsetDateTime in = OffsetDateTime.now().minusHours(9).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
-        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, in, in.plusHours(1), "Typed wrong"));
+        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, in, in.plusHours(1), "Typed wrong time"));
         em.flush();
 
-        checkInService.correct(hse, visit.getId(), in, in.plusHours(8), "Left at 17:00", visit.getVersion());
+        checkInService.correct(hse, visit.getId(), in, in.plusHours(8), "Left at 17:00 by the side gate", visit.getVersion());
         em.flush();
 
         Object kept = em.createNativeQuery("""
                         SELECT count(*) FROM check_in_correction
                         WHERE check_in_id = :visit AND corrected_by = :hse AND old_recorded_by = :hse
                           AND old_check_in_at = :in AND old_check_out_at = :oldOut AND new_check_out_at = :newOut
-                          AND old_note = 'Typed wrong' AND new_note = 'Left at 17:00' AND NOT old_auto_closed""")
+                          AND old_note = 'Typed wrong time' AND new_note = 'Left at 17:00 by the side gate' AND NOT old_auto_closed""")
                 .setParameter("visit", visit.getId()).setParameter("hse", hse).setParameter("in", in)
                 .setParameter("oldOut", in.plusHours(1)).setParameter("newOut", in.plusHours(8))
                 .getSingleResult();
@@ -582,19 +644,19 @@ class ServiceIntegrationTest {
     @Test
     void aStaleCorrectionFailsEvenIfOnlyPlainSqlChangedTheVisit() {
         OffsetDateTime in = OffsetDateTime.now().minusHours(9);
-        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, in, null, null));
+        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, in, null, "Gate camera was down"));
         long versionInForm = visit.getVersion();
         // What the detection service does when a worker checks out
         em.createNativeQuery("UPDATE check_in SET check_out_at = now() WHERE id = :id").setParameter("id", visit.getId()).executeUpdate();
         em.clear();
 
-        assertThatThrownBy(() -> checkInService.correct(hse, visit.getId(), in, in.plusHours(1), null, versionInForm))
+        assertThatThrownBy(() -> checkInService.correct(hse, visit.getId(), in, in.plusHours(1), "Typed the wrong time", versionInForm))
                 .isInstanceOf(StaleEditException.class);
     }
 
     @Test
     void checkInReadsFollowPermissions() {
-        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, OffsetDateTime.now(), null, null));
+        CheckIn visit = checkInService.recordManual(hse, new ManualCheckIn(worker, null, null, OffsetDateTime.now(), null, "Gate camera was down"));
         em.flush();
 
         assertThat(checkInService.listOwn(worker)).containsExactly(visit);
@@ -621,6 +683,9 @@ class ServiceIntegrationTest {
         user.setEmployeeCode(code);
         user.setFullName("Test " + code);
         user.setPasswordHash("x");
+        if (roleName.equals("HSE_OFFICER") || roleName.equals("ADMIN")) {
+            user.setStaffGroup(StaffGroup.OFFICE);
+        }
         return users.saveAndFlush(user).getId();
     }
 
@@ -631,13 +696,20 @@ class ServiceIntegrationTest {
         return teams.save(team);
     }
 
+    /** Saved as the detection app does; with a person, confirmed for them by HSE (BR-48). */
     private Violation violation(Long who) {
         Violation violation = new Violation();
-        violation.setUser(who == null ? null : users.findById(who).orElseThrow());
         violation.setCamera(camera);
         violation.setViolationType(ViolationType.NO_HARD_HAT);
         violation.setDetectedAt(OffsetDateTime.now());
         violation.setSnapshotPath("snapshot.jpg");
-        return violations.saveAndFlush(violation);
+        Violation saved = violations.saveAndFlush(violation);
+        em.refresh(saved);
+        if (who != null) {
+            violationService.confirm(hse, saved.getId(), who, false, null, saved.getVersion());
+            em.flush();
+            em.refresh(saved);
+        }
+        return saved;
     }
 }

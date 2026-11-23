@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import orochi.steelsight.exception.BusinessRuleException;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.identity.service.Permissions;
 import orochi.steelsight.identity.service.UserService;
@@ -30,10 +31,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ShiftController extends PageController {
 
-    private static final LocalTime USUAL_START = LocalTime.of(8, 0);
-    private static final LocalTime USUAL_END = LocalTime.of(17, 0);
 
     private final ShiftService shifts;
+    private final orochi.steelsight.attendance.service.PendingOvertimeService overtime;
     private final UserService users;
     private final SiteTime siteTime;
 
@@ -54,24 +54,47 @@ public class ShiftController extends PageController {
         model.addAttribute("today", siteTime.today());
         model.addAttribute("days", days);
         model.addAttribute("canPlan", canPlan);
+        model.addAttribute("published", canPlan && !user.can(Permissions.SHIFT_UPDATE_ALL) && !shifts.isOpenForManagers(monday));
         model.addAttribute("rows", pageOf(ShiftGrid.rows(workers, planned, days, siteTime), page));
         return "shifts/week";
     }
 
-    /** A date comes from an empty cell of the grid, and fills in the usual 08:00 to 17:00 to edit from. */
+    /**
+     * An empty cell of the grid fills in the person and the day with the morning frame; Pending Overtime
+     * fills in an OVERTIME shift over the pending time (SRS 3.2.15 #9).
+     */
     @GetMapping("/shifts/new")
     public String newShift(@AuthenticationPrincipal AuthenticatedUser user,
                            @RequestParam(required = false) Long workerId,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                           @RequestParam(required = false) Long pendingOvertimeId,
                            Model model) {
         ShiftForm form = new ShiftForm();
         form.setWorkerId(workerId);
-        if (date != null) {
-            form.setStartAt(date.atTime(USUAL_START));
-            form.setEndAt(date.atTime(USUAL_END));
+        form.setDay(date == null ? siteTime.today().plusDays(1) : date);
+        form.setStart(ShiftService.MORNING_START);
+        form.setEnd(ShiftService.MORNING_END);
+        if (pendingOvertimeId != null) {
+            overtime.prefill(user.getUserId(), pendingOvertimeId, form);
         }
         model.addAttribute("form", form);
         return showForm(user, model);
+    }
+
+    @PostMapping("/shifts/copy")
+    public String copyLastWeek(@AuthenticationPrincipal AuthenticatedUser user,
+                               @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week,
+                               RedirectAttributes redirect) {
+        try {
+            ShiftService.CopyResult result = shifts.copyLastWeek(user.getUserId(), week);
+            redirect.addFlashAttribute("success", String.format("%d shifts were copied.", result.copied()));
+            if (!result.skipped().isEmpty()) {
+                redirect.addFlashAttribute("skipped", result.skipped());
+            }
+        } catch (BusinessRuleException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/shifts?week=" + week;
     }
 
     @PostMapping("/shifts")
@@ -91,8 +114,11 @@ public class ShiftController extends PageController {
         ShiftForm form = new ShiftForm();
         form.setWorkerId(shift.getUser().getId());
         form.setZoneId(shift.getZone().getId());
-        form.setStartAt(siteTime.toLocal(shift.getStartAt()));
-        form.setEndAt(siteTime.toLocal(shift.getEndAt()));
+        form.setKind(shift.getKind());
+        form.setReason(shift.getReason());
+        form.setDay(siteTime.dateOf(shift.getStartAt()));
+        form.setStart(siteTime.toLocal(shift.getStartAt()).toLocalTime());
+        form.setEnd(siteTime.toLocal(shift.getEndAt()).toLocalTime());
         form.setVersion(shift.getVersion());
         model.addAttribute("form", form);
         return showEditForm(user, id, model);
@@ -114,14 +140,12 @@ public class ShiftController extends PageController {
         return attempt(redirect, "/shifts", "The shift was cancelled.", () -> shifts.cancel(user.getUserId(), id));
     }
 
-    @PostMapping("/shifts/{id}/complete")
-    public String complete(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id, RedirectAttributes redirect) {
-        return attempt(redirect, "/shifts", "The shift was marked completed.", () -> shifts.complete(user.getUserId(), id));
-    }
-
     private ShiftService.ShiftDetails details(ShiftForm form) {
+        LocalDate day = form.getDay();
         return new ShiftService.ShiftDetails(form.getWorkerId(), form.getZoneId(),
-                siteTime.toInstant(form.getStartAt()), siteTime.toInstant(form.getEndAt()));
+                day == null || form.getStart() == null ? null : siteTime.toInstant(day.atTime(form.getStart())),
+                day == null || form.getEnd() == null ? null : siteTime.toInstant(day.atTime(form.getEnd())),
+                form.getKind(), form.getReason(), form.getPendingOvertimeId());
     }
 
     private String redirectToWeekOf(Shift shift) {
@@ -131,6 +155,7 @@ public class ShiftController extends PageController {
     private String showForm(AuthenticatedUser user, Model model) {
         model.addAttribute("workers", users.listShiftWorkers(user.getUserId()));
         model.addAttribute("zones", shifts.listZones(user.getUserId()));
+        model.addAttribute("canOvertime", user.can(Permissions.SHIFT_UPDATE_ALL));
         return "shifts/form";
     }
 

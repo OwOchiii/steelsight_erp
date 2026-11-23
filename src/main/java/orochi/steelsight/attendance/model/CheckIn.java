@@ -70,4 +70,21 @@ public class CheckIn extends BaseModel implements Versioned {
     /** True when check_out_at is an estimate because the worker never checked out. */
     @Column(name = "auto_closed", nullable = false)
     private boolean autoClosed = false;
+
+    /** No check-out 20 minutes after the shift end, seen at 23:00 (SRS BR-35). Counts 0 hours until explained. */
+    @Column(nullable = false)
+    private boolean incomplete;
+
+    @Column(name = "incomplete_at")
+    private java.time.OffsetDateTime incompleteAt;
+
+    public void flagIncomplete(java.time.OffsetDateTime at) {
+        incomplete = true;
+        incompleteAt = at;
+    }
+
+    public void clearIncomplete() {
+        incomplete = false;
+        incompleteAt = null;
+    }
 }

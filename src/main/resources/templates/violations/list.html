@@ -2,14 +2,64 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{violations.title}, 'violations', ~{::main})}">
 <main class="page">
     <div class="page-head">
-        <h1 th:text="#{violations.heading}">PPE violations</h1>
-        <span class="badge" th:if="${safety != null}" th:classappend="${@display.badge(safety.level)}" th:text="#{safety.scoreLine(${safety.value})}">Safety score</span>
+        <h1 th:text="#{violations.heading}">My violations</h1>
     </div>
-    <th:block th:if="${safety != null and safety.level.name() != 'SAFE'}">
-        <section th:replace="~{fragments/safety :: notice(${safety.level.name()}, ${safety.value}, false)}"></section>
-    </th:block>
-    <p class="empty panel-less-empty" th:if="${violations.totalElements == 0}" th:text="#{violations.none}">You have no recorded violations.</p>
-    <th:block th:unless="${violations.isEmpty()}"><div th:replace="~{fragments/lists :: violations(${violations}, false)}"></div></th:block>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <form class="filters" method="get" th:action="@{/violations}">
+        <div>
+            <label for="month" th:text="#{field.month}">Month</label>
+            <select id="month" name="month">
+                <option th:each="m : ${months}" th:value="${m}" th:selected="${m == month}" th:text="${#temporals.format(m.atDay(1), 'MM/yyyy')}">11/2026</option>
+            </select>
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{common.show}">Show</button>
+    </form>
+
+    <section class="kpis mb-4" th:if="${safety != null}">
+        <div class="kpi">
+            <span class="kpi-label" th:text="#{safety.score}">Safety score</span>
+            <strong class="kpi-value" th:text="${safety.value}">100</strong>
+            <span class="kpi-note" th:text="#{safety.confirmedCount(${safety.violations})}">0 confirmed violations</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-label" th:text="#{safety.bonusLevel}">Bonus level</span>
+            <strong class="kpi-value"><span class="badge" th:classappend="${@display.badge(safety.level)}" th:text="${@display.label(safety.level)}">Level 0</span></strong>
+            <span class="kpi-note" th:if="${provisional}" th:text="#{common.provisional}">Provisional</span>
+        </div>
+    </section>
+    <p class="notice" th:if="${safety == null}" th:text="#{safety.officeNone}">Office staff have no safety score.</p>
+
+    <p class="empty panel-less-empty" th:if="${violations.totalElements == 0}" th:text="#{violations.none}">You have no violations this month.</p>
+    <div class="table-wrap" th:unless="${violations.isEmpty()}">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{field.violation}">Violation</th>
+                <th scope="col" class="hidden md:table-cell" th:text="#{field.detected}">Detected</th>
+                <th scope="col" class="hidden md:table-cell" th:text="#{field.zone}">Zone</th>
+                <th scope="col" th:text="#{field.status}">Status</th>
+                <th scope="col" th:text="#{field.appeal}">Appeal</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="violation : ${violations}">
+                <td>
+                    <a class="row-title" th:href="@{/violations/{id}(id=${violation.id})}" th:text="${@display.label(violation.violationType)}">Type</a>
+                    <span class="row-sub md:hidden" th:text="|${@display.dateTime(violation.detectedAt)}, ${violation.zone.name}|">When</span>
+                </td>
+                <td class="hidden whitespace-nowrap md:table-cell" th:text="${@display.dateTime(violation.detectedAt)}">When</td>
+                <td class="hidden md:table-cell" th:text="${violation.zone.name}">Zone</td>
+                <td><span class="badge" th:classappend="${@display.badge(violation.reviewStatus)}" th:text="${@display.label(violation.reviewStatus)}">Confirmed</span></td>
+                <td>
+                    <span class="badge" th:if="${violation.disputeStatus.name() != 'NONE'}" th:classappend="${@display.badge(violation.disputeStatus)}" th:text="${@display.label(violation.disputeStatus)}">Appeal</span>
+                    <th:block th:if="${violation.disputeStatus.name() == 'NONE' and violationService.whyNoAppeal(me, violation) == null}">
+                        <span class="row-sub" th:text="#{violations.appealUntil(${@display.dateTime(violationService.appealDeadline(violation))})}">Until</span>
+                    </th:block>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
     <nav th:replace="~{fragments/lists :: pager(${violations})}"></nav>
 </main>
 </html>

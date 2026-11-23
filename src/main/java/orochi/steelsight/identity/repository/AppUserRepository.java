@@ -76,5 +76,7 @@ public interface AppUserRepository extends SoftDeletableRepository<AppUser, Long
 
     boolean existsByEmployeeCode(String employeeCode);
 
+    boolean existsByEmployeeCodeIgnoreCase(String employeeCode);
+
     boolean existsByEmail(String email);
 }

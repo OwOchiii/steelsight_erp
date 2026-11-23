@@ -1,0 +1,41 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{review.list}, 'review', ~{::main})}">
+<main class="page">
+    <nav class="crumbs"><a th:href="@{/violations/review}" th:text="#{review.title}">Review queue</a></nav>
+    <div class="page-head"><h1 th:text="#{review.list}">Violation list</h1></div>
+    <form class="filters" method="get" th:action="@{/violations/all}">
+        <div>
+            <label for="month" th:text="#{field.month}">Month</label>
+            <select id="month" name="month">
+                <option th:each="m : ${months}" th:value="${m}" th:selected="${m == filter.month}" th:text="${#temporals.format(m.atDay(1), 'MM/yyyy')}">11/2026</option>
+            </select>
+        </div>
+        <div>
+            <label for="zoneId" th:text="#{field.zone}">Zone</label>
+            <select id="zoneId" name="zoneId">
+                <option value="" th:text="#{common.all}">All</option>
+                <option th:each="zone : ${zones}" th:value="${zone.id}" th:selected="${zone.id == filter.zoneId}" th:text="${zone.name}">Zone</option>
+            </select>
+        </div>
+        <div>
+            <label for="status" th:text="#{field.status}">Status</label>
+            <select id="status" name="status">
+                <option value="" th:text="#{common.all}">All</option>
+                <option th:each="s : ${statuses}" th:value="${s}" th:selected="${s == filter.status}" th:text="#{${'enum.' + s}}">Status</option>
+            </select>
+        </div>
+        <div>
+            <label for="person" th:text="#{field.person}">Person</label>
+            <input id="person" name="person" type="search" th:value="${filter.person}">
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{common.show}">Show</button>
+    </form>
+    <div class="counts">
+        <span th:each="entry : ${counts.byZone}" th:text="|${entry.key}: ${entry.value}|">Zone: 1</span>
+        <span th:each="entry : ${counts.byType}" th:text="|${@display.label(entry.key)}: ${entry.value}|">Type: 1</span>
+    </div>
+    <p class="empty panel-less-empty" th:if="${violations.totalElements == 0}" th:text="#{review.emptyAll}">No violations.</p>
+    <th:block th:unless="${violations.isEmpty()}"><div th:replace="~{fragments/lists :: violations(${violations}, true)}"></div></th:block>
+    <nav th:replace="~{fragments/lists :: pager(${violations})}"></nav>
+</main>
+</html>

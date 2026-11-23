@@ -18,6 +18,15 @@ public final class Text {
         return optional(field, value, maxLength);
     }
 
+    /** Required, and between min and max characters after trimming (SRS CM-02, CM-03). */
+    public static String sized(String field, String value, int min, int max) {
+        String text = required(field, value, Integer.MAX_VALUE);
+        if (text.length() < min || text.length() > max) {
+            throw new BusinessRuleException(field + " must have " + min + " to " + max + " characters");
+        }
+        return text;
+    }
+
     /** Blank becomes null, so it can't collide on a unique column or show as an empty value. Line breaks become \n. */
     public static String optional(String field, String value, int maxLength) {
         if (value == null || value.isBlank()) {

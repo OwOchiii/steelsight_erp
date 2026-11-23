@@ -1,0 +1,49 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{fragments/layout :: app(#{report.pageTitle}, 'reports', ~{::main})}">
+<main class="page narrow">
+    <div class="page-head"><h1 th:text="#{report.pageTitle}">Monthly report</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <form class="sheet mb-4" method="get" th:action="@{/team/report}" hx-boost="false">
+        <div class="grid gap-x-4 sm:grid-cols-2">
+            <div>
+                <label for="month" th:text="#{field.month}">Month</label>
+                <input id="month" name="month" type="month" th:value="${lastMonth}" required>
+            </div>
+            <div sec:authorize="hasAuthority('REPORT_EXPORT_ALL')">
+                <label for="teamId" th:text="#{report.scope}">Scope</label>
+                <select id="teamId" name="teamId">
+                    <option value="" th:text="#{report.wholeSite}">Whole site</option>
+                    <option th:each="team : ${teams}" th:value="${team.id}" th:text="${team.name}">Team</option>
+                </select>
+            </div>
+        </div>
+        <p class="hint" th:text="#{report.hint}">Sheets: Site summary, Office summary, Violations, Attendance and Absences. Before the month is locked the file is marked Provisional.</p>
+        <div class="actions"><button type="submit" class="btn" th:text="#{report.export}">Export</button></div>
+    </form>
+    <section class="panel">
+        <div class="panel-head"><h2 th:text="#{report.exports}">Earlier exports</h2></div>
+        <div class="panel-body">
+            <p class="quiet" th:if="${exports.isEmpty()}" th:text="#{report.noExports}">No exports yet.</p>
+            <table class="data-table" th:unless="${exports.isEmpty()}">
+                <thead><tr>
+                    <th scope="col" th:text="#{report.exported}">Exported</th>
+                    <th scope="col" th:text="#{field.month}">Month</th>
+                    <th scope="col" th:text="#{report.scope}">Scope</th>
+                    <th scope="col" th:text="#{report.by}">By</th>
+                    <th scope="col" th:text="#{common.provisional}">Provisional</th>
+                </tr></thead>
+                <tbody>
+                <tr th:each="e : ${exports}">
+                    <td th:text="${@display.dateTime(e.exportedAt)}">When</td>
+                    <td th:text="${#temporals.format(e.month.atDay(1), 'MM/yyyy')}">11/2026</td>
+                    <td th:text="${e.scope == 'SITE'} ? #{report.wholeSite} : ${e.scope}">Site</td>
+                    <td th:text="${e.by}">Name</td>
+                    <td th:text="${e.provisional} ? #{report.yes} : #{report.no}">Yes</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+</html>

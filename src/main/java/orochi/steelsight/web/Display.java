@@ -125,6 +125,17 @@ public class Display {
         return text.toLowerCase(Locale.ENGLISH).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
     }
 
+    /** SRS 3.2.11: Morning, Afternoon, Evening or Custom, from the shift's times. */
+    public String frame(orochi.steelsight.scheduling.model.Shift shift) {
+        java.time.LocalTime start = siteTime.toLocal(shift.getStartAt()).toLocalTime();
+        java.time.LocalTime end = siteTime.toLocal(shift.getEndAt()).toLocalTime();
+        String key = start.equals(orochi.steelsight.scheduling.service.ShiftService.MORNING_START) && end.equals(orochi.steelsight.scheduling.service.ShiftService.MORNING_END) ? "MORNING"
+                : start.equals(orochi.steelsight.scheduling.service.ShiftService.AFTERNOON_START) && end.equals(orochi.steelsight.scheduling.service.ShiftService.AFTERNOON_END) ? "AFTERNOON"
+                : start.equals(orochi.steelsight.scheduling.service.ShiftService.EVENING_START) && end.equals(orochi.steelsight.scheduling.service.ShiftService.EVENING_END) ? "EVENING"
+                : "CUSTOM";
+        return translate("frame." + key, key);
+    }
+
     /** The class that colours a status badge. */
     public String badge(Enum<?> value) {
         return value == null ? "" : "badge-" + value.name().toLowerCase(Locale.ENGLISH);

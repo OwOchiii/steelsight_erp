@@ -33,30 +33,38 @@ class ServiceAtomicityTest {
     @Autowired TransactionTemplate transaction;
 
     Long worker;
-    Long hse;
-    Long otherHse;
+    Long admin;
+    Long otherAdmin;
     Long zone;
     Long camera;
+    static final String FACTS = "The officer on duty saw the worker without a vest.";
+    static final String NOTE = "Decided after checking the photo.";
+
     Long violation;
     Long category;
 
     @BeforeEach
     void seed() {
         worker = user("TX-W", "WORKER");
-        hse = user("TX-H1", "HSE_OFFICER");
-        otherHse = user("TX-H2", "HSE_OFFICER");
+        admin = user("TX-A1", "ADMIN");
+        otherAdmin = user("TX-A2", "ADMIN");
         zone = jdbc.queryForObject("INSERT INTO zone (name) VALUES ('TX zone') RETURNING id", Long.class);
         camera = jdbc.queryForObject(
                 "INSERT INTO camera (camera_code, zone_id) VALUES ('TX-CAM', ?) RETURNING id", Long.class, zone);
         violation = jdbc.queryForObject("""
                 INSERT INTO violation (user_id, camera_id, violation_type, detected_at, snapshot_path)
                 VALUES (?, ?, 'NO_VEST', now(), 'tx.jpg') RETURNING id""", Long.class, worker, camera);
+        // An HSE Officer confirmed it, so it can be appealed (BR-64)
+        jdbc.update("""
+                UPDATE violation SET review_status = 'CONFIRMED', subject = 'EMPLOYEE', user_id = ?, reviewed_at = now()
+                WHERE id = ?""", worker, violation);
         category = jdbc.queryForObject(
-                "SELECT id FROM ticket_category WHERE category_name = 'PPE dispute'", Long.class);
+                "SELECT id FROM ticket_category WHERE code = 'PPE_APPEAL'", Long.class);
     }
 
     @AfterEach
     void cleanUp() {
+        jdbc.update("DELETE FROM notification WHERE user_id IN (SELECT id FROM app_user WHERE employee_code LIKE 'TX-%')");
         jdbc.update("DELETE FROM ticket WHERE created_by = ?", worker);
         jdbc.update("DELETE FROM violation WHERE id = ?", violation);
         jdbc.update("DELETE FROM camera WHERE id = ?", camera);
@@ -79,11 +87,11 @@ class ServiceAtomicityTest {
 
     @Test
     void failedDecisionLeavesBothTheViolationAndTheTicketUntouched() {
-        Long ticket = tickets.openDispute(worker, violation, "s", "d").getId();
+        Long ticket = tickets.openDispute(worker, violation, null, "I wore my vest the whole time").getId();
         // A temporary constraint makes the ticket half of the decision fail
         jdbc.update("ALTER TABLE ticket ADD CONSTRAINT tx_block_resolve CHECK (status <> 'RESOLVED') NOT VALID");
         try {
-            assertThatThrownBy(() -> violationService.decide(hse, violation, DisputeStatus.UPHELD, null))
+            assertThatThrownBy(() -> tickets.decideAppeal(admin, violation, DisputeStatus.UPHELD, FACTS, NOTE, null))
                     .isInstanceOf(RuntimeException.class);
         } finally {
             jdbc.update("ALTER TABLE ticket DROP CONSTRAINT tx_block_resolve");
@@ -94,15 +102,15 @@ class ServiceAtomicityTest {
     }
 
     @Test
-    void twoOfficersDecidingAtOnceCannotBothWin() {
-        tickets.openDispute(worker, violation, "s", "d");
+    void twoAdminsDecidingAtOnceCannotBothWin() {
+        tickets.openDispute(worker, violation, null, "I wore my vest the whole time");
 
-        // Officer two loads the violation, officer one commits, then officer two tries to commit
+        // Admin two loads the violation, admin one commits, then admin two tries to commit
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             violations.findById(violation).orElseThrow();
-            jdbc.update("UPDATE violation SET dispute_status = 'UPHELD', reviewed_by = ?, reviewed_at = now(), "
-                    + "version = version + 1 WHERE id = ?", hse, violation);
-            violationService.decide(otherHse, violation, DisputeStatus.OVERTURNED, null);
+            jdbc.update("UPDATE violation SET dispute_status = 'UPHELD', appeal_decided_by = ?, appeal_decided_at = now(), "
+                    + "version = version + 1 WHERE id = ?", admin, violation);
+            tickets.decideAppeal(otherAdmin, violation, DisputeStatus.OVERTURNED, FACTS, NOTE, null);
         })).isInstanceOf(OptimisticLockingFailureException.class);
 
         assertThat(disputeStatus()).isEqualTo("DISPUTED");

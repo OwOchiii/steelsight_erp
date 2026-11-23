@@ -10,12 +10,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Times count from today's midnight at the site, so the results don't depend on when this runs. */
+/**
+ * SRS BR-35, run by close_stale_check_ins() (the detection app and the jobs call it): a visit with no
+ * check-out is flagged Incomplete 20 minutes after its shift ends, and closed by the system 4 hours after,
+ * so the next scan is a check-in. The time it writes is never paid. A visit with no shift closes once its
+ * day has passed, counted from today's midnight so the tests don't depend on when they run.
+ */
 @SpringBootTest
 @Import(TestDatabase.class)
 @Transactional
 class AutoCloseCheckInTest {
 
+    private static final String NOW = "now()";
     private static final String MIDNIGHT = "(date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh')";
 
     @Autowired JdbcTemplate jdbc;
@@ -32,8 +38,41 @@ class AutoCloseCheckInTest {
     }
 
     @Test
-    void aVisitToAShiftThatEndedTodayStaysOpen() {
-        Long visit = visit(shift("- interval '9 hours'", "+ interval '1 minute'"), "- interval '9 hours'");
+    void aVisitIsNotFlaggedWithinTwentyMinutesOfTheShiftEnd() {
+        Long visit = visit(shift(NOW, "- interval '8 hours'", "- interval '19 minutes'"), NOW, "- interval '8 hours'");
+
+        jdbc.execute("SELECT close_stale_check_ins()");
+
+        assertThat(isOpen(visit)).isTrue();
+        assertThat(isIncomplete(visit)).isFalse();
+    }
+
+    @Test
+    void aVisitIsFlaggedIncompleteTwentyMinutesAfterTheShiftButStaysOpen() {
+        Long visit = visit(shift(NOW, "- interval '8 hours'", "- interval '21 minutes'"), NOW, "- interval '8 hours'");
+
+        jdbc.execute("SELECT close_stale_check_ins()");
+
+        assertThat(isOpen(visit)).isTrue();
+        assertThat(isIncomplete(visit)).isTrue();
+    }
+
+    @Test
+    void aVisitClosesFourHoursAfterTheShiftWithoutGuessingACheckOut() {
+        Long visit = visit(shift(NOW, "- interval '12 hours'", "- interval '4 hours 1 minute'"), NOW, "- interval '12 hours'");
+
+        jdbc.execute("SELECT close_stale_check_ins()");
+
+        assertThat(isOpen(visit)).isFalse();
+        assertThat(isIncomplete(visit)).isTrue();
+        assertThat(jdbc.queryForObject("""
+                SELECT c.auto_closed AND c.check_out_at = s.end_at + interval '4 hours'
+                FROM check_in c JOIN shift s ON s.id = c.shift_id WHERE c.id = ?""", Boolean.class, visit)).isTrue();
+    }
+
+    @Test
+    void aVisitStillOpensWithinFourHours() {
+        Long visit = visit(shift(NOW, "- interval '11 hours'", "- interval '3 hours 59 minutes'"), NOW, "- interval '11 hours'");
 
         jdbc.execute("SELECT close_stale_check_ins()");
 
@@ -41,57 +80,51 @@ class AutoCloseCheckInTest {
     }
 
     @Test
-    void aVisitToAShiftThatEndedYesterdayClosesAtTheShiftsEnd() {
-        Long visit = visit(shift("- interval '9 hours'", "- interval '1 minute'"), "- interval '9 hours'");
-
-        jdbc.execute("SELECT close_stale_check_ins()");
-
-        assertThat(isOpen(visit)).isFalse();
-        assertThat(jdbc.queryForObject("SELECT auto_closed AND check_out_at = " + MIDNIGHT + " - interval '1 minute' FROM check_in WHERE id = ?",
-                Boolean.class, visit)).isTrue();
-    }
-
-    @Test
     void aVisitWithoutAShiftClosesAtMidnightOnceItsDayHasPassed() {
-        Long yesterday = visit(null, "- interval '1 hour'");
+        Long yesterday = visit(null, MIDNIGHT, "- interval '1 hour'");
         jdbc.execute("SELECT close_stale_check_ins()");
         assertThat(jdbc.queryForObject("SELECT auto_closed AND check_out_at = " + MIDNIGHT + " FROM check_in WHERE id = ?",
                 Boolean.class, yesterday)).isTrue();
 
-        Long today = visit(null, "+ interval '0 minutes'");
+        Long today = visit(null, MIDNIGHT, "+ interval '0 minutes'");
         jdbc.execute("SELECT close_stale_check_ins()");
         assertThat(isOpen(today)).isTrue();
     }
 
     @Test
-    void aCheckInAfterTheShiftEndedStillClosesAfterItStarted() {
-        Long visit = visit(shift("- interval '9 hours'", "- interval '2 hours'"), "- interval '1 hour'");
-
-        jdbc.execute("SELECT close_stale_check_ins()");
-
-        assertThat(jdbc.queryForObject("SELECT auto_closed AND check_out_at = check_in_at + interval '1 minute' FROM check_in WHERE id = ?",
-                Boolean.class, visit)).isTrue();
-    }
-
-    @Test
     void aCancelledShiftCountsAsNoShift() {
-        Long shift = shift("+ interval '3 days'", "+ interval '4 days'");
+        Long shift = shift(MIDNIGHT, "+ interval '3 days'", "+ interval '3 days 8 hours'");
         jdbc.update("UPDATE shift SET status = 'CANCELLED' WHERE id = ?", shift);
-        Long visit = visit(shift, "- interval '1 hour'");
+        Long visit = visit(shift, MIDNIGHT, "- interval '1 hour'");
 
         jdbc.execute("SELECT close_stale_check_ins()");
 
         assertThat(isOpen(visit)).isFalse();
     }
 
-    private Long shift(String start, String end) {
-        return jdbc.queryForObject("INSERT INTO shift (user_id, zone_id, start_at, end_at, created_by) VALUES (?, ?, "
-                + MIDNIGHT + start + ", " + MIDNIGHT + end + ", ?) RETURNING id", Long.class, worker, zone, worker);
+    /** SRS 3.2.35: a check-in closes a visit still open from an earlier day, so the gate never blocks. */
+    @Test
+    void aNewCheckInClosesAVisitLeftOpenFromAnEarlierDay() {
+        Long old = visit(null, MIDNIGHT, "- interval '3 hours'");
+        Long today = visit(null, NOW, "");
+
+        assertThat(isOpen(old)).isFalse();
+        assertThat(isIncomplete(old)).isTrue();
+        assertThat(isOpen(today)).isTrue();
     }
 
-    private Long visit(Long shift, String checkIn) {
+    private Long shift(String base, String start, String end) {
+        return jdbc.queryForObject("INSERT INTO shift (user_id, zone_id, start_at, end_at, created_by) VALUES (?, ?, "
+                + base + start + ", " + base + end + ", ?) RETURNING id", Long.class, worker, zone, worker);
+    }
+
+    private Long visit(Long shift, String base, String checkIn) {
         return jdbc.queryForObject("INSERT INTO check_in (user_id, shift_id, check_in_at, face_similarity) VALUES (?, ?, "
-                + MIDNIGHT + checkIn + ", 90) RETURNING id", Long.class, worker, shift);
+                + base + checkIn + ", 90) RETURNING id", Long.class, worker, shift);
+    }
+
+    private boolean isIncomplete(Long visit) {
+        return jdbc.queryForObject("SELECT incomplete FROM check_in WHERE id = ?", Boolean.class, visit);
     }
 
     private boolean isOpen(Long visit) {

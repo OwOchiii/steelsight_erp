@@ -78,19 +78,6 @@
         <p class="hint panel-body pt-0" th:if="${leaderCandidates.isEmpty()}" th:text="#{teams.noCandidates}">Every manager already leads a team. Create a manager account first.</p>
     </section>
 
-    <section class="panel mb-4" th:unless="${teams.isEmpty()}">
-        <div class="panel-head"><h2 th:text="#{team.lateRule}">Late check-in rule</h2></div>
-        <div class="panel-body">
-            <p class="quiet" th:text="#{team.lateRuleHint}">Checking in up to this long after a shift starts isn't tagged late. Late time is made up at the end of the shift, up to this many minutes.</p>
-            <form class="setting" method="post" th:each="team : ${teams}" th:action="@{/teams/{id}/late-after(id=${team.id})}">
-                <div>
-                    <label th:for="|late-${team.id}|" th:text="#{team.minutes(${team.name})}">Minutes</label>
-                    <input th:id="|late-${team.id}|" type="number" name="minutes" min="0" max="240" required th:value="${team.lateAfterMinutes}">
-                </div>
-                <button type="submit" class="btn secondary" th:text="#{common.save}">Save</button>
-            </form>
-        </div>
-    </section>
 
     <section class="panel">
         <div class="panel-head"><h2 th:text="#{team.people}">People</h2></div>

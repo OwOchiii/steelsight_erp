@@ -27,10 +27,12 @@ class FacePhotoCleanupTest extends PageTestSupport {
     void anOldFacePhotoIsRemovedOnlyAfterItsReplacementOrTheDeletionCommits() throws Exception {
         String unique = UUID.randomUUID().toString().substring(0, 8);
         Long admin = userWithRole("CLN-A-" + unique, "Clean Admin", "ADMIN");
-        String code = "CLN-W-" + unique;
+        String code = ("CLN-W-" + unique).toUpperCase();
 
         mvc.perform(multipart("/team/new").file(photo()).param("employeeCode", code).param("fullName", "Clean Worker")
-                        .param("roleName", "WORKER").param("password", "start-pass-1").with(as(admin)).with(csrf()))
+                        .param("roleName", "WORKER").param("staffGroup", "OFFICE").param("consent", "true")
+                        .param("phoneNumber", "09" + String.format("%08d", Math.abs(unique.hashCode()) % 100_000_000))
+                        .param("password", "start-pass-1").with(as(admin)).with(csrf()))
                 .andExpect(status().is3xxRedirection());
         Long worker = jdbc.queryForObject("SELECT id FROM app_user WHERE employee_code = ?", Long.class, code);
         String first = textColumn("SELECT face_file_path FROM app_user WHERE id = ?", worker);
