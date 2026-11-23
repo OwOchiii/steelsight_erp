@@ -8,6 +8,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import orochi.steelsight.attendance.service.CheckInService;
 import orochi.steelsight.identity.service.Permissions;
+import orochi.steelsight.notification.zalo.ZaloBot;
+import orochi.steelsight.notification.zalo.ZaloLinks;
 import orochi.steelsight.ppe.model.Violation;
 import orochi.steelsight.ppe.service.SafetyScoreService;
 import orochi.steelsight.ppe.service.ViolationService;
@@ -37,6 +39,10 @@ public class HomeController {
     private final CheckInService checkIns;
     private final SafetyScoreService safety;
     private final SiteTime siteTime;
+    private final ZaloBot zalo;
+    private final ZaloLinks zaloLinks;
+    private final orochi.steelsight.identity.service.UserService users;
+    private final orochi.steelsight.notification.service.NotificationService notifications;
 
     /** One day of the signed-in worker's week. */
     public record DayPlan(LocalDate date, boolean today, List<Shift> shifts) {
@@ -48,6 +54,11 @@ public class HomeController {
         model.addAttribute("todayDate", siteTime.today());
         if (user.can(Permissions.SHIFT_READ_OWN)) {
             addMyWeek(user.getUserId(), model);
+            if (zalo.enabled()) {
+                model.addAttribute("zaloLinked", zaloLinks.isLinked(user.getUserId()));
+                model.addAttribute("zaloBotLink", zalo.botLink());
+                model.addAttribute("zaloBotQr", QrCodes.svg(zalo.botLink()));
+            }
         }
         if (user.can(Permissions.TICKET_READ_OWN)) {
             List<Ticket> own = tickets.listOwn(user.getUserId()).stream().filter(ticket -> !ticket.isResolved()).toList();
@@ -68,6 +79,10 @@ public class HomeController {
         }
         if (user.can(Permissions.VIOLATION_READ_ALL)) {
             addSafety(user.getUserId(), model);
+        }
+        if (user.can(Permissions.USER_MANAGE)) {
+            model.addAttribute("failedFaces", users.countFailedFacePhotos(user.getUserId()));
+            model.addAttribute("failedZalo", notifications.countFailedDeliveries());
         }
         boolean seesShifts = user.can(Permissions.SHIFT_READ_TEAM) || user.can(Permissions.SHIFT_READ_ALL);
         boolean seesVisits = user.can(Permissions.CHECKIN_READ_TEAM) || user.can(Permissions.CHECKIN_READ_ALL);
@@ -92,7 +107,7 @@ public class HomeController {
         for (int i = 0; i < 7; i++) {
             LocalDate day = monday.plusDays(i);
             List<Shift> planned = own.stream()
-                    .filter(Shift::isScheduled)
+                    .filter(Shift::isActive)
                     .filter(shift -> siteTime.dateOf(shift.getStartAt()).equals(day))
                     .toList();
             week.add(new DayPlan(day, day.equals(today), planned));
@@ -108,7 +123,8 @@ public class HomeController {
         LocalDate today = siteTime.today();
         LocalDate firstDay = today.minusDays(TREND_DAYS - 1);
         LocalDate lastWeekStarts = today.minusDays(6);
-        List<Violation> recent = violations.listSince(id, siteTime.startOf(firstDay));
+        List<Violation> recent = violations.listSince(id, siteTime.startOf(firstDay)).stream()
+                .filter(v -> v.getReviewStatus() != orochi.steelsight.ppe.model.ReviewStatus.DISMISSED).toList();
 
         long thisWeek = recent.stream().filter(v -> !siteTime.dateOf(v.getDetectedAt()).isBefore(lastWeekStarts)).count();
         model.addAttribute("violationsThisWeek", thisWeek);
@@ -116,9 +132,10 @@ public class HomeController {
         model.addAttribute("violationTotal", recent.size());
         model.addAttribute("violationTrend", Charts.perDay(recent, firstDay, TREND_DAYS, siteTime));
         model.addAttribute("violationsByType", Charts.ranked(recent, Violation::getViolationType));
-        model.addAttribute("violationsByZone", Charts.ranked(recent, v -> v.getCamera().getZone().getName()));
-        model.addAttribute("disputesToDecide", violations.countDisputed(id));
-        model.addAttribute("unidentified", violations.countUnidentified(id));
+        model.addAttribute("violationsByZone", Charts.ranked(recent, v -> v.getZone().getName()));
+        model.addAttribute("disputesToDecide", violations.countDisputed(id));   // shown only to people who decide them
+        model.addAttribute("unidentified", violations.countOpen(id));        // waiting for review (SRS 3.2.3)
+        model.addAttribute("overdueViolations", violations.countOverdue(id));
         model.addAttribute("oldestDisputes", violations.listDisputed(id, PageRequest.of(0, SHORT_LIST)).getContent());
     }
 
@@ -127,7 +144,7 @@ public class HomeController {
         OffsetDateTime from = siteTime.startOf(today);
         OffsetDateTime to = siteTime.startOf(today.plusDays(1));
         List<Shift> todays = shifts.listManaged(id, from, to);
-        model.addAttribute("shiftsToday", todays.stream().filter(Shift::isScheduled).count());
+        model.addAttribute("shiftsToday", todays.stream().filter(Shift::isActive).count());
         if (seesVisits) {
             List<TodayRoster.Row> roster = TodayRoster.rows(todays, checkIns.listStartedInScope(id, from, to), OffsetDateTime.now());
             model.addAttribute("roster", roster);

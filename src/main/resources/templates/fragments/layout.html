@@ -71,20 +71,26 @@
             <div class="nav-group-title" th:text="#{nav.group.mine}">My work</div>
             <th:block sec:authorize="hasAuthority('SHIFT_READ_OWN')"><a th:replace="~{fragments/layout :: navItem(@{/timetable}, 'calendar-days', #{nav.timetable}, ${active == 'timetable'}, null)}"></a></th:block>
             <th:block sec:authorize="hasAuthority('VIOLATION_READ_OWN')"><a th:replace="~{fragments/layout :: navItem(@{/violations}, 'shield-alert', #{nav.violations}, ${active == 'violations'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('CHECKIN_READ_OWN')"><a th:replace="~{fragments/layout :: navItem(@{/attendance/mine}, 'clipboard-check', #{nav.myAttendance}, ${active == 'myAttendance'}, null)}"></a></th:block>
             <th:block sec:authorize="hasAuthority('TICKET_READ_OWN')"><a th:replace="~{fragments/layout :: navItem(@{/tickets}, 'ticket', #{nav.tickets}, ${active == 'tickets'}, null)}"></a></th:block>
         </div>
         <div class="nav-group" sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL', 'VIOLATION_READ_ALL')">
             <div class="nav-group-title" th:text="#{nav.group.safety}">Safety and support</div>
             <th:block sec:authorize="hasAnyAuthority('TICKET_READ_HANDLED', 'TICKET_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/tickets/queue}, 'inbox', #{nav.queue}, ${active == 'queue'}, ${@navCounts.queue(me)})}"></a></th:block>
-            <th:block sec:authorize="hasAuthority('VIOLATION_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/violations/review}, 'shield-check', #{nav.review}, ${active == 'review'}, ${@navCounts.disputes(me)})}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('VIOLATION_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/violations/review}, 'shield-check', #{nav.review}, ${active == 'review'}, ${@navCounts.review(me)})}"></a></th:block>
             <th:block sec:authorize="hasAuthority('VIOLATION_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/safety/shifts}, 'activity', #{nav.safetyShifts}, ${active == 'safetyShifts'}, null)}"></a></th:block>
         </div>
         <div class="nav-group" sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL', 'USER_READ_ALL', 'SHIFT_UPDATE_TEAM', 'USER_MANAGE', 'CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')">
             <div class="nav-group-title" th:text="#{nav.group.workforce}">Workforce</div>
             <th:block sec:authorize="hasAnyAuthority('SHIFT_READ_TEAM', 'SHIFT_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/shifts}, 'calendar-range', #{nav.shifts}, ${active == 'shifts'}, null)}"></a></th:block>
-            <th:block sec:authorize="hasAnyAuthority('CHECKIN_READ_TEAM', 'CHECKIN_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/attendance}, 'clipboard-check', #{nav.attendance}, ${active == 'attendance'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('CHECKIN_READ_TEAM') and !hasAuthority('CHECKIN_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/attendance/team}, 'clipboard-check', #{nav.teamAttendance}, ${active == 'teamAttendance'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('CHECKIN_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/attendance}, 'clipboard-check', #{nav.attendance}, ${active == 'attendance'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('SHIFT_UPDATE_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/overtime}, 'clock', #{nav.overtime}, ${active == 'overtime'}, null)}"></a></th:block>
             <th:block sec:authorize="hasAnyAuthority('SHIFT_UPDATE_TEAM', 'USER_MANAGE')"><a th:replace="~{fragments/layout :: navItem(@{/team}, 'users', #{nav.team}, ${active == 'team'}, null)}"></a></th:block>
             <th:block sec:authorize="hasAuthority('USER_READ_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/workers}, 'user-round', #{nav.workers}, ${active == 'workers'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAnyAuthority('REPORT_EXPORT_TEAM', 'REPORT_EXPORT_ALL')"><a th:replace="~{fragments/layout :: navItem(@{/reports}, 'clipboard-check', #{nav.reports}, ${active == 'reports'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('USER_MANAGE')"><a th:replace="~{fragments/layout :: navItem(@{/zones}, 'map-pin', #{nav.zones}, ${active == 'zones'}, null)}"></a></th:block>
+            <th:block sec:authorize="hasAuthority('USER_MANAGE')"><a th:replace="~{fragments/layout :: navItem(@{/settings}, 'layout-dashboard', #{nav.settings}, ${active == 'settings'}, null)}"></a></th:block>
         </div>
     </nav>
 </aside>

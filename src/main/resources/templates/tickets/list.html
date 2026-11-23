@@ -9,8 +9,29 @@
         </a>
     </div>
     <div th:replace="~{fragments/layout :: messages}"></div>
-    <p class="empty panel-less-empty" th:if="${tickets.totalElements == 0}" th:text="#{tickets.none}">You haven't opened any tickets.</p>
-    <th:block th:unless="${tickets.isEmpty()}"><div th:replace="~{fragments/lists :: tickets(${tickets}, false)}"></div></th:block>
+    <nav class="tabs" th:if="${leader}" th:attr="aria-label=#{tickets.title}">
+        <a th:href="@{/tickets}" th:attr="aria-current=${team} ? null : 'page'" th:text="#{tickets.mine}">Mine</a>
+        <a th:href="@{/tickets(team=true)}" th:attr="aria-current=${team} ? 'page' : null" th:text="#{tickets.team}">My team</a>
+    </nav>
+    <form class="filters" method="get" th:action="@{/tickets}" th:unless="${team}">
+        <div>
+            <label for="status" th:text="#{field.status}">Status</label>
+            <select id="status" name="status">
+                <option value="" th:text="#{common.all}">All</option>
+                <option th:each="s : ${T(orochi.steelsight.ticketing.model.TicketStatus).values()}" th:value="${s}"
+                        th:selected="${s == status}" th:text="${@display.label(s)}">Open</option>
+            </select>
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{common.show}">Show</button>
+    </form>
+    <p class="quiet" th:if="${team}" th:text="#{tickets.teamHint}">The Admin decides these. You can read them and add a comment.</p>
+    <p class="empty panel-less-empty" th:if="${tickets.totalElements == 0}" th:text="${team} ? #{tickets.teamNone} : #{tickets.none}">You haven't opened any tickets.</p>
+    <th:block th:unless="${tickets.isEmpty()}"><div th:replace="~{fragments/lists :: tickets(${tickets}, ${team})}"></div></th:block>
     <nav th:replace="~{fragments/lists :: pager(${tickets})}"></nav>
+    <section class="mt-6" th:if="${teamTickets != null and !teamTickets.isEmpty()}">
+        <h2 th:text="#{tickets.team}">My team's tickets</h2>
+        <p class="quiet" th:text="#{tickets.teamHint}">The Admin decides these. You can read them and add a comment.</p>
+        <div th:replace="~{fragments/lists :: tickets(${teamTickets}, true)}"></div>
+    </section>
 </main>
 </html>

@@ -15,6 +15,7 @@
             <dt th:text="#{field.time}">Time</dt><dd th:text="#{common.timeRange(${@display.dateTime(shift.startAt)}, ${@display.time(shift.endAt)})}">Time</dd>
         </dl>
         <p class="quiet divider" th:text="#{shifts.locked}">A finished or cancelled shift can't be changed.</p>
+        <p class="quiet" th:if="${shift.status.name() == 'COMPLETED'}" th:text="#{shifts.completedAuto}">The system marked this shift completed when it ended.</p>
     </section>
 
     <th:block th:if="${shift == null or shift.scheduled}">
@@ -37,29 +38,66 @@
                     </select>
                 </div>
                 <div>
-                    <label for="startAt" th:text="#{shifts.starts}">Starts</label>
-                    <input id="startAt" type="datetime-local" th:field="*{startAt}" required>
+                    <label for="kind" th:text="#{shifts.kind}">Kind</label>
+                    <select id="kind" th:field="*{kind}">
+                        <option value="REGULAR" th:text="#{enum.REGULAR}">Regular</option>
+                        <option value="OVERTIME" th:if="${canOvertime}" th:text="#{enum.OVERTIME}">Overtime</option>
+                    </select>
                 </div>
                 <div>
-                    <label for="endAt" th:text="#{shifts.ends}">Ends</label>
-                    <input id="endAt" type="datetime-local" th:field="*{endAt}" required>
+                    <label for="frame" th:text="#{shifts.frame}">Frame</label>
+                    <select id="frame">
+                        <option value="" th:text="#{shifts.frameCustom}">Custom</option>
+                        <option value="07:00-11:30" th:text="#{shifts.frameMorning}">Morning 07:00-11:30</option>
+                        <option value="13:30-17:30" th:text="#{shifts.frameAfternoon}">Afternoon 13:30-17:30</option>
+                        <option value="18:00-22:00" th:if="${canOvertime}" th:text="#{shifts.frameEvening}">Evening 18:00-22:00 (overtime)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="day" th:text="#{field.day}">Day</label>
+                    <input id="day" type="date" th:field="*{day}" required>
+                </div>
+                <div class="grid grid-cols-2 gap-x-4">
+                    <div>
+                        <label for="start" th:text="#{shifts.starts}">Starts</label>
+                        <input id="start" type="time" th:field="*{start}" required>
+                    </div>
+                    <div>
+                        <label for="end" th:text="#{shifts.ends}">Ends</label>
+                        <input id="end" type="time" th:field="*{end}" required>
+                    </div>
                 </div>
             </div>
+            <input type="hidden" th:field="*{pendingOvertimeId}">
+            <label for="reason"><span th:text="#{shifts.reason}">Reason</span> <span class="optional" th:text="#{shifts.reasonHint}">required for overtime</span></label>
+            <textarea id="reason" th:field="*{reason}" rows="2" maxlength="500"></textarea>
             <div class="actions"><button type="submit" class="btn" th:text="${shift} ? #{shifts.save} : #{shifts.add}">Save</button></div>
         </form>
 
-        <section class="sheet mt-4" th:if="${shift}">
-            <h2 class="mb-1" th:text="#{shifts.finish}">Finish this shift</h2>
-            <p class="quiet" th:text="#{shifts.finishHint}">This can't be undone. The worker sees the change on their timetable.</p>
+        <section class="sheet mt-4" th:if="${shift != null and !started}">
+            <h2 class="mb-1" th:text="#{shifts.cancelTitle}">Cancel this shift</h2>
+            <p class="quiet" th:text="#{shifts.cancelHint}">This can't be undone. The worker is told at once.</p>
             <div class="actions">
-                <form method="post" th:if="${started}" th:action="@{/shifts/{id}/complete(id=${shift.id})}">
-                    <button type="submit" class="btn secondary" th:text="#{shifts.markCompleted}">Mark completed</button>
-                </form>
                 <form method="post" th:action="@{/shifts/{id}/cancel(id=${shift.id})}">
-                    <button type="submit" class="btn danger" th:text="#{shifts.cancel}">Cancel shift</button>
+                    <button type="submit" class="btn danger" th:text="#{shifts.cancel}"
+                            th:attr="onclick=|return confirm('#{shifts.cancelConfirm(${shift.user.fullName})}')|">Cancel shift</button>
                 </form>
             </div>
         </section>
     </th:block>
+    <script>
+        // A frame fills in the start and end; the evening frame is always overtime (SRS BR-21).
+        (function () {
+            const frame = document.getElementById('frame');
+            if (!frame) return;
+            frame.addEventListener('change', () => {
+                if (!frame.value) return;
+                const [start, end] = frame.value.split('-');
+                document.getElementById('start').value = start;
+                document.getElementById('end').value = end;
+                if (start === '18:00') document.getElementById('kind').value = 'OVERTIME';
+            });
+        })();
+    </script>
 </main>
 </html>

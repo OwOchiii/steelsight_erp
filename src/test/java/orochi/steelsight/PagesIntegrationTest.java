@@ -45,7 +45,7 @@ class PagesIntegrationTest extends PageTestSupport {
         camera = jdbc.queryForObject(
                 "INSERT INTO camera (camera_code, zone_id) VALUES ('PAGE-CAM', ?) RETURNING id", Long.class, zone);
         safetyConcern = jdbc.queryForObject(
-                "SELECT id FROM ticket_category WHERE category_name = 'Safety concern'", Long.class);
+                "SELECT id FROM ticket_category WHERE code = 'OTHER'", Long.class);
     }
 
     @Test
@@ -80,12 +80,14 @@ class PagesIntegrationTest extends PageTestSupport {
     @Test
     void violationListShowsOnlyYourOwn() throws Exception {
         violation(worker, "NO_VEST");
-        violation(otherWorker, "NO_GLOVES");
+        violation(otherWorker, "NO_HARD_HAT");
+        violation(null, camera, "NO_HARD_HAT_AND_VEST");   // still pending: not shown to anyone yet
 
         mvc.perform(get("/violations").with(as(worker)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("No vest")))
-                .andExpect(content().string(not(containsString("No gloves"))));
+                .andExpect(content().string(containsString(">Vest<")))
+                .andExpect(content().string(not(containsString(">Hard hat<"))))
+                .andExpect(content().string(not(containsString("Hard hat and vest"))));
     }
 
     @Test
@@ -111,7 +113,7 @@ class PagesIntegrationTest extends PageTestSupport {
                 .isEqualTo("DISPUTED");
         mvc.perform(get(result.getResponse().getRedirectedUrl()).with(as(worker)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Dispute: No vest")))
+                .andExpect(content().string(containsString("Appeal - violation")))
                 .andExpect(content().string(containsString("I was wearing it")));
         mvc.perform(get("/violations/" + id).with(as(worker)))
                 .andExpect(content().string(not(containsString("Send dispute"))));
@@ -146,21 +148,24 @@ class PagesIntegrationTest extends PageTestSupport {
                 .isEqualTo("NONE");
     }
 
+    /** BR-60: the five categories; an appeal starts from its violation, so it isn't offered here. */
     @Test
-    void newTicketFormOffersZonesAndLeavesOutDisputes() throws Exception {
+    void newTicketFormOffersTheSrsCategoriesWithoutTheAppeal() throws Exception {
         mvc.perform(get("/tickets/new").with(as(worker)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Safety concern")))
-                .andExpect(content().string(containsString("Page Zone")))
-                .andExpect(content().string(not(containsString(">PPE dispute<"))));
+                .andExpect(content().string(containsString(">Attendance error<")))
+                .andExpect(content().string(containsString(">Missing check-out<")))
+                .andExpect(content().string(containsString(">Leave request<")))
+                .andExpect(content().string(containsString(">Other<")))
+                .andExpect(content().string(not(containsString(">Safety concern<"))))
+                .andExpect(content().string(not(containsString(">PPE appeal<"))));
     }
 
     @Test
-    void aSafetyConcernKeepsItsZoneAndPhotoAndThePhotoStaysPrivate() throws Exception {
+    void aTicketKeepsItsPhotoAndThePhotoStaysPrivate() throws Exception {
         MvcResult result = mvc.perform(multipart("/tickets")
                         .file(new MockMultipartFile("photo", "../../evil.exe", "text/html", PNG))
                         .param("categoryId", safetyConcern.toString())
-                        .param("zoneId", zone.toString())
                         .param("subject", "Broken guard rail")
                         .param("description", "Loose on level 2")
                         .with(as(worker)).with(csrf()))
@@ -173,7 +178,6 @@ class PagesIntegrationTest extends PageTestSupport {
 
         mvc.perform(get(url).with(as(worker)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Page Zone")))
                 .andExpect(content().string(containsString(url + "/photo")));
         mvc.perform(get(url + "/photo").with(as(worker)))
                 .andExpect(status().isOk())
@@ -188,10 +192,10 @@ class PagesIntegrationTest extends PageTestSupport {
                         .file(new MockMultipartFile("photo", "photo.png", "image/png", "<script>".getBytes()))
                         .param("categoryId", safetyConcern.toString())
                         .param("subject", "Not an image")
-                        .param("description", "details")
+                        .param("description", "Some details here")
                         .with(as(worker)).with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("JPEG, PNG or WebP")))
+                .andExpect(content().string(containsString("JPEG or PNG")))
                 .andExpect(content().string(containsString("Not an image")));
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ticket WHERE subject = 'Not an image'", Long.class)).isZero();

@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class AccountPagesTest extends PageTestSupport {
 
-    static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    static final byte[] JPEG = TestImages.FACE_JPEG;
 
     Long admin;
     Long manager;
@@ -55,6 +55,7 @@ class AccountPagesTest extends PageTestSupport {
     void adminCreatesAnAccountThatMustChangeItsPassword() throws Exception {
         mvc.perform(post("/team/new").param("employeeCode", "ACC-NEW").param("fullName", "New Person")
                         .param("roleName", "WORKER").param("teamId", team.toString()).param("password", "start-pass-1")
+                        .param("phoneNumber", "0911000001").param("consent", "true")
                         .with(as(admin)).with(csrf()))
                 .andExpect(header().string("Location", containsString("/edit")))
                 .andExpect(flash().attribute("success", "The account was created."));
@@ -70,6 +71,7 @@ class AccountPagesTest extends PageTestSupport {
     void adminCreatesAnAccountWithAFacePhotoThatIsQueuedForEnrolment() throws Exception {
         mvc.perform(multipart("/team/new").file(new MockMultipartFile("photo", "face.jpg", "image/jpeg", JPEG))
                         .param("employeeCode", "ACC-FACE").param("fullName", "Fay Face").param("roleName", "WORKER")
+                        .param("staffGroup", "OFFICE").param("phoneNumber", "0911000002").param("consent", "true")
                         .param("password", "start-pass-1").with(as(admin)).with(csrf()))
                 .andExpect(status().is3xxRedirection());
 
@@ -91,7 +93,7 @@ class AccountPagesTest extends PageTestSupport {
         mvc.perform(post("/team/new").param("employeeCode", "has space").param("fullName", "Typed Name")
                         .param("roleName", "WORKER").param("password", "start-pass-1").with(as(admin)).with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("An employee code can use letters")))
+                .andExpect(content().string(containsString("Employee code: 3 to 20 characters")))
                 .andExpect(content().string(containsString("Typed Name")))
                 .andExpect(content().string(not(containsString("start-pass-1"))));
     }
@@ -124,7 +126,11 @@ class AccountPagesTest extends PageTestSupport {
                 .andExpect(flash().attribute("error", "Choose a photo to upload"));
         mvc.perform(multipart("/team/" + worker + "/face").file(new MockMultipartFile("photo", "f.jpg", "image/jpeg", "<html>".getBytes()))
                         .with(as(admin)).with(csrf()))
-                .andExpect(flash().attribute("error", "The photo must be a JPEG, PNG or WebP image"));
+                .andExpect(flash().attribute("error", "The photo must be JPEG or PNG, at most 5 MB and at least 480 x 480 pixels."));
+        // BR-09: a real photo smaller than 480 x 480 is refused too
+        mvc.perform(multipart("/team/" + worker + "/face").file(new MockMultipartFile("photo", "f.jpg", "image/jpeg", TestImages.SMALL_JPEG))
+                        .with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("error", "The photo must be JPEG or PNG, at most 5 MB and at least 480 x 480 pixels."));
         assertThat(textColumn("SELECT face_file_path FROM app_user WHERE id = ?", worker)).isNull();
     }
 
@@ -178,17 +184,16 @@ class AccountPagesTest extends PageTestSupport {
     }
 
     @Test
-    void aManagerStillPlansShiftsAndSetsTheLateRule() throws Exception {
+    void aManagerStillPlansShifts() throws Exception {
         mvc.perform(get("/shifts/new").param("workerId", worker.toString()).with(as(manager))).andExpect(status().isOk());
-        mvc.perform(post("/teams/" + team + "/late-after").param("minutes", "20").with(as(manager)).with(csrf()))
-                .andExpect(flash().attribute("success", "The late check-in rule was saved."));
     }
 
     @Test
     void someoneGivenAPasswordByAnAdminMustChooseTheirOwnFirst() throws Exception {
-        String code = "ACC-" + UUID.randomUUID().toString().substring(0, 6);
+        String code = ("ACC-" + UUID.randomUUID().toString().substring(0, 6)).toUpperCase();
         mvc.perform(post("/team/new").param("employeeCode", code).param("fullName", "First Timer")
-                .param("roleName", "WORKER").param("password", "start-pass-1").with(as(admin)).with(csrf()));
+                .param("roleName", "WORKER").param("staffGroup", "OFFICE").param("phoneNumber", "0911000003").param("consent", "true")
+                .param("password", "start-pass-1").with(as(admin)).with(csrf()));
 
         MockHttpSession session = (MockHttpSession) mvc.perform(formLogin().userParameter("employeeCode").user(code).password("start-pass-1"))
                 .andExpect(redirectedUrl("/account/password"))

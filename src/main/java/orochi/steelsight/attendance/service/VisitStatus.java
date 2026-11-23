@@ -9,8 +9,8 @@ import java.time.OffsetDateTime;
  * How a visit went against its planned shift. Worked out when read, never stored, so a corrected
  * check-in or an edited shift changes it straight away.
  *
- * @param requiredCheckOut when the worker may leave; null when the visit has no planned shift
- * @param minutesLate      minutes after the shift started, 0 if within the grace period
+ * @param requiredCheckOut the shift end; null when the visit has no planned shift
+ * @param minutesLate      minutes after the shift started, 0 within the 5-minute grace (BR-31)
  * @param minutesEarly     minutes before requiredCheckOut, 0 if they stayed or are still on site
  * @param tooShort         recorded in and out within the minimum visit, so it doesn't count as attending a shift
  */
@@ -33,17 +33,14 @@ public record VisitStatus(CheckIn visit, OffsetDateTime requiredCheckOut, long m
         return visit.getCheckOutAt() == null;
     }
 
-    /** The worker never checked out, so the recorded check-out is only an estimate. */
+    /** Closed by the system: the worker never checked out, and the check-out time isn't real (SRS BR-35). */
     public boolean isMissingCheckOut() {
         return visit.isAutoClosed();
     }
 
-    /**
-     * Checked in at the gate, never checked out, and no vest number to recognise them by on the way out.
-     * It can be an honest miss, so hours stay as they are until someone looks at it and corrects the visit.
-     */
+    /** Flagged Incomplete attendance and not explained yet: counts 0 hours (SRS BR-35, BR-67). */
     public boolean isNeedsReview() {
-        return visit.isAutoClosed() && visit.getPpeLinking() == null && visit.getMethod() == CheckInMethod.FACE;
+        return visit.isIncomplete();
     }
 
     public boolean isOnTime() {

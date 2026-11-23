@@ -45,8 +45,19 @@ Create a web service from an **existing image** with:
 | `SUPABASE_STORAGE_BUCKET` | Only if the ticket bucket isn't named `ticket-photos` |
 | `SUPABASE_FACE_BUCKET` | Only if the face bucket isn't named `face-photos`. The detection service needs the same bucket name, because `face_file_path` holds only the file name |
 | `STEELSIGHT_DETECTION_API_KEY` | A long random value, for example from `openssl rand -hex 32`. The detection software sends the same one. |
+| `SUPABASE_EVIDENCE_BUCKET` | Only if the violation photo bucket isn't named `evidence-photos`. The detection app needs the same name |
 | `ADMIN_EMPLOYEE_CODE` | The first admin's code, or leave unset for `ADMIN` |
 | `ADMIN_PASSWORD` | A strong password for the first admin |
+| `APP_BASE_URL` | `https://<your service>.onrender.com`, for the link at the end of each Zalo message |
+| `ZALO_BOT_TOKEN` | Optional. The bot token from Zalo Bot Creator (bot.zaloplatforms.com). Without it and the link, Zalo is off and notices stay in the web ERP |
+| `ZALO_BOT_LINK` | The bot's share link (`https://zalo.me/...`), opened from the home page |
+| `ZALO_WEBHOOK_SECRET` | A random string of 8 to 256 characters, for example from `openssl rand -hex 24`. Zalo sends it with each webhook call |
+| `ZALO_WEBHOOK_URL` | `https://<your service>.onrender.com/zalo/webhook`. With the secret set, the ERP registers it with Zalo at startup |
+
+**Zalo:** after setting these and redeploying, check the log for the webhook registration. Then log in,
+click **Link Zalo** on the home page, and send the 6-digit code to the bot; it should reply. Render's
+free tier sleeps after 15 minutes, which delays queued Zalo messages and can make Zalo's first webhook
+call time out, so keep the uptime monitor (CR-13) pinging `/actuator/health`.
 
 **Database URL format:** Supabase's **Connect** panel shows a URI such as `postgresql://postgres.<ref>:[YOUR-PASSWORD]@<host>:5432/postgres`. Don't paste it into `DB_URL` as it is. The JDBC driver refuses a username and password inside the URL, and the app fails to start with `Driver org.postgresql.Driver claims to not accept jdbcUrl`. Split it into three settings:
 

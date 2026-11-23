@@ -73,6 +73,15 @@ steelsight:
     minimum-visit-minutes: ${MINIMUM_VISIT_MINUTES:10}
   # Times are stored in UTC and shown in this zone.
   time-zone: ${APP_TIME_ZONE:Asia/Ho_Chi_Minh}
+  jobs:
+    enabled: ${JOBS_ENABLED:true}   # the scheduled jobs of SRS 3.2.38; tests switch them off
+  # The public address of the ERP, for the links at the end of Zalo messages (SRS BR-17).
+  base-url: ${APP_BASE_URL:}
+  zalo:                                           # all optional; without a token and link Zalo stays off
+    bot-token: ${ZALO_BOT_TOKEN:}                 # from Zalo Bot Creator (bot.zaloplatforms.com)
+    bot-link: ${ZALO_BOT_LINK:}                   # the bot's share link from Zalo Bot Creator, opened from the home page
+    webhook-secret: ${ZALO_WEBHOOK_SECRET:}       # any random string of 8 to 256 characters
+    webhook-url: ${ZALO_WEBHOOK_URL:}             # https://<erp host>/zalo/webhook; registered at startup
   storage:
     # Ticket photos: "local" keeps them on disk, "supabase" in a private bucket. Render's disk is
     # wiped on every redeploy, restart or spin-down, so the prod profile uses Supabase.
@@ -82,3 +91,4 @@ steelsight:
     supabase-key: ${SUPABASE_SERVICE_KEY:}
     supabase-bucket: ${SUPABASE_STORAGE_BUCKET:ticket-photos}
     supabase-face-bucket: ${SUPABASE_FACE_BUCKET:face-photos}
+    supabase-evidence-bucket: ${SUPABASE_EVIDENCE_BUCKET:evidence-photos}   # violation photos the detection app uploads

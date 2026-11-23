@@ -16,11 +16,16 @@ import orochi.steelsight.security.AuthenticatedUser;
 public class NotificationController extends PageController {
 
     private final NotificationService notifications;
+    private final orochi.steelsight.notification.service.NoticeText text;
 
     @GetMapping("/notifications")
     public String list(@AuthenticationPrincipal AuthenticatedUser user,
                        @RequestParam(defaultValue = "0") int page, Model model) {
-        model.addAttribute("notifications", notifications.listOwn(user.getUserId(), pageOf(page)));
+        var shown = notifications.listOwn(user.getUserId(), pageOf(page));
+        model.addAttribute("notifications", shown);
+        model.addAttribute("texts", shown.stream().collect(java.util.stream.Collectors.toMap(
+                n -> n.getId(), n -> text.render(n, org.springframework.context.i18n.LocaleContextHolder.getLocale()))));
+        model.addAttribute("deliveries", notifications.deliveries(shown.stream().map(n -> n.getId()).toList()));
         model.addAttribute("unread", notifications.countUnread(user.getUserId()));
         return "notifications/list";
     }

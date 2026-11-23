@@ -3,45 +3,45 @@ package orochi.steelsight.reporting.service;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import orochi.steelsight.attendance.service.CheckInService;
-import orochi.steelsight.attendance.service.VisitStatus;
+import orochi.steelsight.attendance.service.AttendanceCalculator;
+import orochi.steelsight.attendance.service.ShiftAttendance;
+import orochi.steelsight.calendar.MonthLocks;
 import orochi.steelsight.exception.BusinessRuleException;
 import orochi.steelsight.identity.model.AppUser;
+import orochi.steelsight.identity.model.StaffGroup;
 import orochi.steelsight.identity.repository.AppUserRepository;
-import orochi.steelsight.identity.repository.RoleRepository;
 import orochi.steelsight.identity.service.AccessPolicy;
 import orochi.steelsight.identity.service.Permissions;
-import orochi.steelsight.ppe.model.DisputeStatus;
-import orochi.steelsight.ppe.model.ViolationType;
+import orochi.steelsight.ppe.model.SafetyLevel;
 import orochi.steelsight.scheduling.model.Team;
 import orochi.steelsight.scheduling.repository.TeamRepository;
+import orochi.steelsight.web.SiteTime;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.sql.Timestamp;
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The month's figures accounting needs to work out pay and bonuses: safety score, violations and
- * attendance for each worker. A team leader gets the team they lead; an admin gets every worker.
+ * The monthly Excel file for accounting (SRS 3.2.24, BR-71): Site summary, Office summary, Violations,
+ * Attendance and Absences. Attendance comes from AttendanceCalculator, the same as My Attendance, and the
+ * score from safety_scores(), which reads the frozen row once the month is locked. A file made before the
+ * lock is Provisional. Every export is logged. No money is worked out (OR-02).
  */
 @Service
-@Transactional(readOnly = true)
+@Transactional
 @RequiredArgsConstructor
 public class MonthlyReportService {
 
@@ -49,197 +49,188 @@ public class MonthlyReportService {
 
     private final AccessPolicy access;
     private final AppUserRepository users;
-    private final RoleRepository roles;
     private final TeamRepository teams;
-    private final CheckInService checkIns;
+    private final AttendanceCalculator calculator;
+    private final MonthLocks locks;
+    private final SiteTime siteTime;
     private final JdbcTemplate jdbc;
 
-    @Value("${steelsight.time-zone}")
-    private String timeZone;
-
-    @Value("${steelsight.attendance.minimum-visit-minutes}")
-    private int minimumVisitMinutes;
-
-    /** to is the end of the month, or now for the month that is still running. */
     public record Period(YearMonth month, OffsetDateTime from, OffsetDateTime to) {
     }
 
-    public record WorkerRow(Long id, String code, String name, String team, Integer score, String level,
-                            int noHardHat, int noVest, int otherViolations, int awaitingDecision,
-                            int shiftsScheduled, int shiftsWorked, int noShows, BigDecimal hoursWorked,
-                            int timesLate, long minutesLate, int timesEarly, long minutesEarly, int missingCheckOuts,
-                            int needsReview) {
-        public int violations() {
-            return noHardHat + noVest + otherViolations;
+    /** One employee's month. score and level are null for office staff, who have none (BR-56). */
+    public record EmployeeRow(Long id, String code, String name, String team, ShiftAttendance.Summary attendance,
+                              int violations, int reminders, Integer score, SafetyLevel level) {
+
+        public Integer reductionPercent() {
+            return level == null ? null : level.reductionPercent();
         }
     }
 
-    public record ViolationRow(OffsetDateTime detectedAt, String code, String name, ViolationType type,
-                               String camera, DisputeStatus dispute) {
+    /** person is null for a stranger. */
+    public record ViolationRow(OffsetDateTime detectedAt, String zone, String type, String status, String code,
+                               String person, String reviewer, String appeal) {
     }
 
     public record VisitRow(OffsetDateTime checkInAt, OffsetDateTime checkOutAt, String code, String name,
-                           OffsetDateTime shiftStart, OffsetDateTime shiftEnd, long minutesLate, long minutesEarly,
-                           boolean checkOutEstimated, boolean needsReview) {
+                           OffsetDateTime shiftStart, OffsetDateTime shiftEnd, String method, boolean incomplete,
+                           boolean closedBySystem) {
     }
 
-    public record NoShowRow(OffsetDateTime shiftStart, OffsetDateTime shiftEnd, String code, String name) {
+    public record AbsenceRow(OffsetDateTime shiftStart, OffsetDateTime shiftEnd, String code, String name, String zone) {
     }
 
-    /** team is null when the report covers every worker. */
-    public record Report(Period period, String team, OffsetDateTime generatedAt, List<WorkerRow> workers,
-                         List<ViolationRow> violations, List<VisitRow> visits, List<NoShowRow> noShows) {
+    public record Export(OffsetDateTime exportedAt, YearMonth month, String scope, String by, boolean provisional) {
     }
 
-    private record ShiftRow(Long userId, OffsetDateTime start, OffsetDateTime end, boolean attended) {
+    /** team is null for the whole site. */
+    public record Report(Period period, String team, boolean provisional, OffsetDateTime generatedAt,
+                         List<EmployeeRow> site, List<EmployeeRow> office, List<ViolationRow> violations,
+                         List<VisitRow> visits, List<AbsenceRow> absences) {
     }
 
     public Report build(Long actorId, YearMonth month) {
-        Scope scope = scopeOf(actorId);
+        return build(actorId, month, null);
+    }
+
+    /** An Admin exports the whole site or one team; a Manager his own team (SRS 3.2.24 #2). */
+    public Report build(Long actorId, YearMonth month, Long teamId) {
+        Team team = scope(actorId, teamId);
         Period period = period(month);
-        Map<Long, AppUser> workers = scope.workers().stream()
-                .collect(Collectors.toMap(AppUser::getId, Function.identity()));
+        List<AppUser> people = (team == null
+                ? users.findAllByDeletedAtIsNull()
+                : users.findAllByTeamIdAndDeletedAtIsNull(team.getId())).stream()
+                .sorted(Comparator.comparing(AppUser::getFullName).thenComparing(AppUser::getId))
+                .toList();
+        Map<Long, AppUser> byId = people.stream().collect(Collectors.toMap(AppUser::getId, Function.identity()));
+
+        List<AttendanceCalculator.Row> rows = calculator.rows(byId.keySet(), period.from(), period.to());
+        Map<Long, List<AttendanceCalculator.Row>> perPerson = rows.stream().collect(Collectors.groupingBy(AttendanceCalculator.Row::userId));
 
         Map<Long, Integer> scores = new HashMap<>();
-        Map<Long, String> levels = new HashMap<>();
-        // The function counts the whole calendar month that p_at falls in.
-        jdbc.query("SELECT user_id, score, level FROM safety_scores(?)", row -> {
-            scores.put(row.getLong("user_id"), row.getInt("score"));
-            levels.put(row.getLong("user_id"), row.getString("level"));
-        }, Timestamp.from(period.to().minusNanos(1000).toInstant()));
-
-        List<ViolationRow> violations = new ArrayList<>();
-        Map<Long, int[]> violationCounts = new HashMap<>();   // no hard hat, no vest, other, awaiting decision
+        Map<Long, SafetyLevel> levels = new HashMap<>();
+        Map<Long, Integer> counted = new HashMap<>();
+        jdbc.query("SELECT user_id, score, level, violations FROM safety_scores(?)", row -> {
+            scores.put(row.getLong(1), row.getInt(2));
+            levels.put(row.getLong(1), SafetyLevel.of(row.getInt(3)));
+            counted.put(row.getLong(1), row.getInt(4));
+        }, period.from());
+        Map<Long, Integer> reminders = new HashMap<>();
         jdbc.query("""
-                SELECT v.user_id, v.detected_at, v.violation_type, c.camera_code, v.dispute_status
-                FROM violation v JOIN camera c ON c.id = v.camera_id
-                WHERE v.user_id IS NOT NULL AND v.detected_at >= ? AND v.detected_at < ?
-                ORDER BY v.detected_at, v.id
-                """, row -> {
-            AppUser worker = workers.get(row.getLong("user_id"));
-            if (worker == null) {
-                return;
-            }
-            ViolationType type = ViolationType.valueOf(row.getString("violation_type"));
-            DisputeStatus dispute = DisputeStatus.valueOf(row.getString("dispute_status"));
-            violations.add(new ViolationRow(time(row.getTimestamp("detected_at")), worker.getEmployeeCode(),
-                    worker.getFullName(), type, row.getString("camera_code"), dispute));
-            if (dispute == DisputeStatus.OVERTURNED) {
-                return;
-            }
-            int[] counts = violationCounts.computeIfAbsent(worker.getId(), id -> new int[4]);
-            counts[type == ViolationType.NO_HARD_HAT ? 0 : type == ViolationType.NO_VEST ? 1 : 2]++;
-            if (dispute == DisputeStatus.DISPUTED) {
-                counts[3]++;
-            }
-        }, Timestamp.from(period.from().toInstant()), Timestamp.from(period.to().toInstant()));
+                SELECT user_id, count(*) FROM violation WHERE review_status = 'REMINDER'
+                  AND detected_at >= ? AND detected_at < ? GROUP BY user_id""",
+                row -> {
+                    reminders.put(row.getLong(1), row.getInt(2));
+                }, period.from(), period.to());
 
-        // A visit counts for a shift when it is linked to it, or overlaps it: detection doesn't link them yet.
-        // A recorded visit under the minimum doesn't count; an estimated check-out can't say how long they stayed.
-        List<ShiftRow> shifts = jdbc.query("""
-                SELECT s.user_id, s.start_at, s.end_at,
-                       EXISTS (SELECT 1 FROM check_in c
-                               WHERE c.user_id = s.user_id
-                                 AND (c.shift_id = s.id
-                                      OR (c.check_in_at < s.end_at AND COALESCE(c.check_out_at, now()) > s.start_at))
-                                 AND (c.check_out_at IS NULL OR c.auto_closed
-                                      OR c.check_out_at - c.check_in_at >= make_interval(mins => ?))) AS attended
-                FROM shift s
-                WHERE s.status <> 'CANCELLED' AND s.start_at >= ? AND s.start_at < ?
-                ORDER BY s.start_at, s.id
-                """, (row, n) -> new ShiftRow(row.getLong("user_id"), time(row.getTimestamp("start_at")),
-                        time(row.getTimestamp("end_at")), row.getBoolean("attended")),
-                minimumVisitMinutes, Timestamp.from(period.from().toInstant()), Timestamp.from(period.to().toInstant()))
-                .stream().filter(s -> workers.containsKey(s.userId())).toList();
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        List<NoShowRow> noShows = shifts.stream()
-                .filter(s -> !s.attended() && !s.end().isAfter(now))
-                .map(s -> new NoShowRow(s.start(), s.end(), workers.get(s.userId()).getEmployeeCode(),
-                        workers.get(s.userId()).getFullName()))
+        List<EmployeeRow> site = new ArrayList<>();
+        List<EmployeeRow> office = new ArrayList<>();
+        for (AppUser person : people) {
+            ShiftAttendance.Summary attendance = calculator.summary(perPerson.getOrDefault(person.getId(), List.of()));
+            EmployeeRow row = new EmployeeRow(person.getId(), person.getEmployeeCode(), person.getFullName(),
+                    person.getTeam() == null ? null : person.getTeam().getName(), attendance,
+                    counted.getOrDefault(person.getId(), 0), reminders.getOrDefault(person.getId(), 0),
+                    scores.get(person.getId()), levels.get(person.getId()));
+            (person.getStaffGroup() == StaffGroup.SITE && scores.containsKey(person.getId()) ? site : office).add(row);
+        }
+
+        List<AbsenceRow> absences = rows.stream()
+                .filter(r -> r.result().has(ShiftAttendance.Flag.ABSENT))
+                .map(r -> new AbsenceRow(r.result().shift().start(), r.result().shift().end(),
+                        byId.get(r.userId()).getEmployeeCode(), byId.get(r.userId()).getFullName(), r.zone()))
                 .toList();
 
-        List<VisitStatus> visits = checkIns.listStartedInScope(actorId, period.from(), period.to()).stream()
-                .filter(v -> workers.containsKey(v.visit().getUser().getId()))
-                .sorted(Comparator.comparing((VisitStatus v) -> v.visit().getCheckInAt()))
-                .toList();
-
-        List<WorkerRow> rows = scope.workers().stream()
-                .sorted(Comparator.comparing(AppUser::getFullName).thenComparing(AppUser::getId))
-                .map(worker -> row(worker, scores, levels, violationCounts, shifts, noShows, visits, now))
-                .toList();
-        List<VisitRow> visitRows = visits.stream().map(this::visitRow).toList();
-
-        log.info("Monthly report for {} built by user {} ({} workers)", month, actorId, rows.size());
-        return new Report(period, scope.team() == null ? null : scope.team().getName(), now, rows,
-                violations, visitRows, noShows);
+        Report report = new Report(period, team == null ? null : team.getName(), !locks.isLocked(month), OffsetDateTime.now(),
+                site, office, violations(period, team, byId.keySet()), visits(period, byId.keySet()), absences);
+        log.info("Monthly report for {} built by user {} ({} site, {} office)", month, actorId, site.size(), office.size());
+        return report;
     }
 
-    private WorkerRow row(AppUser worker, Map<Long, Integer> scores, Map<Long, String> levels,
-                          Map<Long, int[]> violationCounts, List<ShiftRow> shifts, List<NoShowRow> noShows,
-                          List<VisitStatus> visits, OffsetDateTime now) {
-        Long id = worker.getId();
-        int[] counts = violationCounts.getOrDefault(id, new int[4]);
-        List<ShiftRow> own = shifts.stream().filter(s -> s.userId().equals(id)).toList();
-        List<VisitStatus> mine = visits.stream().filter(v -> v.visit().getUser().getId().equals(id)).toList();
-        long workedSeconds = mine.stream()
-                .filter(v -> v.visit().getCheckOutAt() != null)
-                .mapToLong(v -> Duration.between(v.visit().getCheckInAt(), v.visit().getCheckOutAt()).getSeconds())
-                .filter(seconds -> seconds > 0)
-                .sum();
-        return new WorkerRow(id, worker.getEmployeeCode(), worker.getFullName(),
-                worker.getTeam() == null ? null : worker.getTeam().getName(),
-                scores.get(id), levels.get(id),
-                counts[0], counts[1], counts[2], counts[3],
-                own.size(), (int) own.stream().filter(ShiftRow::attended).count(),
-                (int) noShows.stream().filter(n -> n.code().equals(worker.getEmployeeCode())).count(),
-                BigDecimal.valueOf(workedSeconds).divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP),
-                (int) mine.stream().filter(VisitStatus::isLate).count(),
-                mine.stream().mapToLong(VisitStatus::minutesLate).sum(),
-                (int) mine.stream().filter(VisitStatus::isEarly).count(),
-                mine.stream().mapToLong(VisitStatus::minutesEarly).sum(),
-                (int) mine.stream().filter(VisitStatus::isMissingCheckOut).count(),
-                (int) mine.stream().filter(VisitStatus::isNeedsReview).count());
+    /** Logs one export: who, which month and scope, and whether it was provisional (BR-71). */
+    public void logExport(Long actorId, Report report) {
+        jdbc.update("INSERT INTO report_export (user_id, month, scope, provisional) VALUES (?, ?, ?, ?)",
+                actorId, report.period().month().atDay(1), report.team() == null ? "SITE" : report.team(), report.provisional());
     }
 
-    private VisitRow visitRow(VisitStatus status) {
-        var visit = status.visit();
-        var shift = visit.getShift();
-        return new VisitRow(visit.getCheckInAt(), visit.getCheckOutAt(), visit.getUser().getEmployeeCode(),
-                visit.getUser().getFullName(), shift == null ? null : shift.getStartAt(),
-                shift == null ? null : shift.getEndAt(), status.minutesLate(), status.minutesEarly(),
-                status.isMissingCheckOut(), status.isNeedsReview());
+    /** The earlier exports the actor may see: all for the Admin, his own for a Manager. */
+    @Transactional(readOnly = true)
+    public List<Export> exports(Long actorId) {
+        boolean all = access.has(actorId, Permissions.REPORT_EXPORT_ALL);
+        if (!all) {
+            access.require(actorId, Permissions.REPORT_EXPORT_TEAM);
+        }
+        return jdbc.query("""
+                SELECT e.exported_at, e.month, e.scope, u.full_name, e.provisional
+                FROM report_export e JOIN app_user u ON u.id = e.user_id
+                WHERE ? OR e.user_id = ?
+                ORDER BY e.exported_at DESC LIMIT 50""", (row, n) -> new Export(time(row.getTimestamp(1)),
+                YearMonth.from(row.getDate(2).toLocalDate()), row.getString(3), row.getString(4), row.getBoolean(5)), all, actorId);
     }
 
-    private record Scope(Team team, List<AppUser> workers) {
+    /** Every confirmed violation, reminder and stranger of the month (BR-71). A team's file has the team's. */
+    private List<ViolationRow> violations(Period period, Team team, Set<Long> people) {
+        List<ViolationRow> found = new ArrayList<>();
+        jdbc.query("""
+                SELECT v.detected_at, z.name, v.violation_type, v.review_status, v.subject, u.employee_code, u.full_name,
+                       r.full_name, v.dispute_status, v.user_id, z.team_id
+                FROM violation v JOIN zone z ON z.id = v.zone_id
+                         LEFT JOIN app_user u ON u.id = v.user_id
+                         LEFT JOIN app_user r ON r.id = v.reviewed_by
+                WHERE v.review_status IN ('CONFIRMED', 'REMINDER') AND v.detected_at >= ? AND v.detected_at < ?
+                ORDER BY v.detected_at, v.id""", row -> {
+            Long person = (Long) row.getObject(10);
+            Long zoneTeam = (Long) row.getObject(11);
+            boolean inScope = team == null || (person != null ? people.contains(person) : team.getId().equals(zoneTeam));
+            if (inScope) {
+                boolean stranger = "STRANGER".equals(row.getString(5));
+                found.add(new ViolationRow(time(row.getTimestamp(1)), row.getString(2), row.getString(3),
+                        stranger ? "STRANGER" : row.getString(4), row.getString(6), row.getString(7), row.getString(8),
+                        row.getString(9)));
+            }
+        }, period.from(), period.to());
+        return found;
     }
 
-    /** A leader's own team, or every worker with REPORT_EXPORT_ALL. */
-    private Scope scopeOf(Long actorId) {
-        Long workerRole = roles.findByRoleName("WORKER").orElseThrow().getId();
+    private List<VisitRow> visits(Period period, Set<Long> people) {
+        if (people.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query("""
+                SELECT c.check_in_at, c.check_out_at, u.employee_code, u.full_name, s.start_at, s.end_at, c.method,
+                       c.incomplete, c.auto_closed
+                FROM check_in c JOIN app_user u ON u.id = c.user_id LEFT JOIN shift s ON s.id = c.shift_id
+                WHERE c.user_id = ANY (?) AND c.check_in_at >= ? AND c.check_in_at < ?
+                ORDER BY c.check_in_at, c.id""", (row, n) -> new VisitRow(time(row.getTimestamp(1)),
+                time(row.getTimestamp(2)), row.getString(3), row.getString(4), time(row.getTimestamp(5)),
+                time(row.getTimestamp(6)), row.getString(7), row.getBoolean(8), row.getBoolean(9)),
+                people.toArray(Long[]::new), period.from(), period.to());
+    }
+
+    private Team scope(Long actorId, Long teamId) {
         if (access.has(actorId, Permissions.REPORT_EXPORT_ALL)) {
-            return new Scope(null, users.findAllByRoleIdAndDeletedAtIsNull(workerRole));
+            return teamId == null ? null : teams.require(teamId);
         }
         access.require(actorId, Permissions.REPORT_EXPORT_TEAM);
-        Team team = teams.findAllByManagerId(actorId).stream().findFirst()
+        return teams.findAllByManagerId(actorId).stream().findFirst()
                 .orElseThrow(() -> new BusinessRuleException("You don't lead a team yet"));
-        List<AppUser> members = users.findAllByTeamIdAndDeletedAtIsNull(team.getId()).stream()
-                .filter(u -> u.getRole().getId().equals(workerRole))
-                .toList();
-        return new Scope(team, members);
     }
 
+    /** MSG49: a month that has not started is refused. */
     private Period period(YearMonth month) {
-        ZoneId zone = ZoneId.of(timeZone);
-        OffsetDateTime now = OffsetDateTime.now(zone);
-        if (month == null || month.isAfter(YearMonth.from(now))) {
-            throw new BusinessRuleException("Choose a month that has already started");
+        OffsetDateTime now = OffsetDateTime.now();
+        if (month == null || month.isAfter(YearMonth.from(siteTime.today()))) {
+            throw new BusinessRuleException("This month has not started yet.");
         }
-        OffsetDateTime from = month.atDay(1).atStartOfDay(zone).toOffsetDateTime();
-        OffsetDateTime end = month.plusMonths(1).atDay(1).atStartOfDay(zone).toOffsetDateTime();
+        OffsetDateTime from = siteTime.startOf(month.atDay(1));
+        OffsetDateTime end = siteTime.startOf(month.plusMonths(1).atDay(1));
         return new Period(month, from, end.isAfter(now) ? now : end);
     }
 
-    private OffsetDateTime time(Timestamp value) {
+    private static OffsetDateTime time(Timestamp value) {
         return value == null ? null : value.toInstant().atOffset(ZoneOffset.UTC);
+    }
+
+    static BigDecimal zeroIfNull(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

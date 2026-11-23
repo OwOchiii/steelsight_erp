@@ -36,22 +36,24 @@ public class ReportController {
     private static final MediaType XLSX =
             MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
-    private static final String TEAM_PAGE = "/team";
+    private static final String TEAM_PAGE = "/reports";
 
     private final MonthlyReportService reports;
     private final MonthlyReportWorkbook workbook;
     private final SiteTime siteTime;
+    private final orochi.steelsight.scheduling.repository.TeamRepository teams;
 
     /** A month that can't be exported goes back to the Team page, where the month was chosen, with the reason. */
     @GetMapping("/team/report")
     public ResponseEntity<byte[]> download(@AuthenticationPrincipal AuthenticatedUser user,
                                            @RequestParam(required = false) String month,
+                                           @RequestParam(required = false) Long teamId,
                                            HttpServletRequest request, HttpServletResponse response) throws IOException {
         YearMonth chosen;
         MonthlyReportService.Report report;
         try {
             chosen = monthOf(month);
-            report = reports.build(user.getUserId(), chosen);
+            report = reports.build(user.getUserId(), chosen, teamId);
         } catch (BusinessRuleException e) {
             log.info("Rule broken: {}", e.getMessage());
             RequestContextUtils.getOutputFlashMap(request).put("error", e.getMessage());
@@ -60,14 +62,24 @@ public class ReportController {
             return ResponseEntity.status(HttpStatus.SEE_OTHER).location(URI.create(target)).build();
         }
         byte[] file = workbook.write(report);
-        String name = "steelsight-" + slug(report.team() == null ? "all-workers" : report.team()) + "-" + chosen + ".xlsx";
-        // Pay data: record who took a copy of which month.
+        String name = MonthlyReportWorkbook.fileName(report, report.team() == null ? "Site" : slug(report.team()));
+        // Pay data: record who took a copy of which month (BR-71).
+        reports.logExport(user.getUserId(), report);
         log.info("Monthly report {} downloaded", name);
         return ResponseEntity.ok()
                 .contentType(XLSX)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(name).build().toString())
                 .cacheControl(CacheControl.noStore())
                 .body(file);
+    }
+
+    /** The Monthly Report page: month, scope and the earlier exports (SRS 3.2.24). */
+    @GetMapping("/reports")
+    public String page(@AuthenticationPrincipal AuthenticatedUser user, org.springframework.ui.Model model) {
+        model.addAttribute("exports", reports.exports(user.getUserId()));
+        model.addAttribute("lastMonth", YearMonth.from(siteTime.today()).minusMonths(1));
+        model.addAttribute("teams", user.can(orochi.steelsight.identity.service.Permissions.REPORT_EXPORT_ALL) ? teams.findAll() : java.util.List.of());
+        return "reports/monthly";
     }
 
     /** Last month by default, because pay is worked out once a month has ended. */

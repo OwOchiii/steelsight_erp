@@ -3,12 +3,23 @@
 <main class="page">
     <div class="page-head">
         <h1 th:text="#{shifts.title}">Shifts</h1>
-        <a class="btn" th:if="${canPlan}" th:href="@{/shifts/new}">
-            <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#plus}"/></svg>
-            <span th:text="#{shifts.new}">New shift</span>
-        </a>
+        <div class="flex flex-wrap gap-2">
+            <form th:if="${canPlan}" method="post" th:action="@{/shifts/copy}">
+                <input type="hidden" name="week" th:value="${monday}">
+                <button type="submit" class="btn secondary" th:text="#{shifts.copyLastWeek}">Copy last week</button>
+            </form>
+            <a class="btn" th:if="${canPlan}" th:href="@{/shifts/new}">
+                <svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#plus}"/></svg>
+                <span th:text="#{shifts.new}">New shift</span>
+            </a>
+        </div>
     </div>
     <div th:replace="~{fragments/layout :: messages}"></div>
+    <section class="notice" th:if="${skipped}">
+        <strong th:text="#{shifts.skipped}">Not copied:</strong>
+        <ul><li th:each="line : ${skipped}" th:text="${line}">Line</li></ul>
+    </section>
+    <p class="notice" th:if="${published}" th:text="#{shifts.publishedHint}">The schedule of this week has been sent. Only the Admin can change it now.</p>
     <nav class="week-nav" th:attr="aria-label=#{shifts.week}">
         <a class="week-link" th:href="@{/shifts(week=${previousWeek})}"><svg class="icon" aria-hidden="true"><use th:href="@{/img/icons.svg#chevron-left}"/></svg><span th:text="#{shifts.previousWeek}">Previous week</span></a>
         <strong th:text="#{shifts.weekRange(${@display.date(monday)}, ${@display.date(sunday)})}">Week</strong>
@@ -35,9 +46,10 @@
                     <span class="quiet font-normal" th:text="${row.worker.employeeCode}">Code</span>
                 </th>
                 <td th:each="cell : ${row.cells}" th:classappend="${cell.date == today} ? 'today'">
-                    <a class="shift-chip" th:each="shift : ${cell.shifts}" th:classappend="|chip-${shift.status.name().toLowerCase()}|" th:href="@{/shifts/{id}/edit(id=${shift.id})}">
+                    <a class="shift-chip" th:each="shift : ${cell.shifts}" th:classappend="|chip-${shift.status.name().toLowerCase()} ${shift.overtime ? 'chip-overtime' : ''}|" th:href="@{/shifts/{id}/edit(id=${shift.id})}">
                         <strong th:text="#{common.timeRange(${@display.time(shift.startAt)}, ${@display.time(shift.endAt)})}">Time</strong>
                         <span th:text="|(${@display.hours(shift.durationHours)} h) ${shift.zone.name}|">Zone</span>
+                        <span class="chip-status" th:if="${shift.overtime}" th:text="#{enum.OVERTIME}">Overtime</span>
                         <span class="chip-status" th:unless="${shift.scheduled}" th:text="${@display.label(shift.status)}">Status</span>
                     </a>
                     <a class="add-shift" th:if="${canPlan and row.worker.active and cell.shifts.isEmpty()}"

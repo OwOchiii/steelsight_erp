@@ -9,21 +9,14 @@
     </div>
     <p class="empty panel-less-empty" th:if="${notifications.totalElements == 0}" th:text="#{notifications.none}">You have no notifications.</p>
     <section class="panel" th:unless="${notifications.isEmpty()}">
-        <article class="notification" th:each="note : ${notifications}" th:classappend="${note.read} ? '' : 'unread'">
+        <article class="notification" th:each="note : ${notifications}" th:classappend="${note.read} ? '' : 'unread'"
+                 th:with="delivery=${deliveries.get(note.id)}">
             <div class="notification-body">
                 <span class="quiet small" th:text="${@display.dateTime(note.createdAt)}">When</span>
-                <th:block th:if="${note.kind.name() == 'SAFETY_WARNING'}">
-                    <section th:replace="~{fragments/safety :: notice('WARNING', ${note.score}, true)}"></section>
-                </th:block>
-                <th:block th:if="${note.kind.name() == 'SAFETY_DANGER'}">
-                    <section th:replace="~{fragments/safety :: notice('DANGER', ${note.score}, true)}"></section>
-                </th:block>
-                <th:block th:if="${note.kind.name() == 'HSE_VIOLATION_ALERT'}" th:with="alert=${note.safetyAlert}">
-                    <strong class="block" th:text="#{notifications.alert.title}">Too many PPE violations</strong>
-                    <span class="block" th:text="#{notifications.alert.body(${alert.violationCount}, ${alert.windowSeconds}, ${@display.dateTime(alert.detectedAt)})}">Details</span>
-                    <span class="block" th:if="${alert.cameraCode}" th:text="#{notifications.alert.camera(${alert.cameraCode})}">Camera</span>
-                    <a th:href="@{/violations/review(view='ALL')}" th:text="#{notifications.alert.review}">Review violations</a>
-                </th:block>
+                <p class="body-text" th:text="${texts.get(note.id)}">Text</p>
+                <a th:if="${note.link}" th:href="@{${note.link}}" th:text="#{notifications.open}">Open</a>
+                <span class="badge" th:if="${delivery != null}" th:classappend="|badge-${delivery.status().toLowerCase()}|"
+                      th:text="#{${'notifications.zalo.' + delivery.status()}}" th:title="${delivery.lastError()}">Zalo</span>
             </div>
             <form method="post" th:unless="${note.read}" th:action="@{/notifications/{id}/read(id=${note.id})}">
                 <button type="submit" class="btn secondary" th:text="#{notifications.markRead}">Mark as read</button>

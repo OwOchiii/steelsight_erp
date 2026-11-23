@@ -18,6 +18,15 @@ final class PhotoFormat {
      * Stored names are generated, so they never hold a folder. Refusing anything else means a bad value
      * in the database can't reach into another album or outside the storage folder.
      */
+    /** An evidence photo's path as the detection app writes it: folders allowed, never "..". */
+    static boolean isEvidencePath(String path) {
+        return path != null && path.matches("[A-Za-z0-9][A-Za-z0-9._/-]{0,299}") && !path.contains("..") && !path.contains("//");
+    }
+
+    static boolean isAllowed(PhotoAlbum album, String name) {
+        return album == PhotoAlbum.EVIDENCE ? isEvidencePath(name) : isStoredName(name);
+    }
+
     static boolean isStoredName(String name) {
         return name != null && name.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,99}") && !name.contains("..");
     }
@@ -33,12 +42,20 @@ final class PhotoFormat {
         }
         if (startsWith(head, 0, 0xFF, 0xD8, 0xFF)) return ".jpg";
         if (startsWith(head, 0, 0x89, 'P', 'N', 'G')) return ".png";
-        if (head.length == 12
-                && "RIFF".equals(new String(Arrays.copyOfRange(head, 0, 4), StandardCharsets.US_ASCII))
-                && "WEBP".equals(new String(Arrays.copyOfRange(head, 8, 12), StandardCharsets.US_ASCII))) {
-            return ".webp";
+        throw new BusinessRuleException("The photo must be JPEG or PNG, at most 5 MB and at least 480 x 480 pixels.");
+    }
+
+    /** SRS BR-09, MSG18: a face photo is at least 480 x 480 pixels, so the face is big enough to enrol. */
+    static void checkFace(MultipartFile photo) throws IOException {
+        java.awt.image.BufferedImage image;
+        try (InputStream in = photo.getInputStream()) {
+            image = javax.imageio.ImageIO.read(in);
+        } catch (javax.imageio.IIOException e) {
+            image = null;   // a damaged file is a photo we can't use, not a server error
         }
-        throw new BusinessRuleException("The photo must be a JPEG, PNG or WebP image");
+        if (image == null || image.getWidth() < 480 || image.getHeight() < 480) {
+            throw new BusinessRuleException("The photo must be JPEG or PNG, at most 5 MB and at least 480 x 480 pixels.");
+        }
     }
 
     private static boolean startsWith(byte[] bytes, int offset, int... expected) {

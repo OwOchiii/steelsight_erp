@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -18,6 +19,7 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.web.RequestLogFilter;
+import orochi.steelsight.web.ZaloController;
 
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfig {
@@ -51,7 +53,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/login", "/language", "/css/**", "/js/**", "/img/**", "/error").permitAll()
+                        // The Zalo bot calls this with no session; the controller checks its webhook secret.
+                        .requestMatchers(HttpMethod.POST, ZaloController.WEBHOOK).permitAll()
                         .anyRequest().authenticated())
+                .csrf(csrf -> csrf.ignoringRequestMatchers(ZaloController.WEBHOOK))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .usernameParameter("employeeCode")

@@ -1,0 +1,89 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{attendance.team}, 'teamAttendance', ~{::main})}">
+<main class="page">
+    <div class="page-head"><h1 th:text="#{attendance.team}">Team attendance</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <nav class="tabs" th:attr="aria-label=#{attendance.team}">
+        <a th:href="@{/attendance/team}" th:attr="aria-current=${monthView} ? null : 'page'" th:text="#{attendance.byDay}">Day</a>
+        <a th:href="@{/attendance/team(view='MONTH')}" th:attr="aria-current=${monthView} ? 'page' : null" th:text="#{attendance.byMonth}">Month</a>
+    </nav>
+    <form class="filters" method="get" th:action="@{/attendance/team}">
+        <input type="hidden" name="view" th:value="${monthView} ? 'MONTH' : 'DAY'">
+        <div th:unless="${monthView}">
+            <label for="day" th:text="#{field.day}">Day</label>
+            <input id="day" name="day" type="date" th:value="${day}">
+        </div>
+        <div th:if="${monthView}">
+            <label for="month" th:text="#{field.month}">Month</label>
+            <select id="month" name="month">
+                <option th:each="m : ${months}" th:value="${m}" th:selected="${m == month}" th:text="${#temporals.format(m.atDay(1), 'MM/yyyy')}">11/2026</option>
+            </select>
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{common.show}">Show</button>
+    </form>
+
+    <div class="table-wrap" th:unless="${monthView}">
+        <p class="empty panel-less-empty" th:if="${rows.isEmpty()}" th:text="#{attendance.teamNoShifts}">Nobody on your team had a shift that day.</p>
+        <table class="data-table" th:unless="${rows.isEmpty()}">
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{field.worker}">Worker</th>
+                <th scope="col" th:text="#{field.shift}">Shift</th>
+                <th scope="col" th:text="#{field.checkedIn}">In</th>
+                <th scope="col" th:text="#{field.checkedOut}">Out</th>
+                <th scope="col" th:text="#{shifts.hours}">Hours</th>
+                <th scope="col" th:text="#{field.status}">Status</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="row : ${rows}" th:with="r=${row.result}, person=${members.get(row.userId)}">
+                <td th:text="|${person.fullName} (${person.employeeCode})|">Name</td>
+                <td th:text="|${@display.time(r.shift.start)}-${@display.time(r.shift.end)}|">Shift</td>
+                <td><th:block th:each="v : ${r.visits}"><span class="block" th:text="${@display.time(v.in)}">07:00</span></th:block></td>
+                <td><th:block th:each="v : ${r.visits}"><span class="block" th:text="${v.out != null and !v.closedBySystem} ? ${@display.time(v.out)} : ''">11:30</span></th:block></td>
+                <td th:text="${r.shift.overtime} ? ${r.validOvertimeHours} : ${r.paidHours}">4.50</td>
+                <td><span th:replace="~{fragments/attendance :: flags(${r})}"></span></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-wrap" th:if="${monthView}">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{field.worker}">Worker</th>
+                <th scope="col" th:text="#{summary.shifts}">Shifts</th>
+                <th scope="col" th:text="#{summary.paidHours}">Paid hours</th>
+                <th scope="col" th:text="#{summary.late}">Late</th>
+                <th scope="col" th:text="#{summary.early}">Early</th>
+                <th scope="col" th:text="#{summary.incomplete}">Incomplete</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="person : ${people}" th:with="s=${summaries.get(person.id)}">
+                <td th:text="|${person.fullName} (${person.employeeCode})|">Name</td>
+                <td th:text="#{summary.shiftsValue(${s.planned}, ${s.worked}, ${s.absent})}">Shifts</td>
+                <td th:text="${s.paidHours}">0</td>
+                <td th:text="#{summary.countMinutes(${s.timesLate}, ${s.minutesLate})}">0</td>
+                <td th:text="#{summary.countMinutes(${s.timesEarly}, ${s.minutesEarly})}">0</td>
+                <td th:text="${s.incomplete}">0</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <section class="panel mt-6" th:unless="${pending.isEmpty()}">
+        <div class="panel-head"><h2 th:text="#{overtime.title}">Pending overtime</h2></div>
+        <div class="panel-body">
+            <p class="quiet" th:text="#{overtime.leaderHint}">Tell the Admin who really worked overtime. The Admin adds the overtime shift.</p>
+            <form class="divider" method="post" th:each="row : ${pending}" th:action="@{/overtime/{id}/note(id=${row.id})}">
+                <strong th:text="|${row.name}: ${@display.dateTime(row.start)} - ${@display.time(row.end)} (${row.hours} h)|">Row</strong>
+                <label th:for="|note-${row.id}|" th:text="#{overtime.note}">Note to the Admin</label>
+                <input th:id="|note-${row.id}|" name="note" maxlength="500" th:value="${row.leaderNote}">
+                <div class="actions"><button type="submit" class="btn secondary" th:text="#{common.save}">Save</button></div>
+            </form>
+        </div>
+    </section>
+</main>
+</html>

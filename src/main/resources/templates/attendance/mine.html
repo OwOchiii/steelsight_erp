@@ -1,0 +1,63 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{attendance.mine}, 'myAttendance', ~{::main})}">
+<main class="page">
+    <div class="page-head"><h1 th:text="#{attendance.mine}">My attendance</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <form class="filters" method="get" th:action="@{/attendance/mine}">
+        <div>
+            <label for="month" th:text="#{field.month}">Month</label>
+            <select id="month" name="month">
+                <option th:each="m : ${months}" th:value="${m}" th:selected="${m == month}" th:text="${#temporals.format(m.atDay(1), 'MM/yyyy')}">11/2026</option>
+            </select>
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{common.show}">Show</button>
+    </form>
+    <section class="sheet mb-4">
+        <h2 class="mb-1"><span th:text="#{summary.title}">Summary</span> <span class="badge" th:if="${provisional}" th:text="#{common.provisional}">Provisional</span></h2>
+        <dl th:replace="~{fragments/attendance :: summary(${summary})}"></dl>
+    </section>
+    <p class="empty panel-less-empty" th:if="${rows.isEmpty()}" th:text="#{attendance.noShifts}">You had no shifts this month.</p>
+    <div class="table-wrap" th:unless="${rows.isEmpty()}">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{field.day}">Day</th>
+                <th scope="col" th:text="#{field.shift}">Shift</th>
+                <th scope="col" th:text="#{field.checkedIn}">In</th>
+                <th scope="col" th:text="#{field.checkedOut}">Out</th>
+                <th scope="col" th:text="#{shifts.hours}">Hours</th>
+                <th scope="col" th:text="#{field.status}">Status</th>
+                <th scope="col"><span class="sr-only" th:text="#{common.actions}">Actions</span></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="row : ${rows}" th:with="r=${row.result}, shiftId=${r.shift.id}">
+                <td class="whitespace-nowrap" th:text="${@display.date(r.shift.start)}">Day</td>
+                <td th:text="|${@display.time(r.shift.start)}-${@display.time(r.shift.end)} · ${row.zone}|">Shift</td>
+                <td>
+                    <th:block th:each="v : ${r.visits}"><span class="block" th:text="${@display.time(v.in)}">07:00</span></th:block>
+                </td>
+                <td>
+                    <th:block th:each="v : ${r.visits}"><span class="block" th:text="${v.out != null and !v.closedBySystem} ? ${@display.time(v.out)} : ''">11:30</span></th:block>
+                </td>
+                <td th:text="${r.shift.overtime} ? ${r.validOvertimeHours} : ${r.paidHours}">4.50</td>
+                <td><span th:replace="~{fragments/attendance :: flags(${r})}"></span></td>
+                <td class="row-action">
+                    <a th:if="${openRequests.containsKey(shiftId)}" th:href="@{/tickets/{id}(id=${openRequests.get(shiftId)})}" th:text="#{attendance.requestSent}">Request sent</a>
+                    <th:block th:unless="${openRequests.containsKey(shiftId)}">
+                        <a th:if="${!r.shift.end.isAfter(now) and r.shift.end.plusHours(48).isAfter(now)}"
+                           th:href="@{/tickets/new(category='ATTENDANCE_ERROR', shiftId=${shiftId})}" th:text="#{attendance.reportError}">Report error</a>
+                        <th:block th:if="${r.has(T(orochi.steelsight.attendance.service.ShiftAttendance.Flag).INCOMPLETE)}">
+                            <a th:each="v : ${r.visits}" th:if="${v.incomplete}"
+                               th:href="@{/tickets/new(category='MISSING_CHECK_OUT', checkInId=${v.id})}" th:text="#{attendance.explain}">Explain</a>
+                        </th:block>
+                        <a th:if="${r.shift.end.isAfter(now) and !r.shift.overtime}"
+                           th:href="@{/tickets/new(category='LEAVE', shiftId=${shiftId})}" th:text="#{attendance.requestLeave}">Request leave</a>
+                    </th:block>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+</html>

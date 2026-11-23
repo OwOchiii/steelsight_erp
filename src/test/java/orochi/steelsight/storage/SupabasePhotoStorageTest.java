@@ -28,7 +28,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class SupabasePhotoStorageTest {
 
     private static final String BASE = "https://example.supabase.co/storage/v1/object/ticket-photos/";
-    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0, 0, 13};
+    private static final byte[] PNG = orochi.steelsight.TestImages.FACE_PNG;
 
     private MockRestServiceServer server;
     private SupabasePhotoStorage storage;

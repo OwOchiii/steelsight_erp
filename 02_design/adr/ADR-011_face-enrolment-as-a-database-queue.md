@@ -44,6 +44,7 @@ Decoupled through the shared database (ADR-004), safe when either side is offlin
 
 **Decisions unlocked (ADR tiếp theo có thể viết):**
 - ADR-020: a separate private bucket for face photos.
+- ADR-026: face photos from several angles, one queue row per angle (V14).
 
 ---
 

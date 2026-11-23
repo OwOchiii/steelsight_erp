@@ -36,6 +36,7 @@
 | Ngày | Người thực hiện | Nội dung thay đổi |
 |------|-----------------|-------------------|
 | `2026-11-06` | `Claude Code (Opus 5.5)` | Khởi tạo tài liệu — TDD spec cho IAM, mapped from the existing suite |
+| `2026-11-17` | `Claude Code (Opus 5.5)` | ADR-026: added IAM-TC-033 and IAM-TC-034 for extra face angles |
 
 ---
 
@@ -523,6 +524,8 @@ assertThat(status).isEqualTo("PENDING");
 | IAM-TC-028 | `AccountPagesTest` — `uploadingNothingOrAFakeImageIsRefused` | COND-005 | MEDIUM | 🟢L |
 | IAM-TC-030 | *(new)* `ROLE_MANAGE` decision: remove it or use it (gap G3) | — | LOW | 🔴 |
 | IAM-TC-032 | *(new)* Restart clears sign-in counts (documented, accepted — gap G6) | COND-004 | LOW | 🔴 |
+| IAM-TC-033 | `ServiceIntegrationTest` — `extraAnglesNeedTheFrontPhotoFirstAndDontChangeTheListStatus`; `onlyAnAdminHandlesFacePhotos` | COND-005 (ADR-026) | HIGH | 🟢L |
+| IAM-TC-034 | `FacePhotoCleanupTest` — `anOldFacePhotoIsRemovedOnlyAfterItsReplacementOrTheDeletionCommits` (extra angles replaced, removed, and erased with the account) | COND-012 (ADR-026) | CRITICAL | 🟢L |
 
 ---
 

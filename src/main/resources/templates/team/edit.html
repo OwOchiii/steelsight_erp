@@ -21,8 +21,8 @@
                     <input id="email" type="email" th:field="*{email}" maxlength="200">
                 </div>
                 <div>
-                    <label for="phoneNumber"><span th:text="#{field.phone}">Phone number</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
-                    <input id="phoneNumber" type="tel" th:field="*{phoneNumber}" maxlength="30">
+                    <label for="phoneNumber" th:text="#{field.phone}">Phone number</label>
+                    <input id="phoneNumber" type="tel" th:field="*{phoneNumber}" pattern="0[0-9]{9}" maxlength="10" required>
                 </div>
             </div>
             <div class="actions"><button type="submit" class="btn" th:text="#{team.saveDetails}">Save details</button></div>
@@ -54,7 +54,7 @@
             <form class="setting" method="post" enctype="multipart/form-data" th:action="@{/team/{id}/face(id=${member.id})}">
                 <div class="grow">
                     <label for="photo" th:text="${member.faceFilePath == null} ? #{team.uploadPhoto} : #{team.replacePhoto}">Upload photo</label>
-                    <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}" required>
+                    <input id="photo" name="photo" type="file" accept="image/jpeg,image/png" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}" required>
                 </div>
                 <button type="submit" class="btn secondary" th:text="#{team.savePhoto}">Save photo</button>
             </form>
@@ -89,7 +89,7 @@
                           th:action="@{/team/{id}/face/{pose}(id=${member.id}, pose=${slug})}">
                         <div class="grow">
                             <label th:for="'photo-' + ${slug}" th:text="${row == null} ? #{team.uploadPhoto} : #{team.replacePhoto}">Upload photo</label>
-                            <input th:id="'photo-' + ${slug}" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}" required>
+                            <input th:id="'photo-' + ${slug}" name="photo" type="file" accept="image/jpeg,image/png" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}" required>
                         </div>
                         <button type="submit" class="btn secondary" th:text="#{team.savePhoto}">Save photo</button>
                     </form>
@@ -98,6 +98,30 @@
                         <button type="submit" class="btn danger" th:text="#{team.removePhoto}">Remove photo</button>
                     </form>
                 </th:block>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel mb-4" th:if="${zaloLinked != null}">
+        <div class="panel-head"><h2 th:text="#{zalo.title}">Zalo</h2></div>
+        <div class="panel-body">
+            <p th:text="${zaloLinked} ? #{zalo.statusLinked} : #{zalo.statusNotLinked}">Not linked</p>
+            <div th:if="${zaloCodeNow != null and !zaloLinked}">
+                <p><strong class="text-2xl tracking-widest" th:text="${zaloCodeNow.code}">123456</strong></p>
+                <p class="quiet small" th:text="#{zalo.validUntil(${@display.dateTime(zaloCodeNow.expiresAt)})}">Valid until</p>
+                <figure class="qr-box" th:if="${zaloBotQr != null}">
+                    <div th:utext="${zaloBotQr}"></div>
+                    <figcaption class="quiet small" th:text="#{zalo.scanQr}">Scan with Zalo to open the SteelSight bot, then send the code.</figcaption>
+                </figure>
+                <a th:if="${zaloBotLink != null and !zaloBotLink.isBlank()}" class="btn secondary" th:href="${zaloBotLink}" target="_blank" rel="noopener" th:text="#{zalo.openBot}">Open the bot</a>
+            </div>
+            <div class="actions">
+                <form method="post" th:action="@{/team/{id}/zalo-code(id=${member.id})}">
+                    <button type="submit" class="btn secondary" th:text="#{zalo.newCode}">New link code</button>
+                </form>
+                <form method="post" th:if="${zaloLinked}" th:action="@{/team/{id}/zalo-unlink(id=${member.id})}">
+                    <button type="submit" class="btn secondary" th:text="#{zalo.unlink}">Unlink Zalo</button>
+                </form>
             </div>
         </div>
     </section>
@@ -114,6 +138,15 @@
                     </select>
                 </div>
                 <button type="submit" class="btn secondary" th:text="#{team.saveRole}">Change role</button>
+            </form>
+            <form class="setting" method="post" th:action="@{/team/{id}/group(id=${member.id})}">
+                <div>
+                    <label for="staffGroup" th:text="#{field.group}">Group</label>
+                    <select id="staffGroup" name="staffGroup">
+                        <option th:each="g : ${groups}" th:value="${g}" th:selected="${g == member.staffGroup}" th:text="${@display.label(g)}">Site</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn secondary" th:text="#{team.saveGroup}">Change group</button>
             </form>
             <form class="setting" method="post" th:action="@{/team/{id}/team(id=${member.id})}">
                 <div>

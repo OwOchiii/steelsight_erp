@@ -23,7 +23,8 @@
             <tbody>
             <tr>
                 <td th:each="cell : ${cells}" th:classappend="${cell.date == today} ? 'today'">
-                    <div class="shift-chip" th:each="shift : ${cell.shifts}" th:classappend="|chip-${shift.status.name().toLowerCase()}|">
+                    <div class="shift-chip" th:each="shift : ${cell.shifts}" th:classappend="|chip-${shift.status.name().toLowerCase()} ${shift.overtime ? 'chip-overtime' : ''}|">
+                        <span class="chip-status" th:text="|${@display.frame(shift)} · ${@display.label(shift.kind)}|">Morning · Regular</span>
                         <strong th:text="#{common.timeRange(${@display.time(shift.startAt)}, ${@display.time(shift.endAt)})}">Time</strong>
                         <span th:text="|(${@display.hours(shift.durationHours)} h) ${shift.zone.name}|">Zone</span>
                         <span class="chip-status" th:unless="${shift.scheduled}" th:text="${@display.label(shift.status)}">Status</span>

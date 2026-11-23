@@ -6,12 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import orochi.steelsight.identity.model.AppUser;
-import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.identity.repository.RoleRepository;
-import orochi.steelsight.notification.model.Notification;
 import orochi.steelsight.notification.model.SafetyAlert;
-import orochi.steelsight.notification.repository.NotificationRepository;
 import orochi.steelsight.notification.repository.SafetyAlertRepository;
 import orochi.steelsight.ppe.repository.CameraRepository;
 
@@ -20,7 +16,11 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-/** Takes alerts from the detection software, which decides for itself when violations are too many. */
+/**
+ * Takes the burst alerts the current detection app still sends. The SRS removes burst alerts (CR-02):
+ * every violation alerts the HSE Officers on duty on its own (V21 trigger). The alerts are kept, so the
+ * detection app's outbox stops retrying, but nobody is notified.
+ */
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -30,14 +30,10 @@ public class SafetyAlertService {
     private static final Duration QUIET_AFTER_NOTIFYING = Duration.ofMinutes(15);
     private static final Duration OLDEST_TO_NOTIFY = Duration.ofHours(1);
     private static final Duration FURTHEST_AHEAD_TO_NOTIFY = Duration.ofMinutes(5);
-    private static final String HSE_ROLE = "HSE_OFFICER";
 
     private final JdbcTemplate jdbc;
     private final SafetyAlertRepository alerts;
     private final CameraRepository cameras;
-    private final NotificationRepository notifications;
-    private final AppUserRepository users;
-    private final RoleRepository roles;
 
     public record NewAlert(UUID eventId, int violationCount, int windowSeconds, OffsetDateTime detectedAt, String cameraCode) {
     }
@@ -59,9 +55,6 @@ public class SafetyAlertService {
                 alert.detectedAt(), alert.cameraCode(), notify);
         if (created.isEmpty()) {
             return false;
-        }
-        if (notify) {
-            tellHse(alerts.getReferenceById(created.get(0)), now);
         }
         return true;
     }
@@ -86,15 +79,5 @@ public class SafetyAlertService {
         return registered
                 ? alerts.existsByNotifiedTrueAndCameraCodeAndReceivedAtAfter(cameraCode, since)
                 : alerts.anyNotifiedFromUnregisteredCameraSince(since);
-    }
-
-    private void tellHse(SafetyAlert alert, OffsetDateTime now) {
-        List<AppUser> officers = roles.findByRoleName(HSE_ROLE)
-                .map(role -> users.findActiveByRole(role.getId()))
-                .orElse(List.of());
-        if (officers.isEmpty()) {
-            log.warn("Safety alert {} has no active HSE officer to notify", alert.getId());
-        }
-        officers.forEach(officer -> notifications.save(Notification.hseAlert(officer, alert, now)));
     }
 }

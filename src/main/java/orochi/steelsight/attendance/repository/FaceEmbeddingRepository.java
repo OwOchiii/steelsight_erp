@@ -53,4 +53,8 @@ public interface FaceEmbeddingRepository extends BaseRepository<FaceEmbedding, L
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(nativeQuery = true, value = "DELETE FROM face_embedding WHERE user_id = :userId AND pose = :pose")
     int deleteAngle(@Param("userId") Long userId, @Param("pose") String pose);
+
+    /** Face photos the detection app could not use, of people not deleted (SRS 3.2.3). */
+    @org.springframework.data.jpa.repository.Query("SELECT count(f) FROM FaceEmbedding f WHERE f.status = orochi.steelsight.attendance.model.EmbeddingStatus.FAILED AND f.user.deletedAt IS NULL")
+    long countFailed();
 }

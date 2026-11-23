@@ -5,34 +5,95 @@
     <div class="page-head"><h1 th:text="#{tickets.new}">New ticket</h1></div>
     <div th:replace="~{fragments/layout :: messages}"></div>
     <form class="sheet" method="post" enctype="multipart/form-data" th:action="@{/tickets}" th:object="${form}">
-        <p class="notice" th:text="#{tickets.disputeHint}">To contest a PPE violation, open it from your violations and choose dispute.</p>
+        <p class="notice" th:text="#{tickets.disputeHint}">To appeal a PPE violation, open it from My violations and press Appeal.</p>
         <label for="categoryId" th:text="#{field.category}">Category</label>
         <select id="categoryId" th:field="*{categoryId}" required>
             <option value="" th:text="#{tickets.chooseCategory}">Choose a category</option>
-            <option th:each="category : ${categories}" th:value="${category.id}" th:text="${@display.category(category.categoryName)}">Category</option>
+            <option th:each="category : ${categories}" th:value="${category.id}" th:data-code="${category.code}"
+                    th:text="${@display.category(category.categoryName)}">Category</option>
         </select>
 
         <label for="subject" th:text="#{field.subject}">Subject</label>
-        <input id="subject" th:field="*{subject}" maxlength="200" required>
+        <input id="subject" th:field="*{subject}" minlength="5" maxlength="100" required>
 
         <label for="description" th:text="#{field.details}">Details</label>
-        <textarea id="description" th:field="*{description}" rows="5" maxlength="4000" required></textarea>
+        <textarea id="description" th:field="*{description}" rows="5" minlength="10" maxlength="2000" required></textarea>
 
-        <div class="grid gap-x-4 sm:grid-cols-2">
-            <div>
-                <label for="zoneId"><span th:text="#{field.zone}">Zone</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
-                <select id="zoneId" th:field="*{zoneId}">
-                    <option value="" th:text="#{common.noZone}">No specific zone</option>
-                    <option th:each="zone : ${zones}" th:value="${zone.id}" th:text="${zone.name}">Zone</option>
-                </select>
+        <fieldset class="divider" data-for="ATTENDANCE_ERROR LEAVE">
+            <label for="shiftId" th:text="#{tickets.dayAndShift}">Day and shift</label>
+            <select id="shiftId" th:field="*{shiftId}">
+                <option value="" th:text="#{tickets.chooseShift}">Choose the shift</option>
+                <option th:each="shift : ${shifts}" th:value="${shift.id}"
+                        th:text="|${@display.dateTime(shift.startAt)} - ${@display.time(shift.endAt)} · ${shift.zone.name}|">Shift</option>
+            </select>
+            <p class="hint" th:text="#{tickets.shiftHint}">For an attendance error, within 2 days after the shift; for leave, before the shift ends.</p>
+        </fieldset>
+
+        <fieldset class="divider" data-for="ATTENDANCE_ERROR">
+            <div class="grid gap-x-4 sm:grid-cols-2">
+                <div>
+                    <label for="direction" th:text="#{tickets.direction}">Direction</label>
+                    <select id="direction" th:field="*{direction}">
+                        <option value="" th:text="#{tickets.chooseDirection}">IN or OUT</option>
+                        <option th:each="d : ${directions}" th:value="${d}" th:text="#{${'enum.DIRECTION_' + d.name()}}">IN</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="gateTime" th:text="#{tickets.gateTime}">Time at the gate</label>
+                    <input id="gateTime" type="time" th:field="*{gateTime}">
+                </div>
             </div>
-            <div>
-                <label for="photo"><span th:text="#{field.photo}">Photo</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
-                <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}">
-                <p class="hint" th:text="#{tickets.photoHint}">JPEG, PNG or WebP, up to 5 MB.</p>
+        </fieldset>
+
+        <fieldset class="divider" data-for="MISSING_CHECK_OUT">
+            <label for="checkInId" th:text="#{tickets.visitToExplain}">Visit to explain</label>
+            <select id="checkInId" th:field="*{checkInId}">
+                <option value="" th:text="#{tickets.chooseVisit}">Choose the visit</option>
+                <option th:each="visit : ${incompleteVisits}" th:value="${visit.id}" th:text="${@display.dateTime(visit.checkInAt)}">Visit</option>
+            </select>
+        </fieldset>
+
+        <fieldset class="divider" data-for="LEAVE">
+            <div class="grid gap-x-4 sm:grid-cols-3">
+                <div>
+                    <label for="leaveType" th:text="#{tickets.leaveType}">Leave type</label>
+                    <select id="leaveType" th:field="*{leaveType}">
+                        <option value="" th:text="#{tickets.chooseLeaveType}">Paid or unpaid</option>
+                        <option th:each="t : ${leaveTypes}" th:value="${t}" th:text="${@display.label(t)}">Paid</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="leaveFrom" th:text="#{tickets.leaveFrom}">Leave from</label>
+                    <input id="leaveFrom" type="time" th:field="*{leaveFrom}">
+                </div>
+                <div>
+                    <label for="leaveTo" th:text="#{tickets.leaveTo}">Leave to</label>
+                    <input id="leaveTo" type="time" th:field="*{leaveTo}">
+                </div>
             </div>
+        </fieldset>
+
+        <label for="photo"><span th:text="#{field.photo}">Photo</span> <span class="optional" th:text="#{tickets.photoRequiredForError}">required for an attendance error</span></label>
+        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}">
+        <p class="hint" th:text="#{tickets.photoHint}">JPEG or PNG, up to 5 MB.</p>
+        <div class="actions">
+            <a class="btn secondary" th:href="@{/tickets}" th:text="#{common.cancel}">Cancel</a>
+            <button type="submit" class="btn" th:text="#{tickets.send}">Send ticket</button>
         </div>
-        <div class="actions"><button type="submit" class="btn" th:text="#{tickets.send}">Send ticket</button></div>
     </form>
+    <script th:inline="javascript">
+        // Shows only the fields of the chosen category (SRS 3.2.20). Without JavaScript every field shows.
+        (function () {
+            const select = document.getElementById('categoryId');
+            function show() {
+                const code = select.selectedOptions[0] ? select.selectedOptions[0].dataset.code : '';
+                document.querySelectorAll('fieldset[data-for]').forEach(set => {
+                    set.hidden = !set.dataset.for.split(' ').includes(code);
+                });
+            }
+            select.addEventListener('change', show);
+            show();
+        })();
+    </script>
 </main>
 </html>

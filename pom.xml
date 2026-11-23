@@ -52,6 +52,12 @@
             <artifactId>fastexcel</artifactId>
             <version>0.18.4</version>
         </dependency>
+        <!-- QR code of the Zalo bot link, drawn as inline SVG (SRS CR-10) -->
+        <dependency>
+            <groupId>io.nayuki</groupId>
+            <artifactId>qrcodegen</artifactId>
+            <version>1.8.0</version>
+        </dependency>
         <dependency>
             <groupId>org.dhatim</groupId>
             <artifactId>fastexcel-reader</artifactId>

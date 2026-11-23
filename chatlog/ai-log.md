@@ -1,11 +1,11 @@
 # AI usage log
 
-How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md), [9 November](../transcript/9-11-2026.md) and [16 November](../transcript/16-11-2026.md).
+How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md), [9 November](../transcript/9-11-2026.md), [16 November](../transcript/16-11-2026.md), [17 November](../transcript/17-11-2026.md) and [21 November](../transcript/21-11-2026.md). The 17 November session was opened in the detection app's folder, and the 21 November session in the ERP's; both changed both programs. Only their ERP work is logged here, and the detection work is in that repository's `chatlog/detection-ai-log.md`.
 
 | | |
 |---|---|
 | Tool | Claude Code (Opus 5.5) |
-| Dates | 2026-11-04 to 2026-11-16 (one session ran past midnight) |
+| Dates | 2026-11-04 to 2026-11-21 (one session ran past midnight) |
 | Branch | `feature/erp-backend` |
 
 ## Summary by request
@@ -79,6 +79,29 @@ The developer committed this day's work, with their own attendance and report ch
 | 21:38 | Docker is running, check it | Full suite run: 2 test expectations corrected, then 282 tests passed | Not committed |
 | 21:48 | Write the log, today's transcript, and the design, implementation and testing documents for anything new | `ADR-025`, ADR-006 amended, `MODULE-MAP.md` (BR-PLT-009 and updated rules), 8 TDS and 4 Test-Specs updated with changelog entries, this update and `transcript/16-11-2026.md` | Not committed |
 
+### 2026-11-17
+
+| Time | What the developer asked for | What was produced | Commit |
+|---|---|---|---|
+| 09:56 | Asked whether Claude could change the ERP so a worker has more face photos for better recognition, and whether that needs another column | No new embedding column: migration `V14` adds `face_embedding.pose` (FRONT, LEFT, RIGHT) with one row per angle; `FacePose`, repository and `UserService` angle methods, `/team/{id}/face/{left\|right}` routes, an "Extra angles" section on the account edit page in both languages, photo clean-up on delete; 5 new tests | Not committed |
+| 10:16 | `TranslationsTest` failed: 4 new messages had no Vietnamese translation | The 4 `msg.*` keys added to `messages_vi.properties` | Not committed |
+| 10:21 | Pasted a CodeRabbit review; check each finding against the code before fixing | Two real races fixed with a `SELECT … FOR UPDATE` lock on the worker (`requireForUpdate`) in `changeFaceAngle`, `removeFaceAngle` and `softDelete`; the report page's flash message now saved under the same path as its redirect; the translations finding was already fixed | Not committed |
+| 10:27 | Docker is running, run the full suite | 284 tests passed | Not committed |
+| 13:46 | Write the logs, transcript and documents, in step with the ERP documents | `ADR-026`; ADR-011, `MODULE-MAP.md` (BR-ATT-009, new BR-ATT-011), the ATT and IAM TDS and Test-Specs, `docs/database-design.md` and `docs/user-guide.md` updated; this update and `transcript/17-11-2026.md` | Not committed |
+
+### 2026-11-21
+
+Nothing from this day is committed yet.
+
+| Time | What the developer asked for | What was produced | Commit |
+|---|---|---|---|
+| 12:58 | The ERP and detection app added tables, so update `docs/database-design.md` | Checked V1–V14 column by column against the document: already up to date. The detection app's new tables are in its local SQLite file, not the shared database | None |
+| 13:07 | Read the SRS (Report 3, `.docx`) and say what both programs have, miss, or have extra | Review of the 78 use cases and BR-01 to BR-46: done, missing, built differently (10 rows), extra, and a suggested order | None |
+| 13:21 | Make auto-close and the ticket categories match the SRS, merge both category lists, skip recorded video, add Telegram for check-ins and monthly schedules | `V15` (open visits close 2 h after the shift ends), `V16` (Attendance correction, Personal information update, Other, handled by Admin), ADR-013 amendment, ATT TDS and Test-Spec, `docs/database-design.md`; a view on the zone-to-team idea | Not committed |
+| 13:35 | Docker Desktop is on, run whatever tests are needed | Full suite: 285 passed; a V16 test added to `TeamsTicketsAndReportTest` | Not committed |
+| 13:49 | Build Telegram, leave the zone fallback out, and make sure the gate workflow works: account and face, vector in the detection app, face scan with PPE, the name or missing PPE spoken | `V17` (`app_user.telegram_chat_id`, `telegram_link_code`, `schedule_notice`, read grant for detection); `TelegramBot`, `TelegramStore`, `TelegramNotices`, `TelegramLinks`, `ScheduleNoticeService`; webhook, link and unlink, a Telegram card on the home page, "Send … schedule on Telegram" on the Shifts page; messages for visits entered or corrected by hand and for shift changes; 10 tests. The gate workflow and gate Telegram messages are in the detection log | Not committed |
+| 15:36 | Update the chat log and transcript | This update and `transcript/21-11-2026.md`, in both repositories | Not committed |
+
 ## Decisions made by the developer
 
 ### 2026-11-04
@@ -120,6 +143,20 @@ The developer committed this day's work, with their own attendance and report ch
 - Fix the session, attendance history and Swagger findings first, and leave the other four low findings for later.
 - Show the attendance change history on the visit edit page.
 
+### 2026-11-17
+
+- A worker can have more than one face photo, so a turned face at the gate can still be recognised (ADR-026).
+- The ERP is changed for this, because the detection app can't get more photos any other way.
+
+### 2026-11-21
+
+- Only auto-close and the ticket categories change to match the SRS. The SRS itself stays as it is, so the code can be compared against it.
+- Both ticket category lists are merged.
+- No recorded-video analysis: the footage stays on the switch, for security.
+- Workers get Telegram messages about their check-ins and their monthly schedule. Not every worker uses Telegram, so it's optional.
+- The zone-to-team fallback for violations without a vest number is left out for now.
+- At check-in, the gate says the worker's name, or what PPE they're missing.
+
 ## Decisions suggested by Claude and accepted by the developer
 
 ### 2026-11-04
@@ -154,6 +191,18 @@ From the deployment plan the developer approved on 6 November:
 
 - Not adding JWT. The developer asked for a suggestion; the advice was that it adds nothing for one machine calling one endpoint, and that server sessions suit a server-rendered app better. The developer moved on to the security review instead.
 - Removing the Swagger library rather than switching it off, because nothing used it.
+
+### 2026-11-17
+
+- Each angle is its own `face_embedding` row with a `pose`, rather than extra vector columns or an averaged vector, so each photo keeps its own status and error (ADR-026).
+- The CodeRabbit findings were checked against the code first; all three code findings were real.
+
+### 2026-11-21
+
+- Each worker links their own chat, rather than one group chat per team.
+- The detection app sends gate check-in and check-out messages, because the ERP on Render may be asleep; the ERP sends visits entered by hand and schedules.
+- A chat is linked with a one-time code from the home page.
+- A month's schedule is sent with a button; after that, only changes in that month are sent, so building a month doesn't send a message on every save.
 
 ## Decisions made by Claude and reported to the developer
 
@@ -222,6 +271,27 @@ These came from the request to check every user error, and the developer hasn't 
 - Recorded these as a new `ADR-025` rather than rewriting ADR-006, and recorded old values in each document's changelog, following the documents' immutable history rule.
 - Not changed, and reported instead: ids that don't exist (only reachable by editing the HTML) still show "Page not found"; shifts have no maximum length; any database conflict when saving a check-in is reported as "already checked in".
 
+### 2026-11-17
+
+- The poses are fixed slots, FRONT, LEFT and RIGHT, rather than a free list of photos, so admins are guided to the angles that help.
+- LEFT and RIGHT need a FRONT photo first, and the team list shows the FRONT photo's status.
+- The row lock was also added to `softDelete`, which CodeRabbit didn't mention: without it, a delete could still miss a photo uploaded at the same moment.
+- `requireForUpdate` skips soft-deleted users like `require` does, so deleting an already deleted account still gives 404.
+- The report page fix is in an uncommitted change that wasn't part of this session; it only matters if the app gets a context path.
+
+### 2026-11-21
+
+- `V15` keeps the function's signature but drops and recreates it with its grants, as ADR-013 requires. A check-in after the shift has already ended gets 2 hours from check-in. Visits with no shift still close at midnight, which the SRS doesn't cover.
+- The 2-hour rule brings back the cut-off for overtime that V7 removed; noted as an amendment in ADR-013.
+- `V16` maps three SRS categories to existing names (PPE dispute, Safety concern, Leave request) and adds the other three under Admin, with "Other" last.
+- Telegram messages are in Vietnamese (SRS CR-01), go out only after the change commits, on one background thread; a failed message is logged and dropped.
+- The chat is written with plain SQL, so linking Telegram doesn't change `app_user.version` and make an admin's open form go stale.
+- The webhook checks Telegram's secret header, is exempt from CSRF, and answers in the response body, so the ERP makes no call of its own. Only private chats are handled.
+- Codes last 30 minutes and work once; linking a chat unlinks it from any other account.
+- The Telegram card appears for people who have their own shifts; the schedule button for people who plan shifts, for the month most of the shown week is in.
+- The schedule button went on the Shifts page, the planning page, not the worker timetable page named in the plan at 13:31.
+- Telegram isn't in the SRS (it was removed there); it was built because the developer asked.
+
 ## How the work was checked
 
 ### 2026-11-04
@@ -269,6 +339,22 @@ These came from the request to check every user error, and the developer hasn't 
 - Once the developer started Docker, the full suite ran on the uncommitted working tree: 282 tests in 33 classes, 0 failures, 0 errors. The first run had 2 failures, both wrong test expectations (see below).
 - The case of a 5–20 MB photo on the form needs a signed-in user and the full schema, so it was checked by `ErrorPagesTest` only, not on a real Tomcat.
 - **Not checked in a browser:** the browser's size message on the photo inputs, the redirect-back notices, and the expired-form page.
+
+### 2026-11-17
+
+- `./mvnw test-compile` while Docker was off; `TranslationsTest` on its own.
+- V14 applied to a throwaway Postgres in WSL with every migration, through the detection app's `tests/erp_integration_check.py` as the `steelsight_detection` role: FRONT and LEFT rows both load, the role can't change a pose, and one row per worker and angle is enforced.
+- The full suite with Docker: 284 tests, 0 failures.
+- The new edit page section was rendered by the page tests but not looked at in a browser.
+
+### 2026-11-21
+
+- The database design document was compared with every migration, V1 to V14.
+- The SRS review read the code and the SRS only; neither app was run.
+- Full suite with Docker: 285 tests after V15 and V16, then 296 after Telegram, 0 failures.
+- `TelegramNoticesTest` (10 tests) uses a mock bot. The tests roll back, so they run the after-commit step by hand, and check the exact Vietnamese message text.
+- The detection app's `tests/erp_integration_check.py` applied V1–V17 to a real Postgres (pgserver) and ran as `steelsight_detection`: 35 of 35 checks, including the new V17 ones.
+- Not checked: the new pages in a browser, a real Telegram bot, webhook registration, or the live gate.
 
 ## Problems during the work
 
@@ -335,8 +421,37 @@ These came from the request to check every user error, and the developer hasn't 
 | An existing test expected `decision=BOGUS` to give 404 | Updated to the new 400 on purpose |
 | A start-up error printed the `.env` database URL, including its password, in a command's output during the session | Command output isn't part of the transcript. The transcript and this log were searched for the password and the Supabase host, with no matches. The password has been seen in this session's output, so consider changing it |
 
+### 2026-11-17
+
+| Problem | Outcome |
+|---|---|
+| Docker wasn't running at first | Compiled only, then ran the full suite once the developer started it |
+| `TranslationsTest` failed: 4 new messages had no Vietnamese translation | Added the 4 keys; the test passes |
+| `SoftDeletableRepository.require` treats a deleted user as not found, but the first lock query didn't | The lock query filters `deleted_at IS NULL`, so behaviour matches |
+| The stylesheet is built by Tailwind from the templates, and wasn't rebuilt after the Extra angles section was added, so its `mt-2` class has no CSS | Not fixed yet; run `npm run build:css` |
+
+### 2026-11-21
+
+| Problem | Outcome |
+|---|---|
+| `./mvnw` failed because `JAVA_HOME` wasn't set | Ran with the Linux JDK 17 |
+| Docker wasn't reachable from WSL at first, so the database tests couldn't start | Compiled only, then ran the full suite once the developer started Docker Desktop |
+| `TranslationsTest` failed: English must not have `msg.*` keys, because English shows the text written in the code | Removed the 5 English `msg.*` keys; the Vietnamese ones stay |
+| Telegram messages wait for a commit, and the tests roll back | The tests run only the Telegram after-commit steps by hand, leaving Spring's own alone |
+
 ## Open items
 
+- The 21 November work isn't committed, in either repository: V15, V16, V17, Telegram, the gate speech and the documents.
+- Set up Telegram: create a bot with @BotFather; on Render set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` and `TELEGRAM_WEBHOOK_URL`; put the same token in the detection app's `.env`.
+- Check the Telegram card on the home page and the schedule button on the Shifts page in a browser, in both languages. Run `npm run build:css`, since the button row uses Tailwind classes the stylesheet may not have yet.
+- Decide whether Telegram goes back into the SRS, or stays an extra.
+- With V15, someone working more than 2 hours past their shift gets an estimated check-out that HSE must correct.
+- The other SRS gaps from the 21 November review are still open (transcript, 13:10). The zone-to-team fallback is parked.
+- The 17 November work isn't committed: V14, the extra face angles, the CodeRabbit fixes and the documents.
+- Deploy V14 to Supabase (Flyway runs it on the next start), then upload LEFT and RIGHT photos for workers, ideally photos taken by the gate camera.
+- Run `npm run build:css` so the Extra angles section's spacing (`mt-2`) gets its CSS, and check the section in a browser in both languages.
+- The ERP's `camera` table is empty, so every violation the detection app sends is refused. Add the cameras (the SQL is in the 17 November transcript).
+- Name the extra face photos in the consent record for biometric processing (gap G11).
 - ~~Today's security work isn't committed.~~ Committed as `23e5929` on 12 November. `V12` and `V13` run on the next deploy.
 - The 16 November error handling work (ADR-025) isn't committed.
 - Check in a browser: the photo size message when choosing a large photo, a notice after a failed button, a stale edit keeping the form, and the expired-form page, in both languages.

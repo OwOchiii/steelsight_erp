@@ -18,4 +18,8 @@ public class Camera extends IdentifiedModel {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "zone_id", nullable = false)
     private Zone zone;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private CameraRole role = CameraRole.PPE;
 }

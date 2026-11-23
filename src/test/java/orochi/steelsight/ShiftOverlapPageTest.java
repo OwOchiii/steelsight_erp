@@ -47,13 +47,14 @@ class ShiftOverlapPageTest extends PageTestSupport {
 
     @Test
     void anOverlappingShiftShowsTheFormAgainWithTheProblem() throws Exception {
-        shift(worker, zoneId, "timestamptz '2026-11-10 08:00+07'", "timestamptz '2026-11-10 16:00+07'");
+        // A Monday far enough ahead that the team leader may still plan it (BR-23)
+        shift(worker, zoneId, "timestamptz '2027-03-08 07:00+07'", "timestamptz '2027-03-08 11:30+07'");
 
         mvc.perform(post("/shifts").param("workerId", worker.toString()).param("zoneId", zoneId.toString())
-                        .param("startAt", "2026-11-10T12:00").param("endAt", "2026-11-10T20:00")
+                        .param("day", "2027-03-08").param("start", "10:00").param("end", "14:00")
                         .with(as(manager)).with(csrf()))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().string(containsString("This worker already has a shift at that time")))
+                .andExpect(content().string(containsString("This person already has a shift from")))
                 .andExpect(content().string(containsString("Over Worker (OVER-W)")));
     }
 }

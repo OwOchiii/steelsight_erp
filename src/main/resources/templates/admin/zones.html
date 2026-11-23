@@ -1,0 +1,41 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{zones.title}, 'zones', ~{::main})}">
+<main class="page">
+    <div class="page-head"><h1 th:text="#{zones.title}">Zones</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <p class="quiet" th:text="#{zones.hint}">The name is what every alert, report and Zalo message says. Each work area belongs to the team that works there; HSE picks a violator from that team first.</p>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{zones.name}">Name in alerts</th>
+                <th scope="col" th:text="#{zones.kind}">Kind</th>
+                <th scope="col" th:text="#{zones.cameras}">Cameras</th>
+                <th scope="col" th:text="#{field.team}">Team</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="zone : ${zones}">
+                <td>
+                    <form class="flex gap-2" method="post" th:action="@{/zones/{id}(id=${zone.id})}">
+                        <input name="name" th:value="${zone.name}" minlength="2" maxlength="50" required th:attr="aria-label=#{zones.name}">
+                        <button type="submit" class="btn secondary" th:text="#{common.save}">Save</button>
+                    </form>
+                </td>
+                <td th:text="${@display.label(zone.kind)}">Work area</td>
+                <td th:text="${cameras.get(zone.id)}">CAM-03</td>
+                <td>
+                    <form class="flex gap-2" method="post" th:if="${zone.kind.name() == 'WORK_AREA'}" th:action="@{/zones/{id}/team(id=${zone.id})}">
+                        <select name="teamId" th:attr="aria-label=#{field.team}">
+                            <option value="" th:text="#{team.noTeam}">No team</option>
+                            <option th:each="team : ${teams}" th:value="${team.id}" th:selected="${zone.team != null and zone.team.id == team.id}" th:text="${team.name}">Team</option>
+                        </select>
+                        <button type="submit" class="btn secondary" th:text="#{common.save}">Save</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+</html>

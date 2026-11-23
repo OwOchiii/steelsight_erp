@@ -1,0 +1,12 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{settings.title}, 'settings', ~{::main})}">
+<main class="page narrow">
+    <div class="page-head"><h1 th:text="#{settings.title}">Company settings</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <form class="sheet" method="post" th:action="@{/settings}">
+        <label class="check"><input type="checkbox" name="halfDay" value="true" th:checked="${halfDay}"> <span th:text="#{settings.halfDay}">Half day for unexplained missing check-out</span></label>
+        <p class="hint" th:text="#{settings.halfDayHint}">On: an unexplained missing check-out counts 50% of the shift. Off: 0 hours and To review.</p>
+        <div class="actions"><button type="submit" class="btn" th:text="#{common.save}">Save</button></div>
+    </form>
+</main>
+</html>

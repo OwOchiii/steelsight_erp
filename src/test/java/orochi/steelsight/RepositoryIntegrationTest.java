@@ -22,6 +22,7 @@ import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.identity.repository.RoleRepository;
 import orochi.steelsight.ppe.model.Camera;
 import orochi.steelsight.ppe.model.DisputeStatus;
+import orochi.steelsight.ppe.model.ReviewStatus;
 import orochi.steelsight.ppe.model.PpeLinking;
 import orochi.steelsight.ppe.model.PpeVest;
 import orochi.steelsight.ppe.model.Violation;
@@ -128,26 +129,28 @@ class RepositoryIntegrationTest {
 
     // --- violations ------------------------------------------------------------------------
 
+    /** SRS BR-48: a person the detection app names, even through a vest, is only a suggestion. */
     @Test
-    void vestReadFillsInTheWorkerAndFindsThemByColumn() {
+    void aVestReadOnlySuggestsThePersonAndTheViolationWaitsForReview() {
         Violation saved = violations.saveAndFlush(violation(link("V-1", worker)));
         em.refresh(saved);
 
-        assertThat(saved.getUser()).isEqualTo(worker);
-        assertThat(violations.findAllByUserIdOrderByDetectedAtDesc(worker.getId())).containsExactly(saved);
+        assertThat(saved.getUser()).isNull();
+        assertThat(saved.getSuggestedUser()).isEqualTo(worker);
+        assertThat(saved.getReviewStatus()).isEqualTo(ReviewStatus.PENDING_REVIEW);
+        assertThat(saved.getZone()).isNotNull();   // filled from the camera
     }
 
     @Test
-    void unidentifiedViolationQueuesForHseAndCanBeAssignedWithoutAVest() {
-        Violation saved = violations.saveAndFlush(violation(null));
-        assertThat(violations.findAllByUserIsNullOrderByDetectedAtDesc()).containsExactly(saved);
+    void aViolationNamedByTheDetectionAppIsAlsoOnlyASuggestion() {
+        Violation named = violation(null);
+        named.setUser(worker);
+        Violation saved = violations.saveAndFlush(named);
+        em.refresh(saved);
 
-        saved.setUser(worker);
-        violations.saveAndFlush(saved);
-
-        assertThat(violations.findAllByUserIsNullOrderByDetectedAtDesc()).isEmpty();
-        assertThat(violations.findAllByUserIdOrderByDetectedAtDesc(worker.getId())).containsExactly(saved);
-        assertThat(violations.findAllByUserIdAndDisputeStatus(worker.getId(), DisputeStatus.NONE)).containsExactly(saved);
+        assertThat(saved.getUser()).isNull();
+        assertThat(saved.getSuggestedUser()).isEqualTo(worker);
+        assertThat(violations.countByReviewStatusIn(java.util.List.of(ReviewStatus.PENDING_REVIEW))).isEqualTo(1);
     }
 
     @Test
@@ -159,7 +162,9 @@ class RepositoryIntegrationTest {
         em.clear();
 
         // Another officer decides first
-        jdbc.update("UPDATE violation SET dispute_status = 'DISPUTED', version = version + 1 WHERE id = ?", id);
+        jdbc.update("""
+                UPDATE violation SET review_status = 'CONFIRMED', subject = 'EMPLOYEE', user_id = ?, reviewed_at = now(),
+                       version = version + 1 WHERE id = ?""", worker.getId(), id);
 
         Violation stale = new Violation();
         org.springframework.test.util.ReflectionTestUtils.setField(stale, "id", id);
@@ -304,10 +309,10 @@ class RepositoryIntegrationTest {
     @Test
     void violationHasOnlyOneLiveDisputeTicket() {
         Violation disputed = violations.saveAndFlush(violation(link("V-4", worker)));
-        Ticket first = tickets.saveAndFlush(ticket("PPE dispute", disputed));
+        Ticket first = tickets.saveAndFlush(ticket("PPE appeal", disputed));
 
         assertThatThrownBy(() -> {
-            tickets.saveAndFlush(ticket("PPE dispute", disputed));
+            tickets.saveAndFlush(ticket("PPE appeal", disputed));
         }).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(first.getId()).isNotNull();
     }
@@ -315,13 +320,13 @@ class RepositoryIntegrationTest {
     @Test
     void softDeletedDisputeFreesTheViolation() {
         Violation disputed = violations.saveAndFlush(violation(link("V-5", worker)));
-        Ticket first = tickets.saveAndFlush(ticket("PPE dispute", disputed));
+        Ticket first = tickets.saveAndFlush(ticket("PPE appeal", disputed));
         first.setDeletedAt(OffsetDateTime.now());
         tickets.saveAndFlush(first);
 
-        Ticket second = tickets.saveAndFlush(ticket("PPE dispute", disputed));
+        Ticket second = tickets.saveAndFlush(ticket("PPE appeal", disputed));
 
-        assertThat(tickets.findAllByHandlerRoleId(hse.getRole().getId())).containsExactly(second);
+        assertThat(tickets.findAllByHandlerRoleId(admin.getRole().getId())).containsExactly(second);
     }
 
     // --- permission and scope --------------------------------------------------------------
@@ -339,11 +344,11 @@ class RepositoryIntegrationTest {
     }
 
     @Test
-    void ticketsAreEditedByTheHandlingRoleAndAdmin() {
+    void ticketsAreEditedOnlyByTheAdmin() {
         Long hseTicket = tickets.saveAndFlush(ticket("Safety concern", null)).getId();
         Long adminTicket = tickets.saveAndFlush(ticket("Equipment request", null)).getId();
 
-        assertThat(call("can_update_ticket", hse, hseTicket)).isTrue();
+        assertThat(call("can_update_ticket", hse, hseTicket)).isFalse();
         assertThat(call("can_update_ticket", hse, adminTicket)).isFalse();
         assertThat(call("can_update_ticket", manager, adminTicket)).isFalse();
         assertThat(call("can_update_ticket", manager, hseTicket)).isFalse();

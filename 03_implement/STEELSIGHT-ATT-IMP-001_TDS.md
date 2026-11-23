@@ -25,6 +25,7 @@
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code as built (V1, V2, V5, V7) |
 | 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: ATT-010 now keeps the form, with the longer stale-edit message. Old value kept here: 409 error page "Someone else changed this" |
+| 2026-11-17 | Claude Code (Opus 5.5) — ADR-026 | ADR-026 (V14): `face_embedding.pose` (FRONT/LEFT/RIGHT) with `UNIQUE (user_id, pose)`; `FaceEmbedding` is now many-per-user; repository methods take a pose. Old value kept here: `user_id … UNIQUE`, `findByUserId`, `findAllByUserIdIn` |
 
 ---
 
@@ -54,7 +55,7 @@
 
 ## 1. Tổng quan Module
 
-> Attendance records each site visit (check-in to check-out): by face at the gate (written by the detection service) or by hand (HSE). It judges each visit against its planned shift (late, early, missing check-out), closes forgotten visits after the day ends, and holds the face enrolment queue.
+> Attendance records each site visit (check-in to check-out): by face at the gate (written by the detection service) or by hand (HSE). It judges each visit against its planned shift (late, early, missing check-out), closes forgotten visits 2 hours after their shift ends, and holds the face enrolment queue.
 
 | Field | Value |
 |-------|-------|
@@ -78,7 +79,7 @@
 | BR-ATT-003 | Business Rule | Shift and vest belong to the visit's worker | `check_in_same_worker()`, `recordManual()` | — | ADR-003 |
 | BR-ATT-004 | Business Rule | Late with capped make-up | `AttendanceRules.assess()` | PDPL — accuracy (pay) | ADR-012 |
 | BR-ATT-005 | Business Rule | Early; estimates not judged | `AttendanceRules.assess()`, `VisitStatus` | — | ADR-012 |
-| BR-ATT-006 | Business Rule | Auto-close after the day ends | `close_stale_check_ins(text)` (V7) | — | ADR-013 |
+| BR-ATT-006 | Business Rule | Auto-close 2 h after the shift ends (at midnight without a shift) | `close_stale_check_ins(text)` (V15, was V7) | — | ADR-013 |
 | BR-ATT-007 | Business Rule | Manual add/correct by `CHECKIN_EDIT`; stale fails incl. plain SQL | `CheckInService.recordManual/correct`, `bump_check_in_version()` | — | ADR-006 |
 | BR-ATT-008 | Business Rule | Own / team / all visibility | `CheckInService.list*` | PDPL — least privilege | ADR-001 |
 | BR-ATT-009 | Business Rule | New photo resets enrolment | `FaceEmbeddingRepository.queueForEnrolment()` | PDPL — sensitive data | ADR-011 |
@@ -172,6 +173,7 @@ enum CheckInMethod {
 class FaceEmbedding {
   + id: Long
   + user: AppUser
+  + pose: FacePose  (FRONT | LEFT | RIGHT)
   + sourceFilePath: String
   + status: EmbeddingStatus
   + modelName: String
@@ -212,13 +214,15 @@ class TodayRoster <<web helper>> {
 
 interface CheckInRepository
 interface FaceEmbeddingRepository {
-  + queueForEnrolment(userId, path): int
+  + queueForEnrolment(userId, path): int    // FRONT
+  + queueForEnrolment(userId, pose, path): int
+  + deleteAngle(userId, pose): int
 }
 
 CheckIn --> CheckInMethod
 FaceEmbedding --> EmbeddingStatus
 CheckIn "*" --> "0..1" Shift
-FaceEmbedding "0..1" --> "1" AppUser
+FaceEmbedding "0..3" --> "1" AppUser : one per pose
 CheckInService --> AccessPolicy
 CheckInService --> CheckInRepository
 CheckInService --> AttendanceRules
@@ -262,7 +266,8 @@ CREATE INDEX idx_check_in_shift     ON check_in(shift_id);
 
 CREATE TABLE face_embedding (
   id               bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id          bigint NOT NULL UNIQUE REFERENCES app_user(id) ON DELETE CASCADE,
+  user_id          bigint NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+  pose             text   NOT NULL DEFAULT 'FRONT' CHECK (pose IN ('FRONT','LEFT','RIGHT')),  -- V14
   source_file_path text   NOT NULL,
   status           text   NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','READY','FAILED')),
   embedding        vector(512),           -- InsightFace output (biometric)
@@ -477,11 +482,15 @@ public interface CheckInRepository extends BaseRepository<CheckIn, Long> {
   // No delete.
 }
 public interface FaceEmbeddingRepository extends BaseRepository<FaceEmbedding, Long> {
-  Optional<FaceEmbedding> findByUserId(Long userId);
+  Optional<FaceEmbedding> findByUserIdAndPose(Long userId, FacePose pose);
+  default Optional<FaceEmbedding> findFrontByUserId(Long userId);
+  List<FaceEmbedding> findAllByUserIdOrderByPose(Long userId);
   List<FaceEmbedding> findAllByStatus(EmbeddingStatus status);
-  List<FaceEmbedding> findAllByUserIdIn(Collection<Long> userIds);
-  /** INSERT … ON CONFLICT (user_id) DO UPDATE SET status='PENDING', embedding=NULL, model_name=NULL, error_message=NULL */
-  int queueForEnrolment(Long userId, String sourceFilePath);
+  List<FaceEmbedding> findAllByUserIdInAndPose(Collection<Long> userIds, FacePose pose);
+  /** INSERT … ON CONFLICT (user_id, pose) DO UPDATE SET status='PENDING', embedding=NULL, model_name=NULL, error_message=NULL */
+  int queueForEnrolment(Long userId, String pose, String sourceFilePath);
+  default int queueForEnrolment(Long userId, String sourceFilePath);   // FRONT
+  int deleteAngle(Long userId, String pose);
 }
 ```
 
@@ -659,12 +668,12 @@ Feature: Attendance rules
 
 ### 13.2. Integration Tests
 
-#### TC-INT-001 — Auto-close after the day ends
+#### TC-INT-001 — Auto-close 2 hours after the shift ends
 
 ```gherkin
-  Scenario: Visit to a shift that ended yesterday
+  Scenario: Visit to a shift that ended more than 2 hours ago
     Given test data classification: SYNTHETIC
-    And an open visit whose shift ended yesterday at 17:00 site time
+    And an open visit whose shift ended at 17:00 site time, and it is now after 19:00
     When close_stale_check_ins('Asia/Ho_Chi_Minh') runs
     Then check_out_at = the shift's end and auto_closed = true
     And the worker can check in again

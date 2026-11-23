@@ -1,0 +1,30 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- The status flags of one shift (SRS 3.2.12 #8). r is a ShiftAttendance.Result. -->
+<span class="tags" th:fragment="flags(r)">
+    <th:block th:each="flag : ${r.flags}">
+        <span class="badge" th:classappend="|badge-${flag.name().toLowerCase()}|" th:switch="${flag.name()}">
+            <th:block th:case="'LATE'" th:text="#{${'flag.' + flag.name()}(${r.minutesLate})}">Late</th:block>
+            <th:block th:case="'EARLY'" th:text="#{${'flag.' + flag.name()}(${r.minutesEarly})}">Early</th:block>
+            <th:block th:case="'PAID_LEAVE'" th:text="#{${'flag.' + flag.name()}(${r.paidLeaveHours})}">Paid leave</th:block>
+            <th:block th:case="'UNPAID_LEAVE'" th:text="#{${'flag.' + flag.name()}(${r.unpaidLeaveHours})}">Unpaid leave</th:block>
+            <th:block th:case="'PENDING_OT'" th:text="#{${'flag.' + flag.name()}(${r.pendingOvertimeHours}, ${@display.dateTime(r.pendingOvertimeEnds)})}">Pending OT</th:block>
+            <th:block th:case="'VALID_OT'" th:text="#{${'flag.' + flag.name()}(${r.validOvertimeHours})}">Valid OT</th:block>
+            <th:block th:case="*" th:text="#{${'flag.' + flag.name()}}">Flag</th:block>
+        </span>
+    </th:block>
+</span>
+
+<!-- The month's summary (SRS 3.2.12 #2). s is a ShiftAttendance.Summary. -->
+<dl class="facts" th:fragment="summary(s)">
+    <dt th:text="#{summary.shifts}">Shifts</dt><dd th:text="#{summary.shiftsValue(${s.planned}, ${s.worked}, ${s.absent})}">Planned, worked, absent</dd>
+    <dt th:text="#{summary.paidHours}">Paid hours</dt><dd th:text="${s.paidHours}">0</dd>
+    <dt th:text="#{summary.overtime}">Overtime</dt><dd th:text="#{summary.overtimeValue(${s.validOvertimeHours}, ${s.pendingOvertimeHours})}">Valid, pending</dd>
+    <dt th:text="#{summary.late}">Late</dt><dd th:text="#{summary.countMinutes(${s.timesLate}, ${s.minutesLate})}">0</dd>
+    <dt th:text="#{summary.early}">Early</dt><dd th:text="#{summary.countMinutes(${s.timesEarly}, ${s.minutesEarly})}">0</dd>
+    <dt th:text="#{summary.incomplete}">Incomplete</dt><dd th:text="${s.incomplete}">0</dd>
+    <dt th:text="#{summary.leave}">Leave</dt><dd th:text="#{summary.leaveValue(${s.paidLeaveHours}, ${s.unpaidLeaveHours})}">Paid, unpaid</dd>
+</dl>
+</body>
+</html>

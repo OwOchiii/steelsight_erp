@@ -1,22 +1,17 @@
 package orochi.steelsight.notification.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
+import org.hibernate.annotations.ColumnTransformer;
 import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.model.IdentifiedModel;
 
 import java.time.OffsetDateTime;
 
 /**
- * Something a person should know. The words aren't stored: a page shows them in the reader's language.
- * Safety notices are written by a database trigger, because detection writes violations directly.
+ * Something a person should know. The words aren't stored, only the kind and its parameters, so each
+ * page shows it in the reader's language and the Zalo copy is written in Vietnamese (SRS 3.1.5 #13).
+ * Every notice is saved here first; Zalo is an extra channel (BR-15).
  */
 @Getter
 @Entity
@@ -31,26 +26,27 @@ public class Notification extends IdentifiedModel {
     @Column(nullable = false, updatable = false)
     private NotificationKind kind;
 
-    /** The score when a safety notice was sent. */
-    @Column(updatable = false)
-    private Integer score;
+    /** A JSON object of the parameters, read with NoticeText. */
+    @Column(nullable = false, updatable = false, columnDefinition = "jsonb")
+    @ColumnTransformer(write = "?::jsonb")
+    private String params;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "safety_alert_id", updatable = false)
-    private SafetyAlert safetyAlert;
+    /** The page the notice opens, such as /violations/12. */
+    @Column(updatable = false)
+    private String link;
 
     @Column(name = "read_at")
     private OffsetDateTime readAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private OffsetDateTime createdAt;
 
-    public static Notification hseAlert(AppUser officer, SafetyAlert alert, OffsetDateTime at) {
+    public static Notification of(AppUser user, NotificationKind kind, String paramsJson, String link) {
         Notification notification = new Notification();
-        notification.user = officer;
-        notification.kind = NotificationKind.HSE_VIOLATION_ALERT;
-        notification.safetyAlert = alert;
-        notification.createdAt = at;
+        notification.user = user;
+        notification.kind = kind;
+        notification.params = paramsJson;
+        notification.link = link;
         return notification;
     }
 

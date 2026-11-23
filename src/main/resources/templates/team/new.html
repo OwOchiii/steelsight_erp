@@ -8,8 +8,8 @@
         <div class="grid gap-x-4 sm:grid-cols-2">
             <div>
                 <label for="employeeCode" th:text="#{field.employeeCode}">Employee code</label>
-                <input id="employeeCode" th:field="*{employeeCode}" maxlength="50" required autocomplete="off"
-                       pattern="[A-Za-z0-9._\-]{1,50}">
+                <input id="employeeCode" th:field="*{employeeCode}" minlength="3" maxlength="20" required autocomplete="off"
+                       pattern="[A-Za-z0-9\-]{3,20}">
                 <p class="hint" th:text="#{team.codeHint}">Used to sign in. It can't be changed later.</p>
             </div>
             <div>
@@ -27,7 +27,14 @@
                 </select>
             </div>
             <div>
-                <label for="teamId"><span th:text="#{nav.team}">Team</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                <label for="staffGroup" th:text="#{field.group}">Group</label>
+                <select id="staffGroup" th:field="*{staffGroup}">
+                    <option th:each="g : ${groups}" th:value="${g}" th:text="${@display.label(g)}">Site</option>
+                </select>
+                <p class="hint" th:text="#{team.groupHint}">A team leader is always Site; HSE and the Admin are always Office.</p>
+            </div>
+            <div>
+                <label for="teamId"><span th:text="#{nav.team}">Team</span> <span class="optional" th:text="#{team.teamForSiteWorker}">required for a site worker</span></label>
                 <select id="teamId" th:field="*{teamId}">
                     <option value="" th:text="#{team.noTeam}">No team</option>
                     <option th:each="team : ${teams}" th:value="${team.id}" th:text="${team.name}">Team A</option>
@@ -41,8 +48,9 @@
                 <input id="email" type="email" th:field="*{email}" maxlength="200">
             </div>
             <div>
-                <label for="phoneNumber"><span th:text="#{field.phone}">Phone number</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
-                <input id="phoneNumber" type="tel" th:field="*{phoneNumber}" maxlength="30">
+                <label for="phoneNumber" th:text="#{field.phone}">Phone number</label>
+                <input id="phoneNumber" type="tel" th:field="*{phoneNumber}" pattern="0[0-9]{9}" maxlength="10" required>
+                <p class="hint" th:text="#{team.phoneHint}">The number the employee uses on Zalo: 10 digits starting with 0.</p>
             </div>
         </div>
 
@@ -51,8 +59,11 @@
         <p class="hint" th:text="#{team.startingPasswordHint}">At least 8 characters. They must choose their own the first time they sign in.</p>
 
         <label for="photo"><span th:text="#{team.facePhoto}">Face photo</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
-        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}">
+        <input id="photo" name="photo" type="file" accept="image/jpeg,image/png" data-max-bytes="5242880" th:data-too-large="#{photo.tooLarge}">
         <p class="hint" th:text="#{team.facePhotoHint}">A clear photo of their face, looking at the camera. Used for check-in at the gate. JPEG, PNG or WebP, up to 5 MB.</p>
+
+        <label class="check"><input type="checkbox" th:field="*{consent}" required> <span th:text="#{team.consent}">The employee has signed the consent form for face data.</span></label>
+        <p class="hint" th:text="#{team.consentHint}">Face data is sensitive personal data. Without the signed form the employee may not work on the site.</p>
 
         <div class="actions"><button type="submit" class="btn" th:text="#{team.createAccount}">Create account</button></div>
     </form>

@@ -25,6 +25,7 @@
 |------|-----------------|-------------------|
 | 2026-11-06 | Claude Code (Opus 5.5) — documentation | Tạo tài liệu lần đầu, from the code as built (V1–V11) |
 | 2026-11-16 | Claude Code (Opus 5.5) — ADR-025 | ADR-025: IAM-015 now keeps the form. Old value kept here: "Someone else changed this — Go back, reload the page and try again." on the error page |
+| 2026-11-17 | Claude Code (Opus 5.5) — ADR-026 | ADR-026 (V14): extra LEFT/RIGHT face photos. Added `changeFaceAngle`, `removeFaceAngle`, `faceAngles`, `faceAnglePath`, the `/team/{id}/face/{pose}` routes and the `requireForUpdate` row lock, also now used by `softDelete`. `faceEnrolment` and `faceStatuses` read the FRONT row |
 
 ---
 
@@ -236,10 +237,12 @@ class UserService {
   + updateProfile(actorId, userId, Profile, expectedVersion): AppUser
   + changeRole / assignTeam / setActive
   + changeFacePhoto(actorId, userId, photoPath): AppUser
+  + changeFaceAngle(actorId, userId, pose, photoPath): FaceEmbedding
+  + removeFaceAngle(actorId, userId, pose)
   + softDelete(actorId, userId)
   + changeOwnPassword(actorId, current, next)
   + resetPassword(actorId, userId, next)
-  + get / getForEdit / getWorker / list* / faceEnrolment / faceStatuses / facePhotoPath
+  + get / getForEdit / getWorker / list* / faceEnrolment / faceStatuses / facePhotoPath / faceAngles / faceAnglePath
 }
 
 interface AppUserRepository <<SoftDeletableRepository>>
@@ -497,6 +500,8 @@ public class UserService {
   AppUser assignTeam(Long actorId, Long userId, Long teamId);          // USER_MANAGE; null = no team
   AppUser setActive(Long actorId, Long userId, boolean active);        // USER_MANAGE; not self
   AppUser changeFacePhoto(Long actorId, Long userId, String photoPath);// USER_MANAGE; queues enrolment; old file removed after commit
+  FaceEmbedding changeFaceAngle(Long actorId, Long userId, FacePose pose, String photoPath); // USER_MANAGE; LEFT/RIGHT; needs FRONT; row lock
+  void    removeFaceAngle(Long actorId, Long userId, FacePose pose);  // USER_MANAGE; LEFT/RIGHT; row lock; file removed after commit
   void    softDelete(Long actorId, Long userId);                      // USER_MANAGE; not self; not a leader
   void    changeOwnPassword(Long actorId, String current, String next);// any signed-in user
   void    resetPassword(Long actorId, Long userId, String next);       // USER_MANAGE; sets mustChangePassword
@@ -516,6 +521,8 @@ public class UserService {
   Optional<FaceEmbedding> faceEnrolment(Long actorId, Long userId);         // USER_MANAGE
   Map<Long, EmbeddingStatus> faceStatuses(Long actorId, Collection<Long>);  // USER_MANAGE
   String facePhotoPath(Long actorId, Long userId);                          // USER_MANAGE; NotFound if none
+  Map<FacePose, FaceEmbedding> faceAngles(Long actorId, Long userId);     // USER_MANAGE; LEFT/RIGHT rows
+  String faceAnglePath(Long actorId, Long userId, FacePose pose);         // USER_MANAGE; NotFound if none
 }
 
 // identity/service/AccessPolicy.java — @Component; every method runs one SELECT <sql function>
@@ -586,6 +593,9 @@ All page endpoints use the **session cookie** (`JSESSIONID`) and need a **CSRF t
 | `POST` | `/team/{id}/password` | Session + CSRF | `USER_MANAGE` | — | No |
 | `POST` | `/team/{id}/face` (multipart `photo`) | Session + CSRF | `USER_MANAGE` | — | No |
 | `GET` | `/team/{id}/face` | Session | `USER_MANAGE` | — | Yes |
+| `POST` | `/team/{id}/face/{left\|right}` (multipart `photo`) | Session + CSRF | `USER_MANAGE` | — | No |
+| `POST` | `/team/{id}/face/{left\|right}/delete` | Session + CSRF | `USER_MANAGE` | — | Yes |
+| `GET` | `/team/{id}/face/{left\|right}` | Session | `USER_MANAGE` | — | Yes |
 | `POST` | `/team/{id}/delete` (`confirm=true`) | Session + CSRF | `USER_MANAGE`, not self, not a leader | — | No |
 
 ### 9.2. Request / Response Schemas

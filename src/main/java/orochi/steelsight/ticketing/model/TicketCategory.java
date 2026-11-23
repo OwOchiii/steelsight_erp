@@ -18,4 +18,16 @@ public class TicketCategory extends IdentifiedModel {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "handler_role_id", nullable = false)
     private Role handlerRole;
+
+    /** What the category does; null for an older category that can no longer be chosen. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "code")
+    private CategoryCode code;
+
+    @Column(nullable = false)
+    private boolean active = true;
+
+    public boolean is(CategoryCode wanted) {
+        return code == wanted;
+    }
 }

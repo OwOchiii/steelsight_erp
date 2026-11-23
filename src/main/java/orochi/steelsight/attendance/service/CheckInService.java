@@ -16,6 +16,7 @@ import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.identity.repository.AppUserRepository;
 import orochi.steelsight.identity.service.AccessPolicy;
 import orochi.steelsight.identity.service.Permissions;
+import orochi.steelsight.notification.service.Notices;
 import orochi.steelsight.scheduling.model.Shift;
 import orochi.steelsight.scheduling.model.Zone;
 import orochi.steelsight.scheduling.repository.ShiftRepository;
@@ -37,17 +38,33 @@ public class CheckInService {
     private final CheckInCorrectionRepository corrections;
     private final AppUserRepository users;
     private final ShiftRepository shifts;
+    private final Notices notices;
     private final ZoneRepository zones;
     private final AttendanceRules rules;
+    private final orochi.steelsight.calendar.MonthLocks locks;
+    private final org.springframework.beans.factory.ObjectProvider<orochi.steelsight.ticketing.service.TicketService> tickets;
 
+    /** ticketId: the attendance error ticket that asked for this visit, which is then resolved. */
     public record ManualCheckIn(Long workerId, Long shiftId, Long zoneId, OffsetDateTime checkInAt,
-                                OffsetDateTime checkOutAt, String note) {
+                                OffsetDateTime checkOutAt, String note, Long ticketId) {
+
+        public ManualCheckIn(Long workerId, Long shiftId, Long zoneId, OffsetDateTime checkInAt,
+                             OffsetDateTime checkOutAt, String note) {
+            this(workerId, shiftId, zoneId, checkInAt, checkOutAt, note, null);
+        }
     }
 
     @Transactional(readOnly = true)
     public List<CheckIn> listOwn(Long actorId) {
         access.require(actorId, Permissions.CHECKIN_READ_OWN);
         return checkIns.findAllByUserIdOrderByCheckInAtDesc(actorId);
+    }
+
+    /** The actor's own visits flagged Incomplete attendance, which they may explain (SRS BR-67). */
+    @Transactional(readOnly = true)
+    public List<CheckIn> listOwnIncomplete(Long actorId) {
+        access.require(actorId, Permissions.CHECKIN_READ_OWN);
+        return checkIns.findAllByUserIdOrderByCheckInAtDesc(actorId).stream().filter(CheckIn::isIncomplete).toList();
     }
 
     @Transactional(readOnly = true)
@@ -99,6 +116,19 @@ public class CheckInService {
         return visits.stream().map(rules::assess).toList();
     }
 
+    /** SRS 3.2.14: visits of a day or month, for HSE and the Admin, with an optional name or code. */
+    @Transactional(readOnly = true)
+    public List<VisitStatus> listBetween(Long actorId, OffsetDateTime from, OffsetDateTime to, String person) {
+        access.require(actorId, Permissions.CHECKIN_READ_ALL);
+        String like = person == null ? "" : person.strip().toLowerCase();
+        return checkIns.findAllByCheckInAtGreaterThanEqualAndCheckInAtLessThan(from, to).stream()
+                .filter(v -> like.isEmpty() || v.getUser().getFullName().toLowerCase().contains(like)
+                        || v.getUser().getEmployeeCode().toLowerCase().contains(like))
+                .sorted(java.util.Comparator.comparing(CheckIn::getCheckInAt).reversed())
+                .map(rules::assess)
+                .toList();
+    }
+
     private Page<CheckIn> teamVisits(Long actorId, Supplier<Page<CheckIn>> query) {
         access.require(actorId, Permissions.CHECKIN_READ_TEAM);
         return query.get();
@@ -129,6 +159,8 @@ public class CheckInService {
             throw new BusinessRuleException("Choose a worker");
         }
         requireOrder(details.checkInAt(), details.checkOutAt());
+        locks.requireOpen(details.checkInAt());
+        requireNoOverlap(details.workerId(), null, details.checkInAt(), details.checkOutAt());
 
         CheckIn visit = new CheckIn();
         visit.setMethod(CheckInMethod.MANUAL);
@@ -136,7 +168,7 @@ public class CheckInService {
         visit.setUser(users.require(details.workerId()));
         visit.setCheckInAt(details.checkInAt());
         visit.setCheckOutAt(details.checkOutAt());
-        visit.setNote(Text.optional("A note", details.note(), Text.LONG));
+        visit.setNote(Text.sized("The reason", details.note(), 10, 500));
         if (details.zoneId() != null) {
             visit.setZone(zones.require(details.zoneId()));
         }
@@ -147,27 +179,65 @@ public class CheckInService {
             }
             visit.setShift(shift);
         }
-        return save(visit);
+        CheckIn saved = save(visit);
+        notices.visitRecorded(saved);
+        if (details.ticketId() != null) {
+            tickets.getObject().approveAttendanceError(actorId, details.ticketId(), null);
+        }
+        return saved;
     }
 
     /** Corrects the times on any visit; a stale form fails. A corrected check-out is no longer an estimate. */
     public CheckIn correct(Long actorId, Long checkInId, OffsetDateTime checkInAt, OffsetDateTime checkOutAt,
                            String note, long expectedVersion) {
+        return correct(actorId, checkInId, checkInAt, checkOutAt, note, expectedVersion, null);
+    }
+
+    /** BR-39: a reason of 10 to 500 characters; the history keeps the old and new values and the ticket. */
+    public CheckIn correct(Long actorId, Long checkInId, OffsetDateTime checkInAt, OffsetDateTime checkOutAt,
+                           String note, long expectedVersion, Long ticketId) {
         access.require(actorId, Permissions.CHECKIN_EDIT);
         requireOrder(checkInAt, checkOutAt);
         CheckIn visit = checkIns.require(checkInId);
         visit.requireVersion(expectedVersion);
+        locks.requireOpen(visit.getCheckInAt());
+        locks.requireOpen(checkInAt);
+        requireNoOverlap(visit.getUser().getId(), visit.getId(), checkInAt, checkOutAt);
         AppUser corrector = users.require(actorId);
-        String newNote = Text.optional("A note", note, Text.LONG);
+        String newNote = Text.sized("The reason", note, 10, 500);
         CheckInCorrection correction = CheckInCorrection.of(visit, corrector, checkInAt, checkOutAt, newNote);
+        if (ticketId != null) {
+            correction.setTicket(tickets.getObject().get(actorId, ticketId));
+        }
         visit.setCheckInAt(checkInAt);
         visit.setCheckOutAt(checkOutAt);
         visit.setAutoClosed(false);
+        if (checkOutAt != null) {
+            visit.clearIncomplete();
+        }
         visit.setRecordedBy(corrector);
         visit.setNote(newNote);
         CheckIn saved = save(visit);
         corrections.save(correction);
+        notices.visitCorrected(saved);
+        if (ticketId != null) {
+            tickets.getObject().approveAttendanceError(actorId, ticketId, null);
+        }
         return saved;
+    }
+
+    /** MSG32: a person can't have two visits at the same time. */
+    private void requireNoOverlap(Long userId, Long exceptId, OffsetDateTime in, OffsetDateTime out) {
+        boolean clash = checkIns.findAllByUserIdOrderByCheckInAtDesc(userId).stream()
+                .filter(other -> exceptId == null || !other.getId().equals(exceptId))
+                .anyMatch(other -> {
+                    OffsetDateTime otherOut = other.getCheckOutAt() == null ? OffsetDateTime.MAX : other.getCheckOutAt();
+                    OffsetDateTime thisOut = out == null ? OffsetDateTime.MAX : out;
+                    return other.getCheckInAt().isBefore(thisOut) && otherOut.isAfter(in);
+                });
+        if (clash) {
+            throw new BusinessRuleException("This person already has a visit at that time.");
+        }
     }
 
     private void requireOrder(OffsetDateTime checkInAt, OffsetDateTime checkOutAt) {

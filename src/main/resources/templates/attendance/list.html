@@ -14,6 +14,28 @@
         <a th:href="@{/attendance}" th:attr="aria-current=${onSite} ? null : 'page'" th:text="#{attendance.recent}">Recent visits</a>
         <a th:href="@{/attendance(onSite=true)}" th:attr="aria-current=${onSite} ? 'page' : null" th:text="#{home.onSite}">On site now</a>
     </nav>
+    <form class="filters" method="get" th:action="@{/attendance}" th:if="${filters}">
+        <div>
+            <label for="day" th:text="#{field.day}">Day</label>
+            <input id="day" name="day" type="date" th:value="${day}">
+        </div>
+        <div>
+            <label for="month" th:text="#{attendance.orMonth}">Or a month</label>
+            <input id="month" name="month" type="month" th:value="${month}">
+        </div>
+        <div>
+            <label for="person" th:text="#{field.person}">Person</label>
+            <input id="person" name="person" type="search" th:value="${person}">
+        </div>
+        <div>
+            <label for="flag" th:text="#{attendance.flag}">Flag</label>
+            <select id="flag" name="flag">
+                <option value="" th:text="#{common.all}">All</option>
+                <option th:each="f : ${flags}" th:value="${f}" th:selected="${f == flag}" th:text="#{${'listFlag.' + f.name()}}">Flag</option>
+            </select>
+        </div>
+        <button type="submit" class="btn secondary" th:text="#{common.show}">Show</button>
+    </form>
     <p class="empty panel-less-empty" th:if="${visits.totalElements == 0}" th:text="${onSite} ? #{attendance.emptyOnSite} : #{attendance.emptyRecent}">Empty</p>
     <th:block th:unless="${visits.isEmpty()}"><div th:replace="~{fragments/lists :: visits(${visits}, ${canEdit})}"></div></th:block>
     <nav th:replace="~{fragments/lists :: pager(${visits})}"></nav>
