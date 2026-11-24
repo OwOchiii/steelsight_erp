@@ -17,7 +17,9 @@ copy of the app is still accepted.
 1. **Stop reading `app_user.telegram_chat_id`.** V19 drops the column; Telegram is gone (Zalo only).
    Any query that selects it now fails.
 2. **Stop sending check-in messages itself.** The ERP sends every notice (in-app first, then Zalo,
-   BR-15). Read `zalo_chat_id` only if you still need it for something else.
+   BR-15). Since V23, a check-in or check-out written by the `steelsight_detection` role makes the
+   "Check-in at HH:MM, shift HH:MM-HH:MM" and "Check-out at HH:MM, hours worked N.NN" notices by trigger;
+   check-outs the app closes as `auto_closed` send nothing. Read `zalo_chat_id` only if you still need it.
 
 ## Should change (the ERP already accepts the new way)
 

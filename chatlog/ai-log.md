@@ -1,11 +1,11 @@
 # AI usage log
 
-How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md), [9 November](../transcript/9-11-2026.md), [16 November](../transcript/16-11-2026.md), [17 November](../transcript/17-11-2026.md) and [21 November](../transcript/21-11-2026.md). The 17 November session was opened in the detection app's folder, and the 21 November session in the ERP's; both changed both programs. Only their ERP work is logged here, and the detection work is in that repository's `chatlog/detection-ai-log.md`.
+How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md), [9 November](../transcript/9-11-2026.md), [16 November](../transcript/16-11-2026.md), [17 November](../transcript/17-11-2026.md), [21 November](../transcript/21-11-2026.md) and [23 November](../transcript/23-11-2026.md). The 17 November session was opened in the detection app's folder, and the 21 and 23 November sessions in the ERP's; all three changed both programs. Only their ERP work is logged here, and the detection work is in that repository's `chatlog/detection-ai-log.md`.
 
 | | |
 |---|---|
 | Tool | Claude Code (Opus 5.5) |
-| Dates | 2026-11-04 to 2026-11-21 (one session ran past midnight) |
+| Dates | 2026-11-04 to 2026-11-23 (one session ran past midnight) |
 | Branch | `feature/erp-backend` |
 
 ## Summary by request
@@ -91,7 +91,7 @@ The developer committed this day's work, with their own attendance and report ch
 
 ### 2026-11-21
 
-Nothing from this day is committed yet.
+This day's ERP work was committed in `b6bbb9a` on 23 November, together with that day's work.
 
 | Time | What the developer asked for | What was produced | Commit |
 |---|---|---|---|
@@ -101,6 +101,32 @@ Nothing from this day is committed yet.
 | 13:35 | Docker Desktop is on, run whatever tests are needed | Full suite: 285 passed; a V16 test added to `TeamsTicketsAndReportTest` | Not committed |
 | 13:49 | Build Telegram, leave the zone fallback out, and make sure the gate workflow works: account and face, vector in the detection app, face scan with PPE, the name or missing PPE spoken | `V17` (`app_user.telegram_chat_id`, `telegram_link_code`, `schedule_notice`, read grant for detection); `TelegramBot`, `TelegramStore`, `TelegramNotices`, `TelegramLinks`, `ScheduleNoticeService`; webhook, link and unlink, a Telegram card on the home page, "Send … schedule on Telegram" on the Shifts page; messages for visits entered or corrected by hand and for shift changes; 10 tests. The gate workflow and gate Telegram messages are in the detection log | Not committed |
 | 15:36 | Update the chat log and transcript | This update and `transcript/21-11-2026.md`, in both repositories | Not committed |
+
+### 2026-11-23
+
+The developer committed the work up to 22:15 as `b6bbb9a` at 22:23, and the QR code as `a6b9302` at 22:44. That commit also took in the 21 November work (V15 to V17) and the SRS `.docx`.
+
+| Time | What the developer asked for | What was produced | Commit |
+|---|---|---|---|
+| 12:47 | Compare the ERP with the SRS (23/11 revision) and check the requirements and workflows | Review: what matches, 11 areas where the code contradicts the SRS, what isn't built (no scheduled jobs at all, month lock, overtime, ticket workflows, Zones and Settings pages), the 14 workflows end to end, and old SRS rule numbers cited in uncommitted migrations | None |
+| 13:03 | Remove Telegram, and match the SRS for ticket handling | `V19` drops `telegram_link_code` and `app_user.telegram_chat_id`; the Telegram package, controller, panel and settings removed; the schedule button moved to `/shifts/schedule` on Zalo. `V20` sends every ticket to the Admin, lets the Admin decide disputes, stops anyone handling their own ticket, and lets team leaders read and comment on their team's tickets | `b6bbb9a` |
+| 13:25 | Test every SRS requirement and workflow, match the SRS as closely as possible, change zones to several cameras owned by a team, and check how the report handles violations | `V21` (violation review lifecycle, suggestions, zones with a kind and owning team, 5-point score with levels 0–3, `monthly_score`, `month_lock`, notification deliveries, company settings, export log, `job_run`) and `V22` (shift kind and reason, Incomplete flag, `pending_overtime`, the five SRS ticket categories, ticket participants). New and rewritten services, controllers and pages: Review Queue, My and Team Attendance, Pending Overtime, Zones, Company Settings, Monthly Report; `JobScheduler` and `SiteJobs`; the Zalo dispatcher with retries; translations, with SRS message texts in Vietnamese. The report now lists every confirmed violation, reminder and stranger | `b6bbb9a` |
+| 19:23 | Continue after the usage limit | `SrsViolationReviewTest`, `SrsTicketRulesTest`, `SrsShiftsAndJobsTest`, `SrsWorkflowTest`, `srs/ShiftAttendanceTest`; `04_testing/SRS-TRACEABILITY.md`; `docs/detection-app-contract.md`; 380 tests pass | `b6bbb9a` |
+| 20:15 | Can Claude reach the detection app's folder | Found at `/mnt/d/SteelSight_Demo/steelsight-demo`; nothing breaks against V19–V22, with a list of what it still does the old way | None |
+| 20:32 | Update the desktop app to match the SRS | Done in the detection app; see its log. On the ERP side, the contract and traceability docs record it | `b6bbb9a` for the ERP docs |
+| 21:18 | Claude's opinion of the SRS | Review: testable rules and IDs are its strengths. Problems: the zone model is out of date, BR-46 and BR-47 will rarely give a suggestion, BR-42 can't be expressed with two camera roles, tracking assumptions aren't stated, ticket ownership is easy to misread, facts are repeated | None |
+| 21:31 | How Zalo works, what happens to someone with no shift who walks on site, and how a worker's shift gets marked done | Zalo was tested only against a fake bot, with a 15-minute test plan. A check-in with no shift is recorded with no pay and no alert. Shift `COMPLETED` was set only by hand and nothing read it | None |
+| 21:34 | Make shift completion automatic; manual steps only where the Admin has to decide | The hourly job, and the 23:00 job as a backstop, mark ended shifts `COMPLETED`, skipping cancelled shifts and locked months. The "Mark completed" button, endpoint and `ShiftService.complete()` removed. Home page counts fixed; 381 tests pass | `b6bbb9a` |
+| 21:55 | Add the Zalo bot to `.env.example` | `ZALO_BOT_TOKEN`, `ZALO_BOT_LINK`, `ZALO_WEBHOOK_SECRET`, `ZALO_WEBHOOK_URL`, `APP_BASE_URL`, `SUPABASE_EVIDENCE_BUCKET`; the same in `docs/deployment.md`; a wrong variable name fixed in a `ZaloBot` comment | `b6bbb9a` |
+| 21:59 | Is the webhook secret Zalo's secret token | Yes: you make it up, the ERP registers it, and Zalo sends it back in a header the ERP checks | None |
+| 22:02 | Which webhook URL goes in the Zalo bot settings | `https://<service>.onrender.com/zalo/webhook`; the ERP registers it on start-up if the variables are set; a tunnel is needed for local testing | None |
+| 22:05 | Update the docs again, and the tech stack now that OCR is gone | `docs/tech-stack.md` (EasyOCR gone; Flyway V1–V22, 30 tables; jobs, Zalo, evidence bucket, uptime monitor added), user guide sections for Zalo and the SRS worker rules, a note at the top of the PPE TDS; the detection repo's docs and copies (in its log) | `b6bbb9a` |
+| 22:15 | Is the branch ready to merge to `master` | Mostly: `mvn verify` passes 381 tests and no secrets are in the changes. The stale stylesheet was rebuilt. Commit first, back up Supabase and check its Flyway history before merging, and deploy the ERP before the new desktop app | `b6bbb9a`, committed by the developer |
+| 22:30 | Send Zalo messages by phone number instead of a link code, with the phone required | Not possible with the Zalo Bot Platform; phone-number sending needs a verified Official Account and paid ZBS templates. Suggested keeping the code and adding the QR | None |
+| 22:32 | Do both: phone required and the QR | Phone was already required on the forms and in the service; a hint added. Inline SVG QR of the bot link on the Admin's account page and the worker's Dashboard, using `io.nayuki:qrcodegen:1.8.0`; `QrCodesTest` and two page tests; 385 tests pass | `a6b9302` |
+| 22:54 | Explain the workflow for registering a worker and linking Zalo | The steps from the code: account, first link code and QR, face photo queue, scanning and sending the code, the bot's reply, and what can go wrong | None |
+| 23:01 | What the Zalo bot sends; the base requirement is check-in and check-out | Found that check-in and check-out notices were never created. `V23` adds triggers on the detection app's check-in writes; `CheckOutHours` fills in paid hours before each Zalo send; 3 tests, 388 pass. A full list of what the bot sends | Not committed |
+| 23:13 | Write the transcript and chat log | Not done: the usage limit was reached. Written on 24 November as this update and `transcript/23-11-2026.md` | Not committed |
 
 ## Decisions made by the developer
 
@@ -157,6 +183,15 @@ Nothing from this day is committed yet.
 - The zone-to-team fallback for violations without a vest number is left out for now.
 - At check-in, the gate says the worker's name, or what PPE they're missing.
 
+### 2026-11-23
+
+- Telegram is removed; Zalo is the only chat app, as in the SRS.
+- Match the SRS as closely as possible. When the developer remembered UC-24 as splitting tickets between HSE and the Admin, the SRS text (every ticket to the Admin) was followed.
+- Zones have several cameras and belong to one team. Telling people apart by vest number was unreliable.
+- Shifts complete automatically. Manual steps are only for things the Admin has to decide.
+- The phone number is required for new accounts; the database column stays nullable.
+- The base Zalo notices are check-in and check-out.
+
 ## Decisions suggested by Claude and accepted by the developer
 
 ### 2026-11-04
@@ -203,6 +238,14 @@ From the deployment plan the developer approved on 6 November:
 - The detection app sends gate check-in and check-out messages, because the ERP on Render may be asleep; the ERP sends visits entered by hand and schedules.
 - A chat is linked with a one-time code from the home page.
 - A month's schedule is sent with a button; after that, only changes in that month are sent, so building a month doesn't send a message on every save.
+
+### 2026-11-23
+
+- For a violation in a work zone, HSE still confirms one person; that zone's team is listed first. Scores stay individual.
+- Each zone has one owning team (`zone.team_id`), set on the Zones page.
+- At the gate, the SRS rule stays: the suggestion is whoever CAM-01 recorded within 30 seconds, and the gate zone has no team.
+- The ERP changes stay compatible with the detection app: nothing it writes was dropped or renamed. This was later superseded when the detection app's folder was found and updated too.
+- Keep the 6-digit link code and add a QR code, rather than linking by phone number.
 
 ## Decisions made by Claude and reported to the developer
 
@@ -292,6 +335,20 @@ These came from the request to check every user error, and the developer hasn't 
 - The schedule button went on the Shifts page, the planning page, not the worker timetable page named in the plan at 13:31.
 - Telegram isn't in the SRS (it was removed there); it was built because the developer asked.
 
+### 2026-11-23
+
+- Telegram is removed with a new `V19`, not by editing V17, because a database may already have run V17.
+- The detection app writes straight to the database and the ERP may be asleep, so the review, alert and check-in rules are database triggers: a person the detection app names becomes a suggestion, each violation alerts the HSE Officers on duty (or every HSE Officer and Admin), and a check-in is attached to a shift starting within 60 minutes.
+- The burst-alert endpoint still accepts calls but notifies nobody (CR-02), so the old detection app's queue doesn't retry forever.
+- Every notice is saved in the ERP first, then sent on Zalo in Vietnamese, with retries after 1, 5 and 15 minutes.
+- The scheduled jobs record each run in `job_run`, so each runs once per scheduled time and a missed run is caught up once. They're off in tests.
+- The categories outside the SRS's five, including "Safety concern", are hidden from new tickets, not deleted.
+- The team late-rule setting is removed, because BR-31 fixes the grace period at 5 minutes.
+- Automatic completion bumps the shift's version, so a form opened earlier is refused as stale, and it leaves locked months alone (BR-70).
+- The QR is inline SVG drawn on the server, with no external script or image request. It's hidden when `ZALO_BOT_LINK` isn't set.
+- Check-in and check-out notices are sent only for the detection app's writes. Visits entered by hand have their own notice, and corrections, approved missing check-outs and automatic closes send nothing.
+- `MONTH_SCHEDULE` and `APPEAL_DECIDED` are defined but never sent; they were left alone.
+
 ## How the work was checked
 
 ### 2026-11-04
@@ -355,6 +412,15 @@ These came from the request to check every user error, and the developer hasn't 
 - `TelegramNoticesTest` (10 tests) uses a mock bot. The tests roll back, so they run the after-commit step by hand, and check the exact Vietnamese message text.
 - The detection app's `tests/erp_integration_check.py` applied V1–V17 to a real Postgres (pgserver) and ran as `steelsight_detection`: 35 of 35 checks, including the new V17 ones.
 - Not checked: the new pages in a browser, a real Telegram bot, webhook registration, or the live gate.
+
+### 2026-11-23
+
+- Each migration was first run in order against a throwaway pgvector container, then through the full suite with Testcontainers.
+- Full suite: 299 after Telegram and tickets, 293 after the overhaul's test updates, then 380 with the SRS test classes, 381 after automatic completion, 385 after the QR and 388 after V23, with 0 failures. `mvn verify` passed at the merge check.
+- `schema_checks.sql` was rewritten for the new rules and run as the detection role, which also showed that role can't read notifications.
+- A generated QR was rendered to an image and decoded with OpenCV; it gave back the exact bot link.
+- The detection app's `tests/erp_integration_check.py` ran against V1–V22, and then V1–V23, in Docker as `steelsight_detection`: 21 of 21 checks each time.
+- Not checked: the real Zalo bot and webhook, the Supabase Flyway history (unreachable from WSL), the new pages in a browser, a QR scanned with a phone, or the desktop app with real cameras.
 
 ## Problems during the work
 
@@ -439,14 +505,37 @@ These came from the request to check every user error, and the developer hasn't 
 | `TranslationsTest` failed: English must not have `msg.*` keys, because English shows the text written in the code | Removed the 5 English `msg.*` keys; the Vietnamese ones stay |
 | Telegram messages wait for a commit, and the tests roll back | The tests run only the Telegram after-commit steps by hand, leaving Spring's own alone |
 
+### 2026-11-23
+
+| Problem | Outcome |
+|---|---|
+| Docker Desktop wasn't connected to WSL at first, and the local PostgreSQL needed an unknown password | Compiled and ran the tests that need no database; the developer turned on Docker at 13:25 |
+| The Supabase Flyway history query failed: the host is IPv6-only and WSL can't reach it | Not run. V19 is safe either way; the check is still needed before merging |
+| After the overhaul, 103 tests failed across 17 classes | Mostly outdated tests, updated. Real bugs fixed: Violation Detail crashed with no reviewer, a duplicated `pattern` attribute on the account form, time fields shown as "7:00 AM", a damaged image causing a server error, an `Unpaged` crash, grace-period pay counted from the check-in, a duplicate zone name breaking the page, and team leaders able to open Pending Overtime |
+| The usage limit was reached at 14:51 | Resumed at 19:23; the full suite then failed to start until Docker was back |
+| The compiled stylesheet was missing classes the new templates use | Rebuilt during the merge check |
+| `List.getFirst()` doesn't exist in Java 17 | Used `get(0)` |
+| The usage limit was reached again at 23:14, before the logs were written | Written on 24 November |
+
 ## Open items
 
-- The 21 November work isn't committed, in either repository: V15, V16, V17, Telegram, the gate speech and the documents.
-- Set up Telegram: create a bot with @BotFather; on Render set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` and `TELEGRAM_WEBHOOK_URL`; put the same token in the detection app's `.env`.
-- Check the Telegram card on the home page and the schedule button on the Shifts page in a browser, in both languages. Run `npm run build:css`, since the button row uses Tailwind classes the stylesheet may not have yet.
-- Decide whether Telegram goes back into the SRS, or stays an extra.
-- With V15, someone working more than 2 hours past their shift gets an estimated check-out that HSE must correct.
-- The other SRS gaps from the 21 November review are still open (transcript, 13:10). The zone-to-team fallback is parked.
+- V23 (check-in and check-out notices), `CheckOutHours`, and the matching changes to `JobScheduler`, `ZaloNoticesTest`, the contract doc and the traceability table aren't committed.
+- Before merging to `master`: take a Supabase backup and run `select version from flyway_schema_history order by installed_rank;` from somewhere that can reach the IPv6-only host. If production is at V14, the merge runs V15–V23 against real data. Deploy the ERP before the updated desktop app.
+- Test Zalo against the real bot: create it, set `ZALO_BOT_TOKEN`, `ZALO_BOT_LINK`, `ZALO_WEBHOOK_SECRET`, `ZALO_WEBHOOK_URL` and `APP_BASE_URL` on Render, link an account by scanning the QR with a phone, change a shift, and block the bot to see the retries end in FAILED. Set up the uptime ping (CR-13), or Render's sleep delays messages.
+- Decide what should happen when someone with no shift checks in: today the visit is recorded with no pay and nobody is told.
+- Update the SRS: zones with several cameras owned by a team (1.1.3, 1.4, BR-49), automatic shift completion (3.2.10 #10), BR-42's camera roles, and notes that BR-46 and BR-47 often give no suggestion. The list is in `04_testing/SRS-TRACEABILITY.md`.
+- Decide whether to retire the "Safety concern" ticket category for good; it's hidden from new tickets.
+- HSE no longer sees a worker's appeal reason unless the Admin uses "Ask HSE Officer".
+- Rewrite `03_implement/STEELSIGHT-PPE-IMP-001_TDS.md`, which still describes the vest-link design (it has a note at the top).
+- Drop the `ppe_vest` and `ppe_linking` tables in a later migration, now that the desktop app no longer uses them.
+- Check the new pages in a browser, in both languages: Review Queue, My and Team Attendance, Pending Overtime, Zones, Company Settings, Monthly Report, and the QR.
+- Decide whether `Report3_Software_Requirement_Specification.docx` should stay in git; `b6bbb9a` added it.
+- ~~The 21 November work isn't committed, in either repository.~~ The ERP part was committed in `b6bbb9a` on 23 November.
+- ~~Set up Telegram~~ Telegram was removed on 23 November (V19). It was going to need: create a bot with @BotFather; on Render set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` and `TELEGRAM_WEBHOOK_URL`; put the same token in the detection app's `.env`.
+- ~~Check the Telegram card on the home page and the schedule button on the Shifts page in a browser.~~ Telegram was removed on 23 November; the schedule button now sends on Zalo, and the stylesheet was rebuilt.
+- ~~Decide whether Telegram goes back into the SRS, or stays an extra.~~ Removed on 23 November.
+- ~~With V15, someone working more than 2 hours past their shift gets an estimated check-out that HSE must correct.~~ V22 follows BR-35 instead: the visit is flagged Incomplete and closed 4 hours after the shift, with no guessed check-out time.
+- ~~The other SRS gaps from the 21 November review are still open (transcript, 13:10). The zone-to-team fallback is parked.~~ The 23 November work covers the SRS rules the ERP can enforce, and zones are now owned by teams; `04_testing/SRS-TRACEABILITY.md` lists what's left.
 - The 17 November work isn't committed: V14, the extra face angles, the CodeRabbit fixes and the documents.
 - Deploy V14 to Supabase (Flyway runs it on the next start), then upload LEFT and RIGHT photos for workers, ideally photos taken by the gate camera.
 - Run `npm run build:css` so the Extra angles section's spacing (`mt-2`) gets its CSS, and check the section in a browser in both languages.

@@ -37,6 +37,7 @@ public class ZaloLinks {
 
     private final ZaloBot bot;
     private final ZaloStore store;
+    private final ZaloCommands commands;
     private final MessageSource messages;
     private final SecureRandom random = new SecureRandom();
 
@@ -86,13 +87,16 @@ public class ZaloLinks {
         if (message.equalsIgnoreCase("/stop")) {
             return store.unlinkChat(chatId).isPresent() ? text("zalo.unlinked") : text("zalo.help");
         }
+        var code = CODE.matcher(message);
+        Optional<Long> owner = store.activeOwnerOf(chatId);
+        if (owner.isPresent() && !code.matches()) {
+            return commands.reply(owner.get(), text);    // a linked person: /help, /lich, /chamcong
+        }
         Integer wrong = wrongCodes.getIfPresent(chatId);
         if (wrong != null && wrong >= WRONG_CODES_ALLOWED) {
             return null;
         }
-        var code = CODE.matcher(message);
         if (code.matches()) {
-            Optional<Long> owner = store.activeOwnerOf(chatId);
             Optional<Long> user = store.peekCode(code.group(1));
             if (user.isEmpty()) {
                 wrongCodes.asMap().merge(chatId, 1, Integer::sum);

@@ -11,6 +11,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 import orochi.steelsight.attendance.service.CheckInService;
+import orochi.steelsight.attendance.service.CheckOutHours;
 import orochi.steelsight.notification.service.ZaloDispatcher;
 import orochi.steelsight.notification.zalo.ZaloBot;
 
@@ -52,6 +53,7 @@ class ZaloNoticesTest extends PageTestSupport {
     @MockitoBean ZaloBot bot;
     @Autowired CheckInService checkIns;
     @Autowired ZaloDispatcher dispatcher;
+    @Autowired CheckOutHours checkOutHours;
 
     Long admin;
     Long worker;
@@ -305,6 +307,175 @@ class ZaloNoticesTest extends PageTestSupport {
         when(bot.botLink()).thenReturn("");
         mvc.perform(get("/").with(as(worker)).flashAttr("zaloCode", "123456"))
                 .andExpect(content().string(not(containsString("class=\"qr\""))));
+    }
+
+
+    /** SRS 1.2.4: a gate check-in by the detection app tells the employee the time and the shift. */
+    @Test
+    void aGateCheckInTellsTheEmployeeTheTimeAndTheShift() throws Exception {
+        mvc.perform(post("/team/" + worker + "/zalo-code").with(as(admin)).with(csrf()));
+        webhook(code(worker), CHAT);                                         // linked, so it goes to Zalo too
+        Long zone = zone("Gate notices");
+        Long shift = shift(worker, zone, "date_trunc('minute', now()) - interval '1 hour'", "date_trunc('minute', now()) + interval '7 hours'");
+        Long visit = asDetection("""
+                INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
+                VALUES (?, date_trunc('minute', now()) - interval '65 minutes', 'FACE', 62.5, gen_random_uuid()) RETURNING id""", worker);
+
+        assertThat(jdbc.queryForObject("SELECT shift_id FROM check_in WHERE id = ?", Long.class, visit)).isEqualTo(shift);
+        String range = jdbc.queryForObject("""
+                SELECT to_char(start_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI') || '-' || to_char(end_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI')
+                FROM shift WHERE id = ?""", String.class, shift);
+        assertThat(jdbc.queryForObject("SELECT params ->> 'shift' FROM notification WHERE user_id = ? AND kind = 'CHECK_IN'", String.class, worker))
+                .isEqualTo(range);
+        mvc.perform(get("/notifications").with(as(worker)))
+                .andExpect(content().string(containsString(", shift " + range + ".")));
+        assertThat(jdbc.queryForObject("""
+                SELECT d.status FROM notification_delivery d JOIN notification n ON n.id = d.notification_id
+                WHERE n.user_id = ? AND n.kind = 'CHECK_IN'""", String.class, worker)).isEqualTo("PENDING");   // queued for Zalo
+    }
+
+    /** SRS 1.2.4: a gate check-out tells the paid hours of the shift so far, worked out before the Zalo send. */
+    @Test
+    void aGateCheckOutTellsThePaidHoursOfTheShift() throws Exception {
+        Long zone = zone("Gate notices");
+        shift(worker, zone, "date_trunc('minute', now()) - interval '3 hours'", "date_trunc('minute', now()) + interval '5 hours'");
+        Long visit = asDetection("""
+                INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
+                VALUES (?, date_trunc('minute', now()) - interval '3 hours 5 minutes', 'FACE', 62.5, gen_random_uuid()) RETURNING id""", worker);
+        asDetection("UPDATE check_in SET check_out_at = date_trunc('minute', now()) - interval '1 hour' WHERE id = ? RETURNING id", visit);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notification WHERE user_id = ? AND kind = 'CHECK_OUT'", Integer.class, worker)).isEqualTo(1);
+        assertThat(checkOutHours.fill()).isEqualTo(1);
+        // In 5 minutes before the start, out 2 hours after it: paid from the shift start (BR-31), 2.00 hours.
+        assertThat(jdbc.queryForObject("SELECT params ->> 'hours' FROM notification WHERE user_id = ? AND kind = 'CHECK_OUT'", String.class, worker))
+                .isEqualTo("2.00");
+        mvc.perform(get("/notifications").with(as(worker)))
+                .andExpect(content().string(containsString("hours worked 2.00")));
+        assertThat(checkOutHours.fill()).isZero();      // filled once
+    }
+
+    /** Only the gate speaks: the ERP's own writes, corrections and automatic closes send no check-in or check-out notice. */
+    @Test
+    void erpWritesAndAutomaticClosesSendNoGateNotice() {
+        Long byErp = jdbc.queryForObject("""
+                INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
+                VALUES (?, now() - interval '3 hours', 'FACE', 60, gen_random_uuid()) RETURNING id""", Long.class, worker);
+        jdbc.update("UPDATE check_in SET check_out_at = now() - interval '1 hour' WHERE id = ?", byErp);
+        Long stale = asDetection("""
+                INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
+                VALUES (?, now() - interval '2 days', 'FACE', 60, gen_random_uuid()) RETURNING id""", other);
+        asDetection("UPDATE check_in SET check_out_at = now() - interval '1 day', auto_closed = true WHERE id = ? RETURNING id", stale);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notification WHERE user_id = ? AND kind IN ('CHECK_IN', 'CHECK_OUT')",
+                Integer.class, worker)).isZero();
+        assertThat(jdbc.queryForList("SELECT kind FROM notification WHERE user_id = ? AND kind IN ('CHECK_IN', 'CHECK_OUT')",
+                String.class, other)).containsExactly("CHECK_IN");
+    }
+
+    // ---- Bot commands (team addition, not in the SRS): /help, /lich, /chamcong, answered one line per shift ----
+
+    private static final String WEEK = "date_trunc('week', now() AT TIME ZONE 'Asia/Ho_Chi_Minh')";
+    private static final String LAST_MONTH = "(date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '1 month')";
+
+    /** A site-local time as a timestamptz, e.g. at(WEEK, "2 days 7 hours") is Wednesday 07:00 of this week. */
+    private static String at(String base, String offset) {
+        return "((" + base + " + interval '" + offset + "') AT TIME ZONE 'Asia/Ho_Chi_Minh')";
+    }
+
+    private String day(String base, String offset) {
+        return jdbc.queryForObject("SELECT to_char(" + base + " + interval '" + offset + "', 'DD/MM')", String.class);
+    }
+
+    /** Sends a text from the linked chat and returns the bot's reply. */
+    private String reply(String text) throws Exception {
+        org.mockito.Mockito.clearInvocations(bot);
+        webhook(text, CHAT).andExpect(status().isOk());
+        var sent = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(bot).send(eq(CHAT), sent.capture());
+        return sent.getValue();
+    }
+
+    @Test
+    void aLinkedPersonGetsTheListOfCommandsForHelpOrAnythingElse() throws Exception {
+        link(worker, CHAT);
+
+        assertThat(reply("/help")).contains("/lich tuantoi", "/chamcong thangtruoc", "/stop");
+        assertThat(reply("xin chào")).contains("/lich", "/chamcong");
+    }
+
+    @Test
+    void aChatThatIsNotLinkedGetsNoDataOnlyHowToLink() throws Exception {
+        Long zone = zone("Unlinked zone");
+        shift(worker, zone, at(WEEK, "2 days 7 hours"), at(WEEK, "2 days 17 hours"));
+
+        assertThat(reply("/lich")).contains("Gửi mã 6 chữ số").doesNotContain("Unlinked zone");
+    }
+
+    @Test
+    void lichShowsThisWeekOneLinePerShiftAndTuantoiTheNext() throws Exception {
+        link(worker, CHAT);
+        Long zone = zone("Khu A");
+        shift(worker, zone, at(WEEK, "2 days 7 hours"), at(WEEK, "2 days 17 hours"));
+        shift(worker, zone, at(WEEK, "9 days 13 hours"), at(WEEK, "9 days 17 hours"));
+        shift(other, zone, at(WEEK, "3 days 7 hours"), at(WEEK, "3 days 17 hours"));   // someone else's
+
+        String thisWeek = reply("/lich");
+        assertThat(thisWeek).startsWith("Lịch làm việc tuần " + day(WEEK, "0 days") + "–" + day(WEEK, "6 days") + ":")
+                .contains("\nT4 " + day(WEEK, "2 days") + " 07:00–17:00 · Khu A")
+                .doesNotContain(day(WEEK, "9 days"), "T5 ");
+        assertThat(thisWeek.lines()).hasSize(2);
+
+        String nextWeek = reply("/Lịch tuần tới");     // marks, capitals and spaces don't matter
+        assertThat(nextWeek).contains("T4 " + day(WEEK, "9 days") + " 13:00–17:00 · Khu A")
+                .doesNotContain(day(WEEK, "2 days") + " 07:00");
+    }
+
+    @Test
+    void lichSaysSoWhenThereIsNoShift() throws Exception {
+        link(worker, CHAT);
+
+        assertThat(reply("/lich")).startsWith("Bạn không có ca nào tuần");
+    }
+
+    @Test
+    void chamcongShowsEachShiftWithItsTimesAndStatusThenTheTotals() throws Exception {
+        link(worker, CHAT);
+        Long zone = zone("Chấm công");
+        Long worked = shift(worker, zone, at(LAST_MONTH, "2 days 7 hours"), at(LAST_MONTH, "2 days 11 hours"));
+        shift(worker, zone, at(LAST_MONTH, "3 days 7 hours"), at(LAST_MONTH, "3 days 11 hours"));      // no visit: absent
+        jdbc.update("INSERT INTO check_in (user_id, shift_id, check_in_at, check_out_at, method, face_similarity, event_id) "
+                + "VALUES (?, ?, " + at(LAST_MONTH, "2 days 6 hours 58 minutes") + ", " + at(LAST_MONTH, "2 days 11 hours 5 minutes")
+                + ", 'FACE', 70, gen_random_uuid())", worker, worked);
+
+        String month = jdbc.queryForObject("SELECT to_char(" + LAST_MONTH + ", 'MM/YYYY')", String.class);
+        String answer = reply("/chamcong thangtruoc");
+
+        assertThat(answer).startsWith("Chấm công tháng " + month + ":")
+                .contains(day(LAST_MONTH, "2 days") + " 07:00–11:00 · vào 06:58 · ra 11:05 · Đúng giờ")
+                .contains(day(LAST_MONTH, "3 days") + " 07:00–11:00 · Vắng")
+                .contains("Tổng: đi làm 1/2 ca, 4 giờ công, trễ 0 lần, về sớm 0 lần, vắng 1 ca")
+                .contains("Điểm an toàn: 100/100")
+                .contains("Số liệu tạm tính");
+        assertThat(reply("/chamcong")).doesNotContain(day(LAST_MONTH, "2 days") + " 07:00");
+    }
+
+    @Test
+    void chamcongLeavesOutShiftsThatHaveNotStarted() throws Exception {
+        link(worker, CHAT);
+        Long zone = zone("Later");
+        shift(worker, zone, "date_trunc('minute', now()) + interval '2 days'", "date_trunc('minute', now()) + interval '2 days 4 hours'");
+
+        assertThat(reply("/chamcong")).doesNotContain("Sắp tới");
+    }
+
+    /** Runs one statement as the detection app's database role, inside the test's transaction. */
+    private Long asDetection(String sql, Object... args) {
+        jdbc.execute("SET LOCAL ROLE steelsight_detection");
+        try {
+            return jdbc.queryForObject(sql, Long.class, args);
+        } finally {
+            jdbc.execute("RESET ROLE");
+        }
     }
 
     private void makeDue(Long user) {

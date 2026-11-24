@@ -246,6 +246,19 @@ Zalo is optional. Every notice is also on the bell in this app.
 To stop, click **Stop Zalo notices**, or send `/stop` to the bot. If you can't use the page, the Admin
 can make a code for you (3.6).
 
+Once linked, you can also ask the bot about your own shifts. Each shift comes back as one line:
+
+| Send | You get |
+|---|---|
+| `/lich` | Your shifts this week, e.g. `T4 26/11 07:00–17:00 · Khu A` |
+| `/lich tuantoi` | Your shifts next week |
+| `/chamcong` | This month so far: each shift with its check-in and check-out times and its status (on time, late, absent…), then the totals, your safety score and a link to My Attendance |
+| `/chamcong thangtruoc` | The same for last month |
+| `/help`, or anything else | The list of commands |
+
+Capitals, spaces and Vietnamese marks don't matter, so `/Lịch tuần tới` works too. Until the month is
+locked, the numbers are provisional, the same as on the My Attendance page.
+
 ## 7. Common questions
 
 | Question | Answer |
