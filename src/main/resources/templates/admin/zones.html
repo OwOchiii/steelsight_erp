@@ -1,7 +1,10 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{zones.title}, 'zones', ~{::main})}">
 <main class="page">
-    <div class="page-head"><h1 th:text="#{zones.title}">Zones</h1></div>
+    <div class="page-head">
+        <h1 th:text="#{zones.title}">Zones</h1>
+        <a class="btn" th:href="@{/zones/new}" th:text="#{zones.new}">New zone</a>
+    </div>
     <div th:replace="~{fragments/layout :: messages}"></div>
     <p class="quiet" th:text="#{zones.hint}">The name is what every alert, report and Zalo message says. Each work area belongs to the team that works there; HSE picks a violator from that team first.</p>
     <div class="table-wrap">
@@ -23,7 +26,18 @@
                     </form>
                 </td>
                 <td th:text="${@display.label(zone.kind)}">Work area</td>
-                <td th:text="${cameras.get(zone.id)}">CAM-03</td>
+                <td>
+                    <ul class="m-0 grid list-none gap-1 p-0" th:if="${cameras.get(zone.id) != null}">
+                        <li class="flex items-center gap-2" th:each="camera : ${cameras.get(zone.id)}">
+                            <span th:text="${camera.cameraCode}">CAM-03</span>
+                            <span class="quiet" th:text="${@display.label(camera.role)}">PPE</span>
+                            <form method="post" th:action="@{/zones/cameras/{id}/remove(id=${camera.id})}">
+                                <button type="submit" class="btn secondary" th:text="#{zones.removeCamera}"
+                                        th:attr="aria-label=#{zones.removeCamera} + ' ' + ${camera.cameraCode}">Remove</button>
+                            </form>
+                        </li>
+                    </ul>
+                </td>
                 <td>
                     <form class="flex gap-2" method="post" th:if="${zone.kind.name() == 'WORK_AREA'}" th:action="@{/zones/{id}/team(id=${zone.id})}">
                         <select name="teamId" th:attr="aria-label=#{field.team}">
@@ -37,5 +51,26 @@
             </tbody>
         </table>
     </div>
+
+    <section class="panel mt-6">
+        <div class="panel-head"><h2 th:text="#{zones.linkCamera}">Link a camera</h2></div>
+        <form class="panel-body" method="post" th:action="@{/zones/cameras}">
+            <div class="grid gap-x-4 sm:grid-cols-2">
+                <div>
+                    <label for="cameraCode" th:text="#{zones.cameraCode}">Camera code</label>
+                    <input id="cameraCode" name="code" minlength="2" maxlength="50" pattern="[A-Za-z0-9._\-]{2,50}" required autocomplete="off">
+                    <p class="hint" th:text="#{zones.cameraCodeHint}">The ERP code entered for the camera in the detection app, such as CAM-B2.</p>
+                </div>
+                <div>
+                    <label for="cameraZone" th:text="#{zones.cameraZone}">Zone</label>
+                    <select id="cameraZone" name="zoneId" required>
+                        <option th:each="zone : ${zones}" th:value="${zone.id}" th:text="${zone.name}">Zone A</option>
+                    </select>
+                </div>
+            </div>
+            <p class="hint" th:text="#{zones.linkHint}">A code that is already linked moves to the chosen zone; what it recorded keeps its old zone. Cameras in a gate attendance zone record check-ins; all others record PPE violations.</p>
+            <div class="actions"><button type="submit" class="btn" th:text="#{zones.linkCamera}">Link a camera</button></div>
+        </form>
+    </section>
 </main>
 </html>

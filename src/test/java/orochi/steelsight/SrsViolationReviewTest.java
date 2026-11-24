@@ -330,6 +330,77 @@ class SrsViolationReviewTest extends PageTestSupport {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
     }
 
+    /** The Admin adds a zone from the Zones page, with the same name rules as a rename. */
+    @Test
+    void theAdminAddsAZone() throws Exception {
+        mvc.perform(get("/zones").with(as(admin)))
+                .andExpect(content().string(containsString("/zones/new")));
+        mvc.perform(get("/zones/new").with(as(admin)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+
+        mvc.perform(post("/zones/new").param("name", "  Casting line ").param("kind", "WORK_AREA")
+                        .param("teamId", team.toString()).with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("success", "The zone was added."));
+        assertThat(jdbc.queryForMap("SELECT kind, team_id FROM zone WHERE name = 'Casting line'"))
+                .containsEntry("kind", "WORK_AREA").containsEntry("team_id", team);
+
+        mvc.perform(post("/zones/new").param("name", "casting LINE").param("kind", "WORK_AREA").with(as(admin)).with(csrf()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
+                .andExpect(content().string(containsString("A zone with this name already exists.")));
+        mvc.perform(post("/zones/new").param("name", "Gate 2").param("kind", "GATE_PPE")
+                        .param("teamId", team.toString()).with(as(admin)).with(csrf()))
+                .andExpect(content().string(containsString("Only a work area can belong to a team")));
+        mvc.perform(post("/zones/new").param("name", "X").param("kind", "WORK_AREA").with(as(admin)).with(csrf()))
+                .andExpect(content().string(containsString("A zone name has 2 to 50 characters")));
+        mvc.perform(get("/zones/new").with(as(hse)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(post("/zones/new").param("name", "Sneaky").param("kind", "WORK_AREA").with(as(hse)).with(csrf()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM zone WHERE name IN ('Gate 2', 'X', 'Sneaky')", Long.class)).isZero();
+    }
+
+    /** The Admin links a detection app's camera code to a zone; the zone's kind sets what it records. */
+    @Test
+    void theAdminLinksMovesAndRemovesCameras() throws Exception {
+        Long attendanceGate = jdbc.queryForObject(
+                "INSERT INTO zone (name, kind) VALUES ('Main gate', 'GATE_ATTENDANCE') RETURNING id", Long.class);
+
+        mvc.perform(post("/zones/cameras").param("code", " CAM-7968 ").param("zoneId", workZone.toString()).with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("success", "The camera was linked to the zone."));
+        assertThat(jdbc.queryForMap("SELECT zone_id, role FROM camera WHERE camera_code = 'CAM-7968'"))
+                .containsEntry("zone_id", workZone).containsEntry("role", "PPE");
+        mvc.perform(get("/zones").with(as(admin))).andExpect(content().string(containsString("CAM-7968")));
+
+        // The same code again moves it; the gate attendance zone makes it an attendance camera.
+        mvc.perform(post("/zones/cameras").param("code", "CAM-7968").param("zoneId", attendanceGate.toString()).with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("success", "The camera was linked to the zone."));
+        assertThat(jdbc.queryForMap("SELECT zone_id, role FROM camera WHERE camera_code = 'CAM-7968'"))
+                .containsEntry("zone_id", attendanceGate).containsEntry("role", "ATTENDANCE");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM camera WHERE camera_code = 'CAM-7968'", Long.class)).isEqualTo(1);
+
+        // A camera that recorded a violation moves, but its violation keeps the zone it was seen in.
+        Long seen = detect(workCamera, null);
+        mvc.perform(post("/zones/cameras").param("code", "SV-CAM03").param("zoneId", gateZone.toString()).with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("success", "The camera was linked to the zone."));
+        assertThat(jdbc.queryForObject("SELECT zone_id FROM violation WHERE id = ?", Long.class, seen)).isEqualTo(workZone);
+        mvc.perform(post("/zones/cameras/" + workCamera + "/remove").with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("error", "This camera has records, so it can't be removed. Link it to another zone instead."));
+
+        Long unused = jdbc.queryForObject("SELECT id FROM camera WHERE camera_code = 'CAM-7968'", Long.class);
+        mvc.perform(post("/zones/cameras/" + unused + "/remove").with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("success", "The camera was removed."));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM camera WHERE id = ?", Long.class, unused)).isZero();
+
+        mvc.perform(post("/zones/cameras").param("code", "CAM 1").param("zoneId", workZone.toString()).with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("error", "A camera code has 2 to 50 letters, digits, dots, dashes or underscores"));
+        mvc.perform(post("/zones/cameras").param("code", "CAM-X").with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("error", "Choose the zone the camera watches"));
+        mvc.perform(post("/zones/cameras").param("code", "CAM-HSE").param("zoneId", workZone.toString()).with(as(hse)).with(csrf()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+        mvc.perform(post("/zones/cameras/" + secondWorkCamera + "/remove").with(as(hse)).with(csrf()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+    }
+
     /** SRS 3.1.3: a Manager has no review rights; a worker sees only their own decided violations. */
     @Test
     void onlyHseAndTheAdminReview() throws Exception {

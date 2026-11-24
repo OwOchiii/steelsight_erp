@@ -1,0 +1,37 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: app(#{zones.new}, 'zones', ~{::main})}">
+<main class="page narrow">
+    <nav class="crumbs"><a th:href="@{/zones}" th:text="#{zones.title}">Zones</a></nav>
+    <div class="page-head"><h1 th:text="#{zones.new}">New zone</h1></div>
+    <div th:replace="~{fragments/layout :: messages}"></div>
+    <form class="sheet" method="post" th:action="@{/zones/new}" th:object="${form}">
+        <label for="name" th:text="#{zones.name}">Name in alerts</label>
+        <input id="name" th:field="*{name}" minlength="2" maxlength="50" required autocomplete="off">
+        <p class="hint" th:text="#{zones.nameHint}">2 to 50 characters. Every alert, report and Zalo message uses it.</p>
+
+        <div class="grid gap-x-4 sm:grid-cols-2">
+            <div>
+                <label for="kind" th:text="#{zones.kind}">Kind</label>
+                <select id="kind" th:field="*{kind}" required>
+                    <option th:each="k : ${kinds}" th:value="${k}" th:text="${@display.label(k)}">Work area</option>
+                </select>
+            </div>
+            <div>
+                <label for="teamId"><span th:text="#{field.team}">Team</span> <span class="optional" th:text="#{common.optional}">optional</span></label>
+                <select id="teamId" th:field="*{teamId}">
+                    <option value="" th:text="#{team.noTeam}">No team</option>
+                    <option th:each="team : ${teams}" th:value="${team.id}" th:text="${team.name}">Team A</option>
+                </select>
+                <p class="hint" th:text="#{zones.teamHint}">Only a work area can have a team.</p>
+            </div>
+        </div>
+
+        <p class="hint" th:text="#{zones.camerasHint}">After adding the zone, link its cameras on the Zones page.</p>
+
+        <div class="actions">
+            <a class="btn secondary" th:href="@{/zones}" th:text="#{common.cancel}">Cancel</a>
+            <button type="submit" class="btn" th:text="#{zones.add}">Add zone</button>
+        </div>
+    </form>
+</main>
+</html>
