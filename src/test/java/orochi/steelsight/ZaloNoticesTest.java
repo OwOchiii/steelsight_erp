@@ -365,7 +365,7 @@ class ZaloNoticesTest extends PageTestSupport {
                 INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
                 VALUES (?, date_trunc('minute', now()) - interval '3 hours 5 minutes', 'FACE', 62.5, gen_random_uuid()) RETURNING id""", worker);
         asDetection("UPDATE check_in SET check_out_at = date_trunc('minute', now()) - interval '1 hour' WHERE id = ? RETURNING id", visit);
-        jdbc.update("UPDATE notification_delivery SET next_attempt_at = now() - interval '1 second'");
+        makeDue(worker);
 
         dispatcher.sendDue();
         verify(bot, never()).sendNow(eq(CHAT), contains("Chấm công ra"));
