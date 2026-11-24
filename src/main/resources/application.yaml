@@ -51,6 +51,9 @@ server:
     # How much of a refused upload Tomcat reads and discards. Past this it drops the connection, and the
     # browser shows a network error instead of our error page. Larger than the multipart ceiling above.
     max-swallow-size: 100MB
+    # Tomcat refuses a multipart form with more parts than this, before the page sees it. The new-account
+    # form alone sends 12 (fields, photo, the checkbox's hidden field, the CSRF token); the default is 10.
+    max-part-count: 50
   forward-headers-strategy: framework   # Render's proxy handles HTTPS and forwards to this port
   servlet:
     session:
