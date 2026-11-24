@@ -18,6 +18,7 @@ import orochi.steelsight.notification.zalo.ZaloBot;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -354,6 +355,40 @@ class ZaloNoticesTest extends PageTestSupport {
         assertThat(checkOutHours.fill()).isZero();      // filled once
     }
 
+    /** A check-out saved after fill() ran isn't sent without its hours: the Zalo copy waits for the next fill. */
+    @Test
+    void aCheckOutGoesToZaloOnlyOnceItsHoursAreFilled() throws Exception {
+        link(worker, CHAT);
+        Long zone = zone("Hold back");
+        shift(worker, zone, "date_trunc('minute', now()) - interval '3 hours'", "date_trunc('minute', now()) + interval '5 hours'");
+        Long visit = asDetection("""
+                INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
+                VALUES (?, date_trunc('minute', now()) - interval '3 hours 5 minutes', 'FACE', 62.5, gen_random_uuid()) RETURNING id""", worker);
+        asDetection("UPDATE check_in SET check_out_at = date_trunc('minute', now()) - interval '1 hour' WHERE id = ? RETURNING id", visit);
+        jdbc.update("UPDATE notification_delivery SET next_attempt_at = now() - interval '1 second'");
+
+        dispatcher.sendDue();
+        verify(bot, never()).sendNow(eq(CHAT), contains("Chấm công ra"));
+        assertThat(delivery(worker)).isEqualTo("PENDING");
+
+        checkOutHours.fill();
+        dispatcher.sendDue();
+        verify(bot).sendNow(eq(CHAT), contains("2.00"));
+        assertThat(delivery(worker)).isEqualTo("SENT");
+    }
+
+    /** A notice whose shift is gone still gets an outcome: no hours ("-"), so it doesn't wait for ever. */
+    @Test
+    void aCheckOutWhoseHoursCantBeWorkedOutIsSentWithout() {
+        Long notice = jdbc.queryForObject("""
+                INSERT INTO notification (user_id, kind, params) VALUES (?, 'CHECK_OUT', '{"time": "11:30", "shiftId": 999999999}'::jsonb)
+                RETURNING id""", Long.class, worker);
+
+        assertThat(checkOutHours.fill()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT params ? 'hours' FROM notification WHERE id = " + notice, Boolean.class)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT params ->> 'hours' FROM notification WHERE id = " + notice, String.class)).isNull();
+    }
+
     /** Only the gate speaks: the ERP's own writes, corrections and automatic closes send no check-in or check-out notice. */
     @Test
     void erpWritesAndAutomaticClosesSendNoGateNotice() {
@@ -457,6 +492,29 @@ class ZaloNoticesTest extends PageTestSupport {
                 .contains("Điểm an toàn: 100/100")
                 .contains("Số liệu tạm tính");
         assertThat(reply("/chamcong")).doesNotContain(day(LAST_MONTH, "2 days") + " 07:00");
+    }
+
+    /** A long month is split into several messages at line ends, totals in the first, nothing cut off. */
+    @Test
+    void aLongMonthComesInSeveralMessagesWithTheTotalsFirst() throws Exception {
+        link(worker, CHAT);
+        Long zone = zone("Long month");
+        jdbc.update("""
+                INSERT INTO shift (user_id, zone_id, start_at, end_at, created_by)
+                SELECT ?, ?, (d + h) AT TIME ZONE 'Asia/Ho_Chi_Minh', (d + h + interval '1 hour') AT TIME ZONE 'Asia/Ho_Chi_Minh', ?
+                FROM generate_series(%1$s, %1$s + interval '27 days', interval '1 day') d,
+                     unnest(ARRAY[interval '7 hours', interval '9 hours', interval '11 hours']) h""".formatted(LAST_MONTH),
+                worker, zone, worker);    // 84 absent shifts, about 2,500 characters
+
+        org.mockito.Mockito.clearInvocations(bot);
+        webhook("/chamcong thangtruoc", CHAT).andExpect(status().isOk());
+        var sent = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(bot, org.mockito.Mockito.atLeast(2)).send(eq(CHAT), sent.capture());
+
+        List<String> parts = sent.getAllValues();
+        assertThat(parts).allSatisfy(part -> assertThat(part.length()).isLessThanOrEqualTo(ZaloBot.MAX_TEXT));
+        assertThat(parts.get(0)).contains("Tổng: đi làm 0/84 ca");
+        assertThat(String.join("\n", parts).lines().filter(line -> line.endsWith("· Vắng"))).hasSize(84);
     }
 
     @Test

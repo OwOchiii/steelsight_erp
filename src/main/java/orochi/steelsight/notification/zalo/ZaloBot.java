@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
 public class ZaloBot {
 
     /** Zalo refuses longer texts. */
-    static final int MAX_TEXT = 2000;
+    public static final int MAX_TEXT = 2000;
     private static final Logger log = LoggerFactory.getLogger(ZaloBot.class);
 
     private final RestClient client;

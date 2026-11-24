@@ -25,8 +25,9 @@ import java.util.Locale;
 
 /**
  * Commands a linked person sends to the bot, answered with their own data only: the chat decides whose
- * account it is. Zalo shows plain text, so each shift is one line instead of a grid. A team addition,
- * not in the SRS (team decision 24/11/2026).
+ * account it is. Zalo shows plain text, so each shift is one line instead of a grid. A reply longer than
+ * Zalo allows is split at line ends into several messages, so nothing is cut off. A team addition, not in
+ * the SRS (team decision 24/11/2026).
  *
  * /help, /lich [tuantoi], /chamcong [thangtruoc]; anything else gets the list of commands.
  */
@@ -54,9 +55,12 @@ public class ZaloCommands {
     @Value("${steelsight.base-url:}")
     private String baseUrl;
 
-    /** The reply to one message of a linked person. */
-    public String reply(Long userId, String message) {
-        String command = plain(message);
+    /** The reply to one message of a linked person, as the messages to send in order. */
+    public List<String> reply(Long userId, String message) {
+        return split(answer(userId, plain(message)), ZaloBot.MAX_TEXT);
+    }
+
+    private String answer(Long userId, String command) {
         return switch (command) {
             case "/lich", "/schedule" -> schedule(userId, siteTime.mondayOf(siteTime.today()));
             case "/lichtuantoi", "/lichtuansau", "/schedulenext" -> schedule(userId, siteTime.mondayOf(siteTime.today()).plusWeeks(1));
@@ -97,13 +101,10 @@ public class ZaloCommands {
         if (rows.isEmpty()) {
             return text("zalo.attendance.none", name);
         }
+        // The totals come first, so they are in the first message when a long month is split.
         List<String> lines = new ArrayList<>();
         lines.add(text("zalo.attendance.title", name));
-        for (AttendanceCalculator.Row row : rows) {
-            lines.add(attendanceLine(row));
-        }
         ShiftAttendance.Summary total = calculator.summary(rows);
-        lines.add("");
         lines.add(text("zalo.attendance.summary", String.valueOf(total.worked()), String.valueOf(total.planned()),
                 hours(total.paidHours()), String.valueOf(total.timesLate()), String.valueOf(total.timesEarly()),
                 String.valueOf(total.absent()), String.valueOf(total.incomplete())));
@@ -122,7 +123,41 @@ public class ZaloCommands {
         if (!baseUrl.isBlank()) {
             lines.add(text("zalo.attendance.more", baseUrl.replaceAll("/$", "") + "/attendance/mine?month=" + month));
         }
+        lines.add("");
+        for (AttendanceCalculator.Row row : rows) {
+            lines.add(attendanceLine(row));
+        }
         return String.join("\n", lines);
+    }
+
+    /**
+     * Splits a text into messages of at most max characters, at line ends, keeping every line. A single
+     * line longer than max (not expected) is split inside the line.
+     */
+    public static List<String> split(String text, int max) {
+        List<String> parts = new ArrayList<>();
+        StringBuilder part = new StringBuilder();
+        for (String line : text.split("\n", -1)) {
+            while (line.length() > max) {
+                if (!part.isEmpty()) {
+                    parts.add(part.toString());
+                    part.setLength(0);
+                }
+                parts.add(line.substring(0, max));
+                line = line.substring(max);
+            }
+            if (!part.isEmpty() && part.length() + 1 + line.length() > max) {
+                parts.add(part.toString());
+                part.setLength(0);
+            } else if (!part.isEmpty()) {
+                part.append('\n');
+            }
+            part.append(line);
+        }
+        if (!part.isEmpty()) {
+            parts.add(part.toString());
+        }
+        return parts.stream().map(String::strip).filter(p -> !p.isEmpty()).toList();
     }
 
     /** "T2 24/11 07:00–17:00 · vào 06:55 · ra 17:05 · Đúng giờ" */
