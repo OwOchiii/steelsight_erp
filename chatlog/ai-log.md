@@ -1,11 +1,12 @@
-# AI usage log
 
-How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md), [9 November](../transcript/9-11-2026.md), [16 November](../transcript/16-11-2026.md), [17 November](../transcript/17-11-2026.md), [21 November](../transcript/21-11-2026.md) and [23 November](../transcript/23-11-2026.md). The 17 November session was opened in the detection app's folder, and the 21 and 23 November sessions in the ERP's; all three changed both programs. Only their ERP work is logged here, and the detection work is in that repository's `chatlog/detection-ai-log.md`.
+.# AI usage log
+
+How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md), [9 November](../transcript/9-11-2026.md), [16 November](../transcript/16-11-2026.md), [17 November](../transcript/17-11-2026.md), [21 November](../transcript/21-11-2026.md), [23 November](../transcript/23-11-2026.md) and [24 November](../transcript/24-11-2026.md). The 17 November session was opened in the detection app's folder, and the 21 and 23 November sessions in the ERP's; all three changed both programs. Only their ERP work is logged here, and the detection work is in that repository's `chatlog/detection-ai-log.md`.
 
 | | |
 |---|---|
 | Tool | Claude Code (Opus 5.5) |
-| Dates | 2026-11-04 to 2026-11-23 (one session ran past midnight) |
+| Dates | 2026-11-04 to 2026-11-24 (one session ran past midnight) |
 | Branch | `feature/erp-backend` |
 
 ## Summary by request
@@ -128,6 +129,24 @@ The developer committed the work up to 22:15 as `b6bbb9a` at 22:23, and the QR c
 | 23:01 | What the Zalo bot sends; the base requirement is check-in and check-out | Found that check-in and check-out notices were never created. `V23` adds triggers on the detection app's check-in writes; `CheckOutHours` fills in paid hours before each Zalo send; 3 tests, 388 pass. A full list of what the bot sends | Not committed |
 | 23:13 | Write the transcript and chat log | Not done: the usage limit was reached. Written on 24 November as this update and `transcript/23-11-2026.md` | Not committed |
 
+### 2026-11-24
+
+Nothing from this day is committed yet.
+
+| Time | What the developer asked for | What was produced | Commit |
+|---|---|---|---|
+| 10:15 | Write the chat log and the previous session's transcript | `transcript/23-11-2026.md` and the 23 November entries in this log. The 23 November session hit the usage limit before writing them. Copied to the detection repo, with that day's desktop work in its own log | Not committed |
+| 10:28 | How Zalo notices work; scanning the QR showed a string instead of opening the bot | The QR encodes `ZALO_BOT_LINK` unchanged, so the server's value isn't the bot's full `https://` link. Copy the link from Bot Creator's own QR, and regenerate the token if it was put in that variable | None |
+| 10:34 | Render fails to start: `missing column [score] in table [notification]` | The database has V21, which dropped that column, but Render started an image from before the merge. CI for `febb2bf` passed and called the deploy hook. Fix: set the image URL to `:latest` and deploy, and don't roll back to an older image | None |
+| 10:41 | How to link the bot | The 5 server variables, automatic webhook registration on start-up, the linking steps, and what each failure looks like | None |
+| 10:42 | How to test the webhook | Three layers: `getMe` and `getWebhookInfo` against Zalo, a `curl` that pretends to be Zalo calling `/zalo/webhook`, and the real link while watching the log | None |
+| 11:02 | Can one Zalo account be relinked to test other roles | Yes, after `/stop` or Stop Zalo notices. A notice is marked "not linked" at creation, so link first. Fake chat IDs via `curl` let other accounts count as linked | None |
+| 11:04 | Does the bot have help, schedule and monthly check-in commands | Only the link code and `/stop`. Proposed `/help`, `/lich` and `/chamcong`, one line per shift, because Zalo shows plain text | None |
+| 11:06 | Build all three, one line per day | `ZaloCommands`: `/lich [tuantoi]`, `/chamcong [thangtruoc]`, and the command list for `/help` or anything else; capitals, spaces and Vietnamese marks ignored; own data only, nothing for an unlinked chat. `SafetyScoreService.inMonth`; bot texts in both languages; 6 tests; user guide 6.6 (and the detection repo's copy); a "Team decisions" row in the traceability table | Not committed |
+| 11:40 | Apply two CodeRabbit review comments | Both still valid. Check-out notices wait for their hours: `ZaloDispatcher` holds a CHECK_OUT back until `CheckOutHours.fill` has run, `fill` covers older waiting notices, handles each notice on its own, and gives "-" with a log warning when the hours can't be worked out. Long `/chamcong` replies are split at line ends into messages of at most 2,000 characters, totals first. 3 integration tests and `ZaloCommandsTest` (4) | Not committed |
+| 13:43 | Docker is on, run the tests | `ZaloNoticesTest` 26 of 26; full suite 402 of 402 after fixing one test | Not committed |
+| 13:53 | Write today's chat log and transcript | This update and `transcript/24-11-2026.md` | Not committed |
+
 ## Decisions made by the developer
 
 ### 2026-11-04
@@ -192,6 +211,10 @@ The developer committed the work up to 22:15 as `b6bbb9a` at 22:23, and the QR c
 - The phone number is required for new accounts; the database column stays nullable.
 - The base Zalo notices are check-in and check-out.
 
+### 2026-11-24
+
+- The bot gets commands to read your own schedule and attendance, a team addition beyond the SRS.
+
 ## Decisions suggested by Claude and accepted by the developer
 
 ### 2026-11-04
@@ -246,6 +269,10 @@ From the deployment plan the developer approved on 6 November:
 - At the gate, the SRS rule stays: the suggestion is whoever CAM-01 recorded within 30 seconds, and the gate zone has no team.
 - The ERP changes stay compatible with the detection app: nothing it writes was dropped or renamed. This was later superseded when the detection app's folder was found and updated too.
 - Keep the 6-digit link code and add a QR code, rather than linking by phone number.
+
+### 2026-11-24
+
+- The bot answers `/lich` and `/chamcong` with one line per shift instead of a grid, since Zalo shows plain text.
 
 ## Decisions made by Claude and reported to the developer
 
@@ -349,6 +376,15 @@ These came from the request to check every user error, and the developer hasn't 
 - Check-in and check-out notices are sent only for the detection app's writes. Visits entered by hand have their own notice, and corrections, approved missing check-outs and automatic closes send nothing.
 - `MONTH_SCHEDULE` and `APPEAL_DECIDED` are defined but never sent; they were left alone.
 
+### 2026-11-24
+
+- The commands are `/lich`, `/lich tuantoi`, `/chamcong` and `/chamcong thangtruoc`, with English aliases. Anything else from a linked chat gets the command list; an unlinked chat only gets how to link.
+- The statuses use the attendance pages' own words (`flag.*`) and calculation. Shifts that haven't started are left out of `/chamcong`.
+- Replies go straight back to the chat and aren't saved as notices.
+- `/chamcong` puts the totals, score, provisional note and link before the per-shift lines, so a split month has them in its first message.
+- A check-out notice whose hours can't be worked out is sent with "-" and a warning in the log, rather than waiting for ever or being dropped.
+- `CheckOutHours.fill` has no shared transaction, because a failed query would abort it for every notice after.
+
 ## How the work was checked
 
 ### 2026-11-04
@@ -421,6 +457,13 @@ These came from the request to check every user error, and the developer hasn't 
 - A generated QR was rendered to an image and decoded with OpenCV; it gave back the exact bot link.
 - The detection app's `tests/erp_integration_check.py` ran against V1–V22, and then V1–V23, in Docker as `steelsight_detection`: 21 of 21 checks each time.
 - Not checked: the real Zalo bot and webhook, the Supabase Flyway history (unreachable from WSL), the new pages in a browser, a QR scanned with a phone, or the desktop app with real cameras.
+
+### 2026-11-24
+
+- The Render failure was traced through the code and GitHub's public API for the CI runs. Render's own dashboard couldn't be checked.
+- `ZaloNoticesTest`: 26 of 26 with Docker. Full suite: 402 tests, 0 failures, after one test fix.
+- `ZaloCommandsTest` (splitting and command matching) needs no database.
+- Not checked: the commands with the real bot, or Render after the image fix.
 
 ## Problems during the work
 
@@ -517,9 +560,21 @@ These came from the request to check every user error, and the developer hasn't 
 | `List.getFirst()` doesn't exist in Java 17 | Used `get(0)` |
 | The usage limit was reached again at 23:14, before the logs were written | Written on 24 November |
 
+### 2026-11-24
+
+| Problem | Outcome |
+|---|---|
+| Docker Desktop wasn't connected to WSL at first | Compiled and ran the tests that need no database; the developer turned on Docker at 13:43 |
+| The new hold-back test reset the retry time on every delivery row; in the full suite, SKIPPED rows from other tests broke a check constraint | Uses the existing `makeDue(user)` helper, which only touches that worker's PENDING rows |
+| The local `.env` has no Zalo settings, so the value behind the bad QR couldn't be seen | Explained how to find and set the right link |
+
 ## Open items
 
-- V23 (check-in and check-out notices), `CheckOutHours`, and the matching changes to `JobScheduler`, `ZaloNoticesTest`, the contract doc and the traceability table aren't committed.
+- Today's work isn't committed: the bot commands, the two review fixes and the docs, along with V23 from 23 November.
+- Fix Render: set the image URL to `ghcr.io/owochiii/steelsight_erp:latest` and deploy. Don't roll back to an image older than `febb2bf`, since the database is at V21 or later.
+- Set `ZALO_BOT_LINK` to the bot's full `https://` link, then scan the QR again. If the bot token was ever in that variable, regenerate it.
+- Try `/lich` and `/chamcong` with the real bot once deployed.
+- Keep the local `.env` away from production while V23 is uncommitted, or a local run applies it to Supabase.
 - Before merging to `master`: take a Supabase backup and run `select version from flyway_schema_history order by installed_rank;` from somewhere that can reach the IPv6-only host. If production is at V14, the merge runs V15–V23 against real data. Deploy the ERP before the updated desktop app.
 - Test Zalo against the real bot: create it, set `ZALO_BOT_TOKEN`, `ZALO_BOT_LINK`, `ZALO_WEBHOOK_SECRET`, `ZALO_WEBHOOK_URL` and `APP_BASE_URL` on Render, link an account by scanning the QR with a phone, change a shift, and block the bot to see the retries end in FAILED. Set up the uptime ping (CR-13), or Render's sleep delays messages.
 - Decide what should happen when someone with no shift checks in: today the visit is recorded with no pay and nobody is told.
