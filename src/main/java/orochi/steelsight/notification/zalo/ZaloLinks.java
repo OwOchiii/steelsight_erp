@@ -10,6 +10,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Locale;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -37,6 +38,7 @@ public class ZaloLinks {
 
     private final ZaloBot bot;
     private final ZaloStore store;
+    private final ZaloCommands commands;
     private final MessageSource messages;
     private final SecureRandom random = new SecureRandom();
 
@@ -78,21 +80,35 @@ public class ZaloLinks {
     }
 
     /**
-     * Handles one text sent to the bot, and returns the reply, or null to stay silent. Spaces in the
-     * text are removed, so "123 456" works (SRS 3.2.7).
+     * Handles one text sent to the bot, and returns the replies, each to be sent as its own message, or
+     * none to stay silent. Spaces in the text are removed, so "123 456" works (SRS 3.2.7).
      */
-    public String handle(String chatId, String text) {
+    public List<String> handle(String chatId, String text) {
+        String reply = linkReply(chatId, text);
+        return reply == null ? commandReplies(chatId, text) : List.of(reply);
+    }
+
+    /** A linked person's command, which may need several messages; empty when the chat isn't linked. */
+    private List<String> commandReplies(String chatId, String text) {
+        return store.activeOwnerOf(chatId).map(owner -> commands.reply(owner, text)).orElse(List.of());
+    }
+
+    /** The reply about linking, or null for a linked person's command, or for a silenced chat. */
+    private String linkReply(String chatId, String text) {
         String message = text == null ? "" : text.replaceAll("\\s+", "");
         if (message.equalsIgnoreCase("/stop")) {
             return store.unlinkChat(chatId).isPresent() ? text("zalo.unlinked") : text("zalo.help");
+        }
+        var code = CODE.matcher(message);
+        Optional<Long> owner = store.activeOwnerOf(chatId);
+        if (owner.isPresent() && !code.matches()) {
+            return null;                                 // a linked person: /help, /lich, /chamcong
         }
         Integer wrong = wrongCodes.getIfPresent(chatId);
         if (wrong != null && wrong >= WRONG_CODES_ALLOWED) {
             return null;
         }
-        var code = CODE.matcher(message);
         if (code.matches()) {
-            Optional<Long> owner = store.activeOwnerOf(chatId);
             Optional<Long> user = store.peekCode(code.group(1));
             if (user.isEmpty()) {
                 wrongCodes.asMap().merge(chatId, 1, Integer::sum);

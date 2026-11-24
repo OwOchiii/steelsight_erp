@@ -107,6 +107,7 @@ repo can't test them; see `docs/detection-app-contract.md`.
 | CR-19 Pending overtime | Done |
 | CR-20 Leave requests | Done |
 | CR-21 Month lock, report, export log | Done |
+| 1.2.4 Check-in and check-out notices on Zalo | Done (V23 triggers on writes by the detection role; hours from `CheckOutHours`): `ZaloNoticesTest.aGateCheckIn…`, `aGateCheckOut…`, `aCheckOutGoesToZaloOnlyOnceItsHoursAreFilled`, `aCheckOutWhoseHoursCantBeWorkedOut…`, `erpWritesAndAutomaticCloses…` |
 | CR-22 Clock on gate screen | *Desktop*: shown on `/gate` |
 
 ## Team decisions that differ from the SRS
@@ -115,6 +116,7 @@ repo can't test them; see `docs/detection-app-contract.md`.
 |---|---|---|---|
 | Shift COMPLETED | 3.2.10 #10: a person clicks "Mark completed" after the shift ends | Automatic: the hourly and 23:00 jobs mark every ended shift COMPLETED, except in a locked month (BR-70); no manual button (team decision 23/11/2026) | `SrsShiftsAndJobsTest.endedShiftsAreCompletedAutomatically`, `ManagerPagesIntegrationTest.aFinishedShiftIsCompletedByTheSystem…` |
 | Zones | 1.4: one camera per zone | A zone has several cameras and belongs to one team | `SrsViolationReviewTest` |
+| Zalo bot commands | Not in the SRS: the bot only links (code) and unlinks (`/stop`) | A linked person can send `/help`, `/lich [tuantoi]` and `/chamcong [thangtruoc]` and get their own schedule and attendance, one line per shift; an unlinked chat gets only how to link (team decision 24/11/2026) | `ZaloNoticesTest.aLinkedPersonGetsTheListOfCommands…`, `aChatThatIsNotLinked…`, `lichShowsThisWeek…`, `lichSaysSo…`, `chamcongShowsEachShift…`, `chamcongLeavesOut…`, `aLongMonthComesInSeveralMessages…`; `ZaloCommandsTest` |
 
 ## Workflows (SRS 1.2)
 

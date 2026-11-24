@@ -66,9 +66,8 @@ public class ZaloController extends PageController {
         }
         String chatId = String.valueOf(chat.get("id"));
         Object text = message.get("text");
-        String reply = links.handle(chatId, text instanceof String s ? s : null);
-        if (reply != null) {
-            bot.send(chatId, reply);
+        for (String reply : links.handle(chatId, text instanceof String s ? s : null)) {
+            bot.send(chatId, reply);                     // in order: one sending thread
         }
         return ResponseEntity.ok(Map.of());
     }

@@ -70,6 +70,11 @@ public class SafetyScoreService {
         return find(userId, OffsetDateTime.now());
     }
 
+    /** A person's score in a month, for the Zalo bot answering that person's own /chamcong; no permission check. */
+    public Score inMonth(Long userId, OffsetDateTime inMonth) {
+        return find(userId, inMonth);
+    }
+
     public Score of(Long actorId, Long workerId) {
         access.require(actorId, Permissions.USER_READ_ALL);
         return find(workerId, OffsetDateTime.now());

@@ -8,6 +8,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import orochi.steelsight.attendance.service.CheckOutHours;
 import orochi.steelsight.calendar.SiteCalendar;
 import orochi.steelsight.notification.service.ZaloDispatcher;
 import orochi.steelsight.web.SiteTime;
@@ -42,14 +43,16 @@ public class JobScheduler {
     private final JdbcTemplate jdbc;
     private final SiteTime siteTime;
     private final ZaloDispatcher zalo;
+    private final CheckOutHours checkOutHours;
     private final boolean enabled;
     private final Map<String, Job> jobs = new LinkedHashMap<>();
 
-    public JobScheduler(JdbcTemplate jdbc, SiteTime siteTime, ZaloDispatcher zalo, SiteJobs site,
-                        @Value("${steelsight.jobs.enabled:true}") boolean enabled) {
+    public JobScheduler(JdbcTemplate jdbc, SiteTime siteTime, ZaloDispatcher zalo, CheckOutHours checkOutHours,
+                        SiteJobs site, @Value("${steelsight.jobs.enabled:true}") boolean enabled) {
         this.jdbc = jdbc;
         this.siteTime = siteTime;
         this.zalo = zalo;
+        this.checkOutHours = checkOutHours;
         this.enabled = enabled;
         jobs.put("day-end", new Job(now -> daily(now, LocalTime.of(23, 0)), site::dayEnd));
         jobs.put("morning", new Job(now -> daily(now, LocalTime.of(7, 0)), site::morning));
@@ -66,11 +69,16 @@ public class JobScheduler {
         tick();
     }
 
-    /** Every minute: Zalo deliveries, then any job that is due. */
+    /** Every minute: hours for new check-out notices, Zalo deliveries, then any job that is due. */
     @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
     public void tick() {
         if (!enabled) {
             return;
+        }
+        try {
+            checkOutHours.fill();       // before sending, so the Zalo message has its hours worked
+        } catch (RuntimeException e) {
+            log.warn("Check-out hours failed: {}", e.getMessage());
         }
         try {
             zalo.sendDue();

@@ -53,6 +53,7 @@ public class ZaloDispatcher {
                          JOIN notification n ON n.id = d.notification_id
                          JOIN app_user u ON u.id = n.user_id
                 WHERE d.status = 'PENDING' AND d.next_attempt_at <= now()
+                  AND (n.kind <> 'CHECK_OUT' OR n.params ? 'hours')   -- wait for CheckOutHours.fill
                 ORDER BY d.next_attempt_at
                 LIMIT 200
                 FOR UPDATE OF d SKIP LOCKED""", (row, n) -> new Due(row.getLong(1), row.getString(2),
