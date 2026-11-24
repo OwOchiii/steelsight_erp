@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.scheduling.config.ScheduledTaskHolder;
 import org.springframework.transaction.annotation.Transactional;
 import orochi.steelsight.exception.BusinessRuleException;
 import orochi.steelsight.jobs.JobScheduler;
@@ -38,6 +39,7 @@ class SrsShiftsAndJobsTest extends PageTestSupport {
     @Autowired ShiftService shifts;
     @Autowired SiteJobs jobs;
     @Autowired JobScheduler scheduler;
+    @Autowired ScheduledTaskHolder scheduledTasks;
 
     Long admin;
     Long leader;
@@ -61,6 +63,13 @@ class SrsShiftsAndJobsTest extends PageTestSupport {
     // --- shifts ---------------------------------------------------------------------------------
 
     /** BR-21, MSG26: 30 minutes to 12 hours, starting and ending on the same day. */
+    /** The minute tick is really scheduled, so a notice goes to Zalo within a minute, not at the next restart. */
+    @Test
+    void theJobSchedulerTicksEveryMinute() {
+        assertThat(scheduledTasks.getScheduledTasks())
+                .anyMatch(task -> task.getTask().toString().equals(JobScheduler.class.getName() + ".tick"));
+    }
+
     @Test
     void br21_aShiftLastsThirtyMinutesToTwelveHoursOnOneDay() {
         String msg26 = "The end must be after the start and the shift must last 30 minutes to 12 hours.";
