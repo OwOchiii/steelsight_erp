@@ -9,7 +9,7 @@ import java.util.List;
  */
 public enum NotificationKind {
     CHECK_IN("checkInAt", "shift"),
-    CHECK_OUT("checkOutAt", "hours"),
+    CHECK_OUT("checkOutAt", "shift", "hours"),
     VISIT_RECORDED("recordedBy", "checkInAt", "checkOut"),
     VISIT_CORRECTED("checkInAt", "checkOut"),
     WEEKLY_SCHEDULE("week", "shifts"),

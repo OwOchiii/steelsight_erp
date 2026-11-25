@@ -62,9 +62,9 @@ FROM (VALUES
 ) AS v(code, name, email, phone, role, active)
 JOIN role r ON r.role_name = v.role;
 
-INSERT INTO team (name, manager_id, late_after_minutes) VALUES
-    ('Team A', pg_temp.person('MGR01'), 15),
-    ('Team B', pg_temp.person('MGR02'), 30);
+INSERT INTO team (name, manager_id) VALUES
+    ('Team A', pg_temp.person('MGR01')),
+    ('Team B', pg_temp.person('MGR02'));
 
 UPDATE app_user SET team_id = (SELECT id FROM team WHERE name = 'Team A') WHERE employee_code IN ('WRK01', 'WRK02', 'WRK03');
 UPDATE app_user SET team_id = (SELECT id FROM team WHERE name = 'Team B') WHERE employee_code IN ('WRK04', 'WRK05', 'WRK06');

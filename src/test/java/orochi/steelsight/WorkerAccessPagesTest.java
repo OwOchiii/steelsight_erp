@@ -98,9 +98,34 @@ class WorkerAccessPagesTest extends PageTestSupport {
     }
 
     @Test
-    void managerStillCannotOpenViolationPages() throws Exception {
-        Long violation = violation(theirs, camera, "NO_VEST");
-        mvc.perform(get("/violations/" + violation).with(as(manager))).andExpect(status().isForbidden());
+    void aTeamLeaderSeesAndAppealsTheirOwnViolationsButNoOneElses() throws Exception {
+        // SRS 3.1.3 and V27: a team leader works on site and has a safety score (BR-56), so My Violations
+        // and the appeal (BR-64) are theirs too. Nobody else's violation, and no review pages.
+        Long own = violation(manager, camera, "NO_HARD_HAT");
+        Long someoneElses = violation(theirs, camera, "NO_VEST");
+
+        mvc.perform(get("/violations").with(as(manager)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/violations/" + own)))
+                .andExpect(content().string(not(containsString("/violations/" + someoneElses + "\""))))
+                .andExpect(content().string(containsString("95")));   // 100 - 5 (BR-57)
+        mvc.perform(get("/violations/" + own).with(as(manager))).andExpect(status().isOk());
+        mvc.perform(get("/").with(as(manager))).andExpect(content().string(containsString("href=\"/violations\"")));
+
+        mvc.perform(post("/violations/" + own + "/dispute").param("reason", "My hard hat was on the bench next to me")
+                        .with(as(manager)).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+        assertThat(jdbc.queryForObject("SELECT dispute_status FROM violation WHERE id = ?", String.class, own))
+                .isEqualTo("DISPUTED");
+
+        mvc.perform(get("/violations/" + someoneElses).with(as(manager))).andExpect(status().isForbidden());
+        mvc.perform(post("/violations/" + someoneElses + "/dispute").param("reason", "Not mine to dispute at all")
+                        .with(as(manager)).with(csrf()))
+                .andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject("SELECT dispute_status FROM violation WHERE id = ?", String.class, someoneElses))
+                .isEqualTo("NONE");
+        mvc.perform(get("/violations/review").with(as(manager))).andExpect(status().isForbidden());
+        mvc.perform(get("/violations/all").with(as(manager))).andExpect(status().isForbidden());
     }
 
     @Test

@@ -323,13 +323,11 @@ class ZaloNoticesTest extends PageTestSupport {
                 VALUES (?, date_trunc('minute', now()) - interval '65 minutes', 'FACE', 62.5, gen_random_uuid()) RETURNING id""", worker);
 
         assertThat(jdbc.queryForObject("SELECT shift_id FROM check_in WHERE id = ?", Long.class, visit)).isEqualTo(shift);
-        String range = jdbc.queryForObject("""
-                SELECT to_char(start_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI') || '-' || to_char(end_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI')
-                FROM shift WHERE id = ?""", String.class, shift);
+        String label = shiftLabel(shift);
         assertThat(jdbc.queryForObject("SELECT params ->> 'shift' FROM notification WHERE user_id = ? AND kind = 'CHECK_IN'", String.class, worker))
-                .isEqualTo(range);
+                .isEqualTo(label);
         mvc.perform(get("/notifications").with(as(worker)))
-                .andExpect(content().string(containsString(", shift " + range + ".")));
+                .andExpect(content().string(containsString(", starting shift " + label + ".")));
         assertThat(jdbc.queryForObject("""
                 SELECT d.status FROM notification_delivery d JOIN notification n ON n.id = d.notification_id
                 WHERE n.user_id = ? AND n.kind = 'CHECK_IN'""", String.class, worker)).isEqualTo("PENDING");   // queued for Zalo
@@ -339,19 +337,21 @@ class ZaloNoticesTest extends PageTestSupport {
     @Test
     void aGateCheckOutTellsThePaidHoursOfTheShift() throws Exception {
         Long zone = zone("Gate notices");
-        shift(worker, zone, "date_trunc('minute', now()) - interval '3 hours'", "date_trunc('minute', now()) + interval '5 hours'");
+        Long shift = shift(worker, zone, "date_trunc('minute', now()) - interval '3 hours'", "date_trunc('minute', now()) + interval '5 hours'");
         Long visit = asDetection("""
                 INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
                 VALUES (?, date_trunc('minute', now()) - interval '3 hours 5 minutes', 'FACE', 62.5, gen_random_uuid()) RETURNING id""", worker);
         asDetection("UPDATE check_in SET check_out_at = date_trunc('minute', now()) - interval '1 hour' WHERE id = ? RETURNING id", visit);
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM notification WHERE user_id = ? AND kind = 'CHECK_OUT'", Integer.class, worker)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT params ->> 'shift' FROM notification WHERE user_id = ? AND kind = 'CHECK_OUT'", String.class, worker))
+                .isEqualTo(shiftLabel(shift));
         assertThat(checkOutHours.fill()).isEqualTo(1);
         // In 5 minutes before the start, out 2 hours after it: paid from the shift start (BR-31), 2.00 hours.
         assertThat(jdbc.queryForObject("SELECT params ->> 'hours' FROM notification WHERE user_id = ? AND kind = 'CHECK_OUT'", String.class, worker))
                 .isEqualTo("2.00");
         mvc.perform(get("/notifications").with(as(worker)))
-                .andExpect(content().string(containsString("hours worked 2.00")));
+                .andExpect(content().string(containsString(", finishing shift " + shiftLabel(shift) + ", hours worked 2.00.")));
         assertThat(checkOutHours.fill()).isZero();      // filled once
     }
 
@@ -375,6 +375,92 @@ class ZaloNoticesTest extends PageTestSupport {
         dispatcher.sendDue();
         verify(bot).sendNow(eq(CHAT), contains("2.00"));
         assertThat(delivery(worker)).isEqualTo("SENT");
+    }
+
+    /** The shift is named by its weekday, date and time, as the shift notices name it ("T3 24/11 08:00–17:00"). */
+    @Test
+    void theShiftIsNamedByItsDayAndTimes() {
+        Long shift = shift(worker, zone("Label"), "timestamptz '2026-11-24 08:00+07'", "timestamptz '2026-11-24 17:00+07'");
+        assertThat(shiftLabel(shift)).isEqualTo("T3 24/11 08:00–17:00");
+    }
+
+    /** A gate visit with no shift says so, in Vietnamese on Zalo, instead of naming a shift. */
+    @Test
+    void aVisitWithNoShiftSaysSo() throws Exception {
+        link(worker, CHAT);
+        Long visit = asDetection("""
+                INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
+                VALUES (?, date_trunc('minute', now()) - interval '2 hours', 'FACE', 62.5, gen_random_uuid()) RETURNING id""", worker);
+        asDetection("UPDATE check_in SET check_out_at = date_trunc('minute', now()) - interval '1 hour' WHERE id = ? RETURNING id", visit);
+        checkOutHours.fill();
+        makeDue(worker);
+
+        mvc.perform(get("/notifications").with(as(worker)))
+                .andExpect(content().string(containsString("(no shift).")))
+                .andExpect(content().string(not(containsString("starting shift"))));
+        dispatcher.sendDue();
+        verify(bot).sendNow(eq(CHAT), contains("Chấm công vào lúc"));
+        verify(bot).sendNow(eq(CHAT), contains("Chấm công ra lúc"));
+        verify(bot, org.mockito.Mockito.times(2)).sendNow(eq(CHAT), contains("(không có ca)."));
+    }
+
+    /**
+     * A gate check-out finishes the shift: it is COMPLETED at once, not when it ends. Coming back during the
+     * shift still goes with it; the system closing a stale visit completes nothing.
+     */
+    @Test
+    void aCheckOutCompletesTheShift() {
+        Long zone = zone("Completing");
+        Long shift = shift(worker, zone, "date_trunc('minute', now()) - interval '3 hours'", "date_trunc('minute', now()) + interval '5 hours'");
+        long versionBefore = jdbc.queryForObject("SELECT version FROM shift WHERE id = ?", Long.class, shift);
+        Long visit = asDetection("""
+                INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
+                VALUES (?, date_trunc('minute', now()) - interval '3 hours', 'FACE', 62.5, gen_random_uuid()) RETURNING id""", worker);
+        assertThat(shiftStatus(shift)).isEqualTo("SCHEDULED");
+
+        asDetection("UPDATE check_in SET check_out_at = date_trunc('minute', now()) - interval '1 hour' WHERE id = ? RETURNING id", visit);
+
+        assertThat(shiftStatus(shift)).isEqualTo("COMPLETED");
+        assertThat(jdbc.queryForObject("SELECT version FROM shift WHERE id = ?", Long.class, shift)).isEqualTo(versionBefore + 1);
+        Long back = asDetection("""
+                INSERT INTO check_in (user_id, check_in_at, method, face_similarity, event_id)
+                VALUES (?, date_trunc('minute', now()) - interval '30 minutes', 'FACE', 62.5, gen_random_uuid()) RETURNING id""", worker);
+        assertThat(jdbc.queryForObject("SELECT shift_id FROM check_in WHERE id = ?", Long.class, back)).isEqualTo(shift);
+
+        Long other = userWithRole("ZL-W3", "Lan Worker", "WORKER");
+        Long open = shift(other, zone, "date_trunc('minute', now()) - interval '2 hours'", "date_trunc('minute', now()) + interval '2 hours'");
+        Long stale = jdbc.queryForObject("""
+                INSERT INTO check_in (user_id, check_in_at, face_similarity) VALUES (?, now() - interval '2 hours', 90) RETURNING id""",
+                Long.class, other);
+        jdbc.update("UPDATE check_in SET check_out_at = now(), auto_closed = true WHERE id = ?", stale);
+        assertThat(shiftStatus(open)).isEqualTo("SCHEDULED");
+    }
+
+    /** A visit HSE types in with its check-out completes its shift too; a cancelled shift stays cancelled. */
+    @Test
+    void aRecordedCheckOutCompletesTheShiftButNotACancelledOne() {
+        Long zone = zone("Recorded");
+        Long shift = shift(worker, zone, "date_trunc('minute', now()) - interval '4 hours'", "date_trunc('minute', now()) + interval '4 hours'");
+        jdbc.update("""
+                INSERT INTO check_in (user_id, shift_id, check_in_at, check_out_at, face_similarity)
+                VALUES (?, ?, now() - interval '4 hours', now() - interval '1 hour', 90)""", worker, shift);
+        assertThat(shiftStatus(shift)).isEqualTo("COMPLETED");
+
+        Long other = userWithRole("ZL-W4", "Mai Worker", "WORKER");
+        Long cancelled = shift(other, zone, "date_trunc('minute', now()) - interval '4 hours'", "date_trunc('minute', now()) + interval '4 hours'");
+        jdbc.update("UPDATE shift SET status = 'CANCELLED' WHERE id = ?", cancelled);
+        jdbc.update("""
+                INSERT INTO check_in (user_id, shift_id, check_in_at, check_out_at, face_similarity)
+                VALUES (?, ?, now() - interval '4 hours', now() - interval '1 hour', 90)""", other, cancelled);
+        assertThat(shiftStatus(cancelled)).isEqualTo("CANCELLED");
+    }
+
+    private String shiftStatus(Long shift) {
+        return jdbc.queryForObject("SELECT status FROM shift WHERE id = ?", String.class, shift);
+    }
+
+    private String shiftLabel(Long shift) {
+        return jdbc.queryForObject("SELECT shift_label(?)", String.class, shift);
     }
 
     /** A notice whose shift is gone still gets an outcome: no hours ("-"), so it doesn't wait for ever. */

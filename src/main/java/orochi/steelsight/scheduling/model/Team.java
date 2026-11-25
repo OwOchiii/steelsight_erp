@@ -19,10 +19,6 @@ public class Team extends IdentifiedModel {
     @JoinColumn(name = "manager_id")
     private AppUser manager;
 
-    /** How long after a shift starts someone on this team can check in before being tagged late. */
-    @Column(name = "late_after_minutes", nullable = false)
-    private int lateAfterMinutes = 15;
-
     public boolean isManagedBy(Long userId) {
         return manager != null && manager.getId().equals(userId);
     }

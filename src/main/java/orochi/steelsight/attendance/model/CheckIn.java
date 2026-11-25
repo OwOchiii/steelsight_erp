@@ -7,7 +7,6 @@ import orochi.steelsight.identity.model.AppUser;
 import orochi.steelsight.model.BaseModel;
 import orochi.steelsight.model.Versioned;
 import orochi.steelsight.ppe.model.Camera;
-import orochi.steelsight.ppe.model.PpeLinking;
 import orochi.steelsight.scheduling.model.Shift;
 import orochi.steelsight.scheduling.model.Zone;
 
@@ -39,10 +38,6 @@ public class CheckIn extends BaseModel implements Versioned {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "camera_id")
     private Camera camera;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ppe_linking_id")
-    private PpeLinking ppeLinking;
 
     @Column(name = "check_in_at", nullable = false)
     private OffsetDateTime checkInAt = OffsetDateTime.now();

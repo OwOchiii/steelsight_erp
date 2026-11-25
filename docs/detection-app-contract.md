@@ -18,21 +18,23 @@ copy of the app is still accepted.
    Any query that selects it now fails.
 2. **Stop sending check-in messages itself.** The ERP sends every notice (in-app first, then Zalo,
    BR-15). Since V23, a check-in or check-out written by the `steelsight_detection` role makes the
-   "Check-in at HH:MM, shift HH:MM-HH:MM" and "Check-out at HH:MM, hours worked N.NN" notices by trigger;
+   "Check-in at HH:MM, starting shift T3 24/11 08:00–17:00" and "Check-out at HH:MM, finishing shift
+   T3 24/11 08:00–17:00, hours worked N.NN" notices by trigger (V24 names the shift; a visit with no shift
+   says "(no shift)");
    check-outs the app closes as `auto_closed` send nothing. Read `zalo_chat_id` only if you still need it.
 
 ## Should change (the ERP already accepts the new way)
 
 3. **Violations: send a suggestion, not a person.** Write `suggested_user_id` and
-   `suggestion_similarity` (0–1, BR-47). If you still write `user_id` or `ppe_linking_id`, the trigger
-   moves that person into `suggested_user_id`; the violation always starts `PENDING_REVIEW` with no
+   `suggestion_similarity` (0–1, BR-47). If you still write `user_id`, the trigger moves that person
+   into `suggested_user_id`; the violation always starts `PENDING_REVIEW` with no
    person (BR-48). Don't write `review_status`, `subject` or `zone_id`; the zone comes from the camera.
 4. **One violation when both items are missing:** type `NO_HARD_HAT_AND_VEST` (BR-45, CR-06), not
    two rows. `NO_GLOVES` and `NO_HARNESS` are out of scope (OR-04).
-5. **Stop calling `POST /api/v1/detection/alerts`** (burst alerts, CR-02). It still answers 201 so
-   your outbox stops retrying, but it notifies nobody; each violation alerts the HSE Officers on duty
-   by a database trigger (BR-54).
-6. **Stop using `ppe_vest` / `ppe_linking`** (CR-01). The tables stay until you do.
+5. **No burst alerts** (CR-02): `POST /api/v1/detection/alerts` and the table `safety_alert` were
+   removed in V26. Each violation alerts the HSE Officers on duty by a database trigger (BR-54).
+6. **No vest numbers** (CR-01): `ppe_vest`, `ppe_linking` and the `ppe_linking_id` columns of
+   `check_in` and `violation` were removed in V26.
 7. **Evidence photos:** upload to the private bucket `evidence-photos` (env `SUPABASE_EVIDENCE_BUCKET`)
    and write its path in `snapshot_path`. Paths may contain folders (`2026/11/23/cam03-….jpg`), never
    `..`. The ERP shows them only after a permission check (CM-07).
@@ -47,6 +49,9 @@ copy of the app is still accepted.
 
 - `zone.kind` is `GATE_ATTENDANCE`, `GATE_PPE` or `WORK_AREA`; `zone.name` is what alerts say and the
   Admin can rename it (CR-03).
+- `zone.code` (V26) is fixed: `GATE-IN`, `GATE-PPE`, `AREA-A`, `AREA-B` ... The database gives it when
+  a zone is added and refuses any change, so the camera settings can name the zone by it (SRS 3.2.30).
+  The detection role can read it.
 - A zone can have **several cameras** (team decision; the SRS still says one). Each camera reports in
   its own zone.
 - A `WORK_AREA` zone can belong to a team (`zone.team_id`); HSE picks the violator from it first.

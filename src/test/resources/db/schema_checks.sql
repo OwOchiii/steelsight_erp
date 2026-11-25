@@ -1,11 +1,11 @@
--- Checks the database rules of the migrations (V1 to V22). Run by SchemaChecksSqlTest during mvn verify.
+-- Checks the database rules of the migrations (V1 to V26). Run by SchemaChecksSqlTest during mvn verify.
 -- Everything rolls back. Any failed check stops with an error; success ends with "ALL CHECKS PASSED".
 \set ON_ERROR_STOP on
 BEGIN;
 
 DO $$
 DECLARE
-  v_worker bigint; v_other bigint; v_zone bigint; v_cam bigint; v_vest bigint; v_link bigint;
+  v_worker bigint; v_other bigint; v_zone bigint; v_cam bigint; v_gate bigint;
   v_viol bigint; v_shift bigint; v_user bigint; v_closed integer; v_auto boolean;
 BEGIN
   INSERT INTO app_user (role_id, employee_code, full_name, password_hash)
@@ -16,8 +16,26 @@ BEGIN
   SELECT id, 'T3', 'Test Officer', 'x', 'OFFICE' FROM role WHERE role_name = 'HSE_OFFICER';
   INSERT INTO zone (name) VALUES ('Test zone') RETURNING id INTO v_zone;
   INSERT INTO camera (camera_code, zone_id) VALUES ('CAM-T', v_zone) RETURNING id INTO v_cam;
-  INSERT INTO ppe_vest (vest_code) VALUES ('V-T') RETURNING id INTO v_vest;
-  INSERT INTO ppe_linking (ppe_vest_id, user_id) VALUES (v_vest, v_worker) RETURNING id INTO v_link;
+
+  -- V26: the vest tables, burst alerts and the per-team late tolerance are gone (CR-01, CR-02, BR-31)
+  ASSERT to_regclass('public.ppe_vest') IS NULL AND to_regclass('public.ppe_linking') IS NULL
+         AND to_regclass('public.safety_alert') IS NULL, 'the vest and burst alert tables should be gone';
+  ASSERT NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public'
+                       AND (column_name = 'ppe_linking_id' OR (table_name = 'team' AND column_name = 'late_after_minutes'))),
+    'no column should point at a vest link, and teams have no late tolerance';
+
+  -- V26: each zone gets the next free code of its kind, and it never changes (SRS 3.2.23)
+  ASSERT (SELECT code FROM zone WHERE id = v_zone) ~ '^AREA-[A-Z0-9]+$', 'a work area gets an AREA code';
+  INSERT INTO zone (name, kind) VALUES ('Test gate', 'GATE_PPE') RETURNING id INTO v_gate;
+  ASSERT (SELECT code FROM zone WHERE id = v_gate) LIKE 'GATE-PPE%', 'a gate PPE zone gets a GATE-PPE code';
+  BEGIN
+    UPDATE zone SET code = 'AREA-ZZ' WHERE id = v_zone;
+    RAISE EXCEPTION 'CHECK_FAILED: a zone code was changed';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM LIKE 'CHECK_FAILED%' THEN RAISE; END IF;
+  END;
+  UPDATE zone SET name = 'Test zone renamed' WHERE id = v_zone;   -- the name stays the Admin's to change
 
   -- generated column
   INSERT INTO shift (user_id, zone_id, start_at, end_at, created_by)
@@ -63,11 +81,11 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 
-  -- a vest read, or a person the detection app names, is only a suggestion
-  INSERT INTO violation (ppe_linking_id, camera_id, violation_type, detected_at, snapshot_path)
-  VALUES (v_link, v_cam, 'NO_HARD_HAT', now(), 's2.jpg') RETURNING id, user_id INTO v_viol, v_user;
-  ASSERT v_user IS NULL, 'a vest read does not decide the person';
-  ASSERT (SELECT suggested_user_id FROM violation WHERE id = v_viol) = v_worker, 'the vest wearer is the suggestion';
+  -- the person the detection app suggests, or names, is only a suggestion (BR-47, BR-48)
+  INSERT INTO violation (suggested_user_id, camera_id, violation_type, detected_at, snapshot_path)
+  VALUES (v_worker, v_cam, 'NO_HARD_HAT', now(), 's2.jpg') RETURNING id, user_id INTO v_viol, v_user;
+  ASSERT v_user IS NULL, 'a suggestion does not decide the person';
+  ASSERT (SELECT suggested_user_id FROM violation WHERE id = v_viol) = v_worker, 'the suggestion is kept';
   INSERT INTO violation (user_id, camera_id, violation_type, detected_at, snapshot_path)
   VALUES (v_other, v_cam, 'NO_HARD_HAT_AND_VEST', now(), 's3.jpg') RETURNING id INTO v_viol;
   ASSERT (SELECT suggested_user_id FROM violation WHERE id = v_viol) = v_other, 'a named person is the suggestion';
@@ -102,7 +120,7 @@ BEGIN
 
   -- every table the outbox writes to refuses a repeated event
   ASSERT (SELECT count(*) FROM pg_constraint
-          WHERE conname IN ('uq_violation_event', 'uq_check_in_event', 'uq_ppe_linking_event')) = 3,
+          WHERE conname IN ('uq_violation_event', 'uq_check_in_event')) = 2,
     'outbox tables should have unique event ids';
 
   -- the detection role can do its job
@@ -110,6 +128,7 @@ BEGIN
   PERFORM id, face_file_path FROM app_user;
   PERFORM employee_code, full_name FROM app_user;          -- V13: names for the gate screen
   PERFORM zalo_chat_id FROM app_user;                      -- V18: gate check-in messages on Zalo
+  PERFORM code, name, kind FROM zone;                       -- V26: camera settings name the zone by its code
   ASSERT (SELECT count(*) FROM face_embedding) = 1, 'detection should see embeddings';
   UPDATE face_embedding SET status = 'READY', model_name = 'buffalo_l', embedding = array_fill(0.1, ARRAY[512])::vector;
   INSERT INTO violation (camera_id, violation_type, detected_at, snapshot_path)

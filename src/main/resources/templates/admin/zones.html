@@ -12,6 +12,7 @@
             <thead>
             <tr>
                 <th scope="col" th:text="#{zones.name}">Name in alerts</th>
+                <th scope="col" th:text="#{zones.code}">Code</th>
                 <th scope="col" th:text="#{zones.kind}">Kind</th>
                 <th scope="col" th:text="#{zones.cameras}">Cameras</th>
                 <th scope="col" th:text="#{field.team}">Team</th>
@@ -25,6 +26,7 @@
                         <button type="submit" class="btn secondary" th:text="#{common.save}">Save</button>
                     </form>
                 </td>
+                <td th:text="${zone.code}">AREA-A</td>
                 <td th:text="${@display.label(zone.kind)}">Work area</td>
                 <td>
                     <ul class="m-0 grid list-none gap-1 p-0" th:if="${cameras.get(zone.id) != null}">
@@ -64,7 +66,7 @@
                 <div>
                     <label for="cameraZone" th:text="#{zones.cameraZone}">Zone</label>
                     <select id="cameraZone" name="zoneId" required>
-                        <option th:each="zone : ${zones}" th:value="${zone.id}" th:text="${zone.name}">Zone A</option>
+                        <option th:each="zone : ${zones}" th:value="${zone.id}" th:text="${zone.code + ' · ' + zone.name}">AREA-A · Zone A</option>
                     </select>
                 </div>
             </div>
