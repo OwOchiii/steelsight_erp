@@ -8,9 +8,18 @@
         <div class="grid gap-x-4 sm:grid-cols-2">
             <div>
                 <label for="employeeCode" th:text="#{field.employeeCode}">Employee code</label>
-                <input id="employeeCode" th:field="*{employeeCode}" minlength="3" maxlength="20" required autocomplete="off"
-                       pattern="[A-Za-z0-9\-]{3,20}">
-                <p class="hint" th:text="#{team.codeHint}">Used to sign in. It can't be changed later.</p>
+                <div id="codeField" th:fragment="codeField">
+                    <div class="flex gap-2">
+                        <input id="employeeCode" name="employeeCode" minlength="3" maxlength="20" required autocomplete="off"
+                               pattern="[A-Za-z0-9\-]{3,20}"
+                               th:value="${code != null ? code : (form != null ? form.employeeCode : '')}">
+                        <button type="button" class="btn secondary" th:attr="hx-get=@{/team/new/code}"
+                                hx-include="#roleName" hx-target="#codeField" hx-swap="outerHTML"
+                                th:text="#{team.generateCode}">Generate</button>
+                    </div>
+                    <p class="notice error" th:if="${codeError != null}" th:text="${codeError}">No free employee code was found.</p>
+                    <p class="hint" th:unless="${codeError != null}" th:text="#{team.codeHint}">Used to sign in. It can't be changed later.</p>
+                </div>
             </div>
             <div>
                 <label for="fullName" th:text="#{field.fullName}">Full name</label>

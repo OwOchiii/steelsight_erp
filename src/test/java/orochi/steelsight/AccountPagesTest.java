@@ -52,6 +52,32 @@ class AccountPagesTest extends PageTestSupport {
     }
 
     @Test
+    void generateFillsAFreeCodeForTheRoleAndOnlyTheAdminCanUseIt() throws Exception {
+        mvc.perform(get("/team/new").with(as(admin)))
+                .andExpect(content().string(containsString("/team/new/code")))
+                .andExpect(content().string(containsString(">Generate<")));
+
+        String field = mvc.perform(get("/team/new/code").param("roleName", "WORKER").with(as(admin)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        java.util.regex.Matcher found = java.util.regex.Pattern.compile("value=\"(WRK-\\d{5})\"").matcher(field);
+        assertThat(found.find()).as(field).isTrue();
+        String code = found.group(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE upper(employee_code) = ?", Long.class, code)).isZero();
+
+        // The suggested code goes through the normal form like a typed one.
+        mvc.perform(post("/team/new").param("employeeCode", code).param("fullName", "Generated Person")
+                        .param("roleName", "WORKER").param("teamId", team.toString()).param("password", "start-pass-1")
+                        .param("phoneNumber", "0911000009").param("consent", "true")
+                        .with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("success", "The account was created."));
+        assertThat(idOf(code)).isNotNull();
+
+        mvc.perform(get("/team/new/code").param("roleName", "WORKER").with(as(manager))).andExpect(status().isForbidden());
+        mvc.perform(get("/team/new/code").param("roleName", "WORKER").with(as(worker))).andExpect(status().isForbidden());
+    }
+
+    @Test
     void adminCreatesAnAccountThatMustChangeItsPassword() throws Exception {
         mvc.perform(post("/team/new").param("employeeCode", "ACC-NEW").param("fullName", "New Person")
                         .param("roleName", "WORKER").param("teamId", team.toString()).param("password", "start-pass-1")

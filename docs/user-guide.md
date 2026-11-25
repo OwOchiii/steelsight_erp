@@ -61,14 +61,26 @@ Each team has one leader, and a manager leads at most one team. Create the manag
 ### 3.2 Create an account
 1. Open **Team**, then click **New account**.
 2. Fill in:
-   - **Employee code:** used to sign in, such as `WRK07`, using letters, numbers, dots, dashes and underscores. It can't be changed later.
-   - **Full name**
-   - **Role:** Worker, HSE officer, Manager or Admin
-   - **Team:** optional. Workers usually belong to one.
-   - **Email** and **Phone number:** optional
-   - **Starting password:** at least 8 characters. Give it to the person, who must change it at their first sign-in.
-   - **Face photo:** optional, for check-in at the gate. Use a clear photo of the face looking at the camera, as JPEG, PNG or WebP, up to 5 MB.
+   - **Role:** Worker, HSE officer, Manager or Admin. Choose it first.
+   - **Employee code:** used to sign in, and can't be changed later. Click **Generate** for a free code
+     for the chosen role, such as `WRK-48213` (MGR-, HSE-, ADM-, or EMP- with no role). It's checked
+     against every account, deleted ones too, and drawn again if taken. Or type your own: 3 to 20
+     letters A-Z, digits and dashes.
+   - **Full name:** 2 to 100 characters.
+   - **Group:** Site or Office. A team leader is always Site; HSE and the Admin are always Office.
+   - **Team:** required for a Site worker.
+   - **Email:** optional. **Phone number:** the number the person uses on Zalo, 10 digits starting
+     with 0, not used by another active employee.
+   - **Starting password:** at least 8 characters. Give it to the person, who must change it at their
+     first sign-in.
+   - **Face photo:** optional now, needed for check-in at the gate. A clear photo of the face looking at
+     the camera, JPEG or PNG, at least 480 × 480 pixels, at most 5 MB.
+   - Tick **The employee has signed the consent form for face data.** The account can't be created
+     without it.
 3. Click **Create account**. The new account's page opens.
+
+Every rule and its message, with a step-by-step walk through all the workflows, is in
+[workflow-tutorial.md](workflow-tutorial.md).
 
 ### 3.3 Edit an account
 Open **Team** and click **Edit** next to the person. The page has these sections:
