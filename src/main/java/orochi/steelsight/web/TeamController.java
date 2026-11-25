@@ -44,6 +44,7 @@ import java.util.List;
 public class TeamController extends PageController {
 
     private final UserService users;
+    private final orochi.steelsight.identity.service.EmployeeCodes employeeCodes;
     private final TeamService teams;
     private final PhotoStorage photos;
     private final SiteTime siteTime;
@@ -102,6 +103,22 @@ public class TeamController extends PageController {
     public String newAccount(@AuthenticationPrincipal AuthenticatedUser user, Model model) {
         model.addAttribute("form", new NewAccountForm());
         return showNewAccount(user, model);
+    }
+
+    /**
+     * The Generate button of the New Account form (htmx): a free code for the chosen role, put in the
+     * code field. The Admin can still change it before saving.
+     */
+    @GetMapping("/team/new/code")
+    public String suggestCode(@AuthenticationPrincipal AuthenticatedUser user,
+                              @RequestParam(required = false) String roleName, Model model) {
+        requireAdmin(user);
+        try {
+            model.addAttribute("code", employeeCodes.suggest(user.getUserId(), roleName));
+        } catch (orochi.steelsight.exception.BusinessRuleException e) {
+            model.addAttribute("codeError", e.getMessage());
+        }
+        return "team/new :: codeField";
     }
 
     @PostMapping("/team/new")

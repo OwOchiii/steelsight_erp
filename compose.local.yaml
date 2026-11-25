@@ -1,0 +1,50 @@
+# A local copy of Steelsight for trying it out: PostgreSQL 17 with pgvector, and the ERP built from this
+# folder. Nothing here talks to Supabase, Render or Zalo. Start it with scripts/local.sh (see
+# docs/local-run.md), or: docker compose -f compose.local.yaml up -d --build
+#
+# The passwords below are for this throwaway local database only. Change them with LOCAL_DB_PASSWORD and
+# LOCAL_ADMIN_PASSWORD in your shell; never reuse them anywhere else.
+name: steelsight-local
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: steelsight-local-db
+    environment:
+      POSTGRES_DB: steelsight_local
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-steelsight-local}
+    ports:
+      - "127.0.0.1:55434:5432"   # 55434: clear of a PostgreSQL on 5432 and the older steelsight-db container on 55433
+    volumes:
+      - steelsight-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d steelsight_local"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    container_name: steelsight-local-erp
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: local          # not prod: no Supabase Storage, no secure-only cookie
+      DB_URL: jdbc:postgresql://db:5432/steelsight_local
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${LOCAL_DB_PASSWORD:-steelsight-local}
+      ADMIN_EMPLOYEE_CODE: ADMIN
+      ADMIN_PASSWORD: ${LOCAL_ADMIN_PASSWORD:-Admin12345}
+      STORAGE_TYPE: local
+      STORAGE_DIR: /tmp/steelsight-uploads   # photos live in the container until it is removed
+      SESSION_COOKIE_SECURE: "false"
+      JOBS_ENABLED: "true"
+      APP_BASE_URL: http://localhost:8080
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70"
+    ports:
+      - "8080:8080"
+
+volumes:
+  steelsight-db-data:
