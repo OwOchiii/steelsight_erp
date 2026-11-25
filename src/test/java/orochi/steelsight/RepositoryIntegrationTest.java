@@ -23,13 +23,9 @@ import orochi.steelsight.identity.repository.RoleRepository;
 import orochi.steelsight.ppe.model.Camera;
 import orochi.steelsight.ppe.model.DisputeStatus;
 import orochi.steelsight.ppe.model.ReviewStatus;
-import orochi.steelsight.ppe.model.PpeLinking;
-import orochi.steelsight.ppe.model.PpeVest;
 import orochi.steelsight.ppe.model.Violation;
 import orochi.steelsight.ppe.model.ViolationType;
 import orochi.steelsight.ppe.repository.CameraRepository;
-import orochi.steelsight.ppe.repository.PpeLinkingRepository;
-import orochi.steelsight.ppe.repository.PpeVestRepository;
 import orochi.steelsight.ppe.repository.ViolationRepository;
 import orochi.steelsight.scheduling.model.Shift;
 import orochi.steelsight.scheduling.model.Team;
@@ -62,8 +58,6 @@ class RepositoryIntegrationTest {
     @Autowired ZoneRepository zones;
     @Autowired ShiftRepository shifts;
     @Autowired CameraRepository cameras;
-    @Autowired PpeVestRepository vests;
-    @Autowired PpeLinkingRepository links;
     @Autowired ViolationRepository violations;
     @Autowired CheckInRepository checkIns;
     @Autowired FaceEmbeddingRepository embeddings;
@@ -129,10 +123,12 @@ class RepositoryIntegrationTest {
 
     // --- violations ------------------------------------------------------------------------
 
-    /** SRS BR-48: a person the detection app names, even through a vest, is only a suggestion. */
+    /** SRS BR-47, BR-48: the person the detection app suggests stays a suggestion until HSE reviews it. */
     @Test
-    void aVestReadOnlySuggestsThePersonAndTheViolationWaitsForReview() {
-        Violation saved = violations.saveAndFlush(violation(link("V-1", worker)));
+    void theDetectionAppsSuggestionWaitsForReview() {
+        Violation suggested = violation();
+        suggested.setSuggestedUser(worker);
+        Violation saved = violations.saveAndFlush(suggested);
         em.refresh(saved);
 
         assertThat(saved.getUser()).isNull();
@@ -143,7 +139,7 @@ class RepositoryIntegrationTest {
 
     @Test
     void aViolationNamedByTheDetectionAppIsAlsoOnlyASuggestion() {
-        Violation named = violation(null);
+        Violation named = violation();
         named.setUser(worker);
         Violation saved = violations.saveAndFlush(named);
         em.refresh(saved);
@@ -155,7 +151,7 @@ class RepositoryIntegrationTest {
 
     @Test
     void staleEditOfAViolationFailsInsteadOfOverwriting() {
-        Violation saved = violations.saveAndFlush(violation(link("V-2", worker)));
+        Violation saved = violations.saveAndFlush(violation());
         Long id = saved.getId();
         Long staleVersion = saved.getVersion();
         em.flush();
@@ -225,14 +221,6 @@ class RepositoryIntegrationTest {
 
         CheckIn visit = faceCheckIn(worker);
         visit.setShift(theirs);
-
-        assertThatThrownBy(() -> checkIns.saveAndFlush(visit)).hasMessageContaining("does not belong to user");
-    }
-
-    @Test
-    void visitCannotPointAtAnotherWorkersVest() {
-        CheckIn visit = faceCheckIn(worker);
-        visit.setPpeLinking(link("V-3", otherWorker));
 
         assertThatThrownBy(() -> checkIns.saveAndFlush(visit)).hasMessageContaining("does not belong to user");
     }
@@ -308,7 +296,7 @@ class RepositoryIntegrationTest {
 
     @Test
     void violationHasOnlyOneLiveDisputeTicket() {
-        Violation disputed = violations.saveAndFlush(violation(link("V-4", worker)));
+        Violation disputed = violations.saveAndFlush(violation());
         Ticket first = tickets.saveAndFlush(ticket("PPE appeal", disputed));
 
         assertThatThrownBy(() -> {
@@ -319,7 +307,7 @@ class RepositoryIntegrationTest {
 
     @Test
     void softDeletedDisputeFreesTheViolation() {
-        Violation disputed = violations.saveAndFlush(violation(link("V-5", worker)));
+        Violation disputed = violations.saveAndFlush(violation());
         Ticket first = tickets.saveAndFlush(ticket("PPE appeal", disputed));
         first.setDeletedAt(OffsetDateTime.now());
         tickets.saveAndFlush(first);
@@ -408,20 +396,8 @@ class RepositoryIntegrationTest {
         return teams.save(team);
     }
 
-    private PpeLinking link(String vestCode, AppUser wearer) {
-        PpeVest vest = new PpeVest();
-        vest.setVestCode(vestCode);
-        vests.save(vest);
-
-        PpeLinking link = new PpeLinking();
-        link.setPpeVest(vest);
-        link.setUser(wearer);
-        return links.saveAndFlush(link);
-    }
-
-    private Violation violation(PpeLinking link) {
+    private Violation violation() {
         Violation violation = new Violation();
-        violation.setPpeLinking(link);
         violation.setCamera(camera);
         violation.setViolationType(ViolationType.NO_HARD_HAT);
         violation.setDetectedAt(OffsetDateTime.now());

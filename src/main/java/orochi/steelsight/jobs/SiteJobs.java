@@ -41,7 +41,8 @@ public class SiteJobs {
     private final SiteTime siteTime;
 
     /**
-     * Shifts that have ended become COMPLETED by themselves; nobody has to mark them. Locked months are
+     * Shifts that have ended become COMPLETED by themselves; nobody has to mark them. A check-out already
+     * completes its shift (V25), so this catches the shifts nobody checked out of. Locked months are
      * left as they are (BR-70). The version goes up, so a form opened before stays stale.
      */
     int completeEndedShifts() {

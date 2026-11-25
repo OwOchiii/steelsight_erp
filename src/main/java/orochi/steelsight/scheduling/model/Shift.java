@@ -67,7 +67,7 @@ public class Shift extends BaseModel implements Versioned {
         return status == ShiftStatus.SCHEDULED;
     }
 
-    /** Planned or done: every shift that wasn't cancelled. Ended shifts become COMPLETED by the hourly job. */
+    /** Planned or done: every shift that wasn't cancelled. A shift becomes COMPLETED at check-out (V25), or by the hourly job once it ends. */
     public boolean isActive() {
         return status != ShiftStatus.CANCELLED;
     }

@@ -51,11 +51,22 @@ public class NoticeText {
         for (int i = 0; i < names.size(); i++) {
             args[i] = format(names.get(i), params.get(names.get(i)), locale);
         }
-        String text = messages.getMessage("notice." + kind.name(), args, kind.name(), locale);
+        String key = "notice." + kind.name();
+        if (names.contains("shift") && isBlank(params.get("shift"))) {
+            key = key + ".noShift";     // a gate visit with no shift: "Check-in at 07:58 (no shift)."
+        }
+        String text = messages.getMessage(key, args, null, locale);
+        if (text == null) {
+            text = messages.getMessage("notice." + kind.name(), args, kind.name(), locale);
+        }
         if (kind == NotificationKind.VIOLATION_ALERT && Boolean.TRUE.equals(params.get("nobodyOnDuty"))) {
             text = text + " " + messages.getMessage("notice.nobodyOnDuty", null, "", locale);
         }
         return text;
+    }
+
+    private static boolean isBlank(Object value) {
+        return value == null || String.valueOf(value).isBlank();
     }
 
     private Object format(String name, Object value, Locale locale) {

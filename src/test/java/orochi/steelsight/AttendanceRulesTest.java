@@ -6,10 +6,8 @@ import orochi.steelsight.attendance.model.CheckInMethod;
 import orochi.steelsight.attendance.service.AttendanceRules;
 import orochi.steelsight.attendance.service.VisitStatus;
 import orochi.steelsight.identity.model.AppUser;
-import orochi.steelsight.ppe.model.PpeLinking;
 import orochi.steelsight.scheduling.model.Shift;
 import orochi.steelsight.scheduling.model.ShiftStatus;
-import orochi.steelsight.scheduling.model.Team;
 
 import java.time.OffsetDateTime;
 
@@ -60,16 +58,6 @@ class AttendanceRulesTest {
 
         assertThat(status.isLate()).isFalse();
         assertThat(status.minutesEarly()).isEqualTo(30);
-    }
-
-    @Test
-    void theTeamNoLongerChangesTheGrace() {
-        Team relaxed = new Team();
-        relaxed.setLateAfterMinutes(30);
-        CheckIn visit = visit(at("08:20"), at("17:00"), shift());
-        visit.getUser().setTeam(relaxed);
-
-        assertThat(rules.assess(visit).minutesLate()).isEqualTo(20);
     }
 
     @Test

@@ -30,11 +30,6 @@ public class Violation extends BaseModel implements Versioned {
     @JoinColumn(name = "user_id")
     private AppUser user;
 
-    /** The vest read by OCR in the old detection app. Kept so its rows still load (SRS CR-01). */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ppe_linking_id")
-    private PpeLinking ppeLinking;
-
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "camera_id", nullable = false)
     private Camera camera;

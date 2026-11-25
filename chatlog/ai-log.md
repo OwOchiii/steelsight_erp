@@ -1,12 +1,11 @@
+# AI usage log
 
-.# AI usage log
-
-How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md), [9 November](../transcript/9-11-2026.md), [16 November](../transcript/16-11-2026.md), [17 November](../transcript/17-11-2026.md), [21 November](../transcript/21-11-2026.md), [23 November](../transcript/23-11-2026.md) and [24 November](../transcript/24-11-2026.md). The 17 November session was opened in the detection app's folder, and the 21 and 23 November sessions in the ERP's; all three changed both programs. Only their ERP work is logged here, and the detection work is in that repository's `chatlog/detection-ai-log.md`.
+How AI was used on the Steelsight ERP. The full conversations are in the transcripts for [4 November](../transcript/4-11-2026.md), [5 November, including the session that ran past midnight](../transcript/5-11-2026.md) [6 November](../transcript/6-11-2026.md), [9 November](../transcript/9-11-2026.md), [16 November](../transcript/16-11-2026.md), [17 November](../transcript/17-11-2026.md), [21 November](../transcript/21-11-2026.md), [23 November](../transcript/23-11-2026.md), [24 November](../transcript/24-11-2026.md) and [25 November](../transcript/25-11-2026.md). The 17 November session was opened in the detection app's folder, and the 21 and 23 November sessions in the ERP's; all three changed both programs. Only their ERP work is logged here, and the detection work is in that repository's `chatlog/detection-ai-log.md`.
 
 | | |
 |---|---|
 | Tool | Claude Code (Opus 5.5) |
-| Dates | 2026-11-04 to 2026-11-24 (one session ran past midnight) |
+| Dates | 2026-11-04 to 2026-11-25 (one session ran past midnight) |
 | Branch | `feature/erp-backend` |
 
 ## Summary by request
@@ -146,6 +145,22 @@ Nothing from this day is committed yet.
 | 11:40 | Apply two CodeRabbit review comments | Both still valid. Check-out notices wait for their hours: `ZaloDispatcher` holds a CHECK_OUT back until `CheckOutHours.fill` has run, `fill` covers older waiting notices, handles each notice on its own, and gives "-" with a log warning when the hours can't be worked out. Long `/chamcong` replies are split at line ends into messages of at most 2,000 characters, totals first. 3 integration tests and `ZaloCommandsTest` (4) | Not committed |
 | 13:43 | Docker is on, run the tests | `ZaloNoticesTest` 26 of 26; full suite 402 of 402 after fixing one test | Not committed |
 | 13:53 | Write today's chat log and transcript | This update and `transcript/24-11-2026.md` | Not committed |
+| 23:52 | The Zalo check-in and check-out messages should name the shift they start and finish, with its date and time, then write the logs | V24 (`shift_label()`, check-in and check-out triggers rewritten, older notices relabelled): "Chấm công vào lúc 07:52, bắt đầu ca T3 24/11 08:00–17:00." and "Chấm công ra lúc 17:05, kết thúc ca T3 24/11 08:00–17:00, số giờ làm N.NN.", with "(không có ca)" for a visit with no shift. Texts in both languages, `NoticeText` picks the no-shift wording, 2 new tests plus 2 updated, user guide 6.6, detection-app contract. The code was already in the working tree; this session checked and tested it | Not committed |
+| 00:05 (25 Nov) | Make check-out complete the shift too | V25: a trigger on `check_in` marks the visit's SCHEDULED shift COMPLETED on any real check-out (gate, typed-in visit, correction, approved missing check-out), with the version raised; not for the system's close of a stale visit, a cancelled shift or a locked month. Shifts already checked out of are completed by the migration. The hourly job stays for shifts nobody checked out of. Coming back during the shift still attaches to it. 2 tests; shift page wording, user guide, traceability, database design | Not committed |
+
+### 2026-11-25
+
+Nothing from this day is committed yet.
+
+| Time | What the developer asked for | What was produced | Commit |
+|---|---|---|---|
+| 11:02 | Check Report 4 (the Software Design Document) and its diagrams against the code and the detection app | Report 4 stops at the 4 November design (V1–V9): its package diagram, about 20 class names, the data dictionary (19 tables, where the schema has about 30), triggers, routes, authorization matrix and report sheets are out of date, and its detection app is the old Docker, EasyOCR and burst-alert design. The diagrams are draw.io drawings, not PlantUML from `03_implement`. Still right: the stack table, deployment and authentication | None |
+| 11:21 | Check the new Report 3 against the code, title by title; the licensing is out of the detection app | Licensing confirmed gone. Diffed against the previous Report 3 from git: only 3.1.5 (the ERD, now 24 tables with columns), CR-23, the site-wide 5-minute late tolerance and two wordings changed, so every other title is as traced in `04_testing/SRS-TRACEABILITY.md`. The ERD doesn't match the schema: tables the SRS removes still existed, `zone.code` and the bonus percentages were missing, and many names and shapes differ. The new file's cover says September and its Record of Changes lost the 23/11 row | None |
+| 11:30 | Write V26 and test it, then rewrite `docs/database-design.md` | V26: drops `ppe_vest`, `ppe_linking`, both `ppe_linking_id` columns, `safety_alert` and `team.late_after_minutes`; a fixed `zone.code` (GATE-IN, GATE-PPE, AREA-A …) given by a trigger and never changed. The alert endpoint and the vest and alert classes removed; the Zones page shows the code. Schema checks, a new zone-code test, the detection app's integration check updated. `docs/database-design.md` rewritten from the migrated schema (27 tables, 7 domains, a section on differences from the SRS); contract, deployment and traceability docs updated | Not committed |
+| 11:51 | Write today's transcript and chat log, and one design document per title | `transcript/25-11-2026.md` (generated from the session file) and this update. New `docs/system-design.md`, `docs/detailed-design.md`, `docs/integration-design.md` and `docs/security-and-report-design.md`, following Report 4's titles and the code; `docs/database-design.md` was already rewritten. The detailed design points to the `03_implement` diagrams and says which are out of date (ATT, SCH, PPE, TKT, NTF, RPT). `docs/tech-stack.md` corrected (V26, 27 tables, no alert API). Found that team leaders can't see their own violations | Not committed |
+| 12:34 | Make the design documents into Report 4 as Markdown, and check the `02_design`, `03_implement` and `04_testing` files brought from the detection repo | `Report4_Software_Design_Document.md`, assembled from the design documents in the docx's structure (Record of Changes, sections 1 to 5, renumbered, with a deployment diagram, the local outbox and file storage sections). The 38 detection files are identical to the detection repo's and no ERP file was replaced. The detection ADRs are current (vest decisions superseded by ADR-123), but the `STEELSIGHT-DET-*` TDS and Test-Specs date from 9 to 17 November and still describe vest numbers, the Telegram notifier and burst alerts; the Test-Specs name files that no longer exist (`steelsight/gate.py`, `records/notify.py`, `tests/test_vest_fix.py`, `tests/test_config.py`) | Not committed |
+| 12:50 | Write the test documentation from the Report 5 template, using another project's Report 5 as reference, and keep it as close to the codebase as possible | `Report5_Test_Documentation.md` with every figure from today's runs: the ERP suite with JaCoCo attached from the command line (402 of 402: 80 unit, 315 integration, 7 automated SRS workflows; 89.2% of lines, 70.6% of branches) and the detection app's pytest suite twice (166 of 167, then 167 of 167; the failure is a flaky test in the unused vest OCR code). `04_testing/Report5_Unit_Test.xlsx` and `04_testing/Report5_Test_Report.xlsx` generated from the results by the new `scripts/report5_test_cases.py`, with 15 manual system scenarios marked not run. Seven defects listed, two open: team leaders can't see their own violations (a test asserts the old behaviour) and the clock-dependent workflow test | Not committed |
+| 13:35 | Fix the team leader permission | V27 gives the MANAGER role `VIOLATION_READ_OWN`, so team leaders see their own violations and score and can appeal (SRS 3.1.3); reads stay own-only. `WorkerAccessPagesTest.managerStillCannotOpenViolationPages` replaced by a test of the SRS behaviour, including refusal of someone else's violation and the review pages. Full suite 402 of 402. Report 5 (DEF-01 closed, M11), the case sheets, the authorization matrix, database and system design, tech stack, traceability, Report 4 and the user guide updated; the user guide's late check-in rule (still the old per-team 15 minutes with make-up time) corrected to the fixed 5 minutes | Not committed |
 
 ## Decisions made by the developer
 
@@ -214,6 +229,11 @@ Nothing from this day is committed yet.
 ### 2026-11-24
 
 - The bot gets commands to read your own schedule and attendance, a team addition beyond the SRS.
+- A check-out completes its shift at once, not only when the shift ends (25 November, 00:05).
+
+### 2026-11-25
+
+- The design documents go in `docs/`, one per title, and point to `03_implement` for the class and sequence diagrams.
 
 ## Decisions suggested by Claude and accepted by the developer
 
@@ -273,6 +293,10 @@ From the deployment plan the developer approved on 6 November:
 ### 2026-11-24
 
 - The bot answers `/lich` and `/chamcong` with one line per shift instead of a grid, since Zalo shows plain text.
+
+### 2026-11-25
+
+- V26 removes what the SRS removes (vest tables, burst alerts, the per-team late tolerance) and adds `zone.code`.
 
 ## Decisions made by Claude and reported to the developer
 
@@ -385,6 +409,13 @@ These came from the request to check every user error, and the developer hasn't 
 - A check-out notice whose hours can't be worked out is sent with "-" and a warning in the log, rather than waiting for ever or being dropped.
 - `CheckOutHours.fill` has no shared transaction, because a failed query would abort it for every notice after.
 
+### 2026-11-25
+
+- Where the schema and the SRS ERD differ only in names or shape, the ERD should change, since the code is tested. The list is in section 4 of `docs/database-design.md`; the developer hasn't decided yet.
+- The database gives the zone code, in a trigger, so the ERP, the site setup script and the tests that insert zones get the same codes. Hibernate reads it back (`@Generated`).
+- The `/api/**` key check stays with no endpoint behind it, in case an API comes back; the key is marked optional in `docs/deployment.md`.
+- The bonus reductions stay fixed at 2/4/6% in `SafetyLevel`, since the developer didn't choose; the SRS puts them in `safety_policy`.
+
 ## How the work was checked
 
 ### 2026-11-04
@@ -464,6 +495,19 @@ These came from the request to check every user error, and the developer hasn't 
 - `ZaloNoticesTest`: 26 of 26 with Docker. Full suite: 402 tests, 0 failures, after one test fix.
 - `ZaloCommandsTest` (splitting and command matching) needs no database.
 - Not checked: the commands with the real bot, or Render after the image fix.
+- V24: `ZaloNoticesTest` 28 of 28, `ZaloCommandsTest` 4, `TranslationsTest` 3. Full suite (23:58 to 00:01): 407 tests, 1 failure, `SrsWorkflowTest.workflow124`, because it ran across midnight: its check-in "3 hours ago" was on the 24th and Team Attendance showed the 25th. Not caused by V24; it passed at 13:51.
+- V25: full suite (00:05 to 00:09) 409 tests, 2 failures: `workflow124` again (midnight), and `ManagerPagesIntegrationTest.aFinishedShiftIsCompletedByTheSystem…`, which checked the old shift page wording. After updating that assertion, `ManagerPagesIntegrationTest` 27, `ZaloNoticesTest` 30, `SrsShiftsAndJobsTest` 17 and `TranslationsTest` 3 all pass.
+- Not checked: the new wording with the real Zalo bot.
+
+### 2026-11-25
+
+- Report 3 was compared with the copy in git (`b6bbb9a`) by extracting the text of both and diffing; its ERD figures were read as images.
+- Full suite: 402 tests, 0 failures, after fixing the new zone-code test.
+- V26 on existing data: a throwaway pgvector database migrated to V25 with zones of every kind, a vest link, a visit and a violation using it, a team late setting and a burst alert, then V26. Codes came out GATE-IN, GATE-PPE, AREA-A, AREA-B and GATE-IN-2, every row survived, and the detection role could still read zones, write violations and visits, check out and close stale visits.
+- The detection app's `tests/erp_integration_check.py` against V1–V26: 22 of 22.
+- `docs/database-design.md` was compared with the migrated schema by a script: all 27 tables match column for column, with 52 foreign keys.
+- Not checked: V26 against Supabase, the Zones page in a browser, or the desktop app's zone dropdown.
+- The design documents were written from the code: roles and permissions from a migrated throwaway database, routes from the controllers, operations from the public methods, jobs from `JobScheduler` and `SiteJobs`, report sheets from `MonthlyReportWorkbook`. The package diagram was redrawn from the imports after the first draft was too tidy. Every relative link was checked.
 
 ## Problems during the work
 
@@ -567,10 +611,31 @@ These came from the request to check every user error, and the developer hasn't 
 | Docker Desktop wasn't connected to WSL at first | Compiled and ran the tests that need no database; the developer turned on Docker at 13:43 |
 | The new hold-back test reset the retry time on every delivery row; in the full suite, SKIPPED rows from other tests broke a check constraint | Uses the existing `makeDue(user)` helper, which only touches that worker's PENDING rows |
 | The local `.env` has no Zalo settings, so the value behind the bad QR couldn't be seen | Explained how to find and set the right link |
+| `JAVA_HOME` wasn't set in the shell, so the first test run didn't start and only old reports were left | Ran with `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64` |
+| `SrsWorkflowTest.workflow124` depends on the clock and fails when the suite runs across midnight | Reported as an open item; not changed |
+
+### 2026-11-25
+
+| Problem | Outcome |
+|---|---|
+| The local database needed a password, and reading it as the `postgres` system user was refused | Read the schema from the migrations, then from throwaway Docker databases |
+| `JAVA_HOME` pointed at a Windows JDK | Ran Maven with `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64` |
+| Many tests and the sample data insert zones without a code, so a `NOT NULL` code broke them | The code is given by a database trigger instead of the ERP |
+| The new zone-code test assumed only work areas hold AREA codes, but other tests change a zone's kind after adding it | The test skips every code already taken |
 
 ## Open items
 
-- Today's work isn't committed: the bot commands, the two review fixes and the docs, along with V23 from 23 November.
+- Nothing from 24 or 25 November is committed: the bot commands, the two review fixes, V24, V25, V26 (vest tables, burst alerts and the team late tolerance removed, zone codes), V27 (team leaders see their own violations), the rewritten `docs/database-design.md`, the new design documents and the logs, along with V23 from 23 November.
+- Update Report 4 (the Software Design Document): it still describes the 4 November design. The new documents in `docs/` (system, database, detailed, integration, security and report design) follow the code and can be its source. Redraw its diagrams, or take them from `03_implement`.
+- Update Report 3's ERD (3.1.5) from section 4 of `docs/database-design.md`, or decide to change the code instead. Also fix its cover date (September) and restore the 23/11 row of its Record of Changes.
+- Decide whether the bonus reductions (2/4/6%) move into `safety_policy`, as the SRS says, or stay fixed in the ERP.
+- Decide whether to remove the `/api/**` key check, now that no endpoint is left behind it.
+- Make the desktop app's camera settings name the zone by `zone.code` (SRS 3.2.30), and check the Zones page in a browser in both languages.
+- Run the 15 manual system scenarios of `04_testing/Report5_Test_Report.xlsx` (sheet "System manual") on the deployed build with the real cameras and Zalo bot, then the acceptance session; fill in the team's testing roles in Report 5, section 3.1.
+- ~~Give the MANAGER role `VIOLATION_READ_OWN`.~~ Done in V27 on 25 November.
+- Update the TDS diagrams in `03_implement` that the detailed design marks out of date (ATT, SCH, PPE, TKT, NTF, RPT), and the detection TDS and Test-Specs (`STEELSIGHT-DET-*`, now also in this repo), which still describe vest numbers, the Telegram notifier and burst alerts and name deleted files. ADR-105 doesn't mention the face scanner that SRS BR-27 to BR-29 use.
+- Make `SrsWorkflowTest.workflow124` independent of the clock; it fails when the suite runs across midnight.
+- Note in the SRS (3.2.10) that a shift is completed at check-out or when it ends, with no manual step.
 - Fix Render: set the image URL to `ghcr.io/owochiii/steelsight_erp:latest` and deploy. Don't roll back to an image older than `febb2bf`, since the database is at V21 or later.
 - Set `ZALO_BOT_LINK` to the bot's full `https://` link, then scan the QR again. If the bot token was ever in that variable, regenerate it.
 - Try `/lich` and `/chamcong` with the real bot once deployed.
@@ -582,7 +647,7 @@ These came from the request to check every user error, and the developer hasn't 
 - Decide whether to retire the "Safety concern" ticket category for good; it's hidden from new tickets.
 - HSE no longer sees a worker's appeal reason unless the Admin uses "Ask HSE Officer".
 - Rewrite `03_implement/STEELSIGHT-PPE-IMP-001_TDS.md`, which still describes the vest-link design (it has a note at the top).
-- Drop the `ppe_vest` and `ppe_linking` tables in a later migration, now that the desktop app no longer uses them.
+- ~~Drop the `ppe_vest` and `ppe_linking` tables in a later migration, now that the desktop app no longer uses them.~~ Done in V26 on 25 November, with `safety_alert`.
 - Check the new pages in a browser, in both languages: Review Queue, My and Team Attendance, Pending Overtime, Zones, Company Settings, Monthly Report, and the QR.
 - Decide whether `Report3_Software_Requirement_Specification.docx` should stay in git; `b6bbb9a` added it.
 - ~~The 21 November work isn't committed, in either repository.~~ The ERP part was committed in `b6bbb9a` on 23 November.
@@ -617,7 +682,7 @@ These came from the request to check every user error, and the developer hasn't 
 - A leave request doesn't cancel shifts, so an approved leave day still counts as a no-show unless admin cancels that shift.
 - The detection service needs the face bucket name, and must process `PENDING` face photos from it.
 - Check the redesign and new pages in a browser, on desktop and phone, in both themes and both languages.
-- The detection software needs its own change to count violations and call the alert API, and it needs `STEELSIGHT_DETECTION_API_KEY` set on both sides.
+- ~~The detection software needs its own change to count violations and call the alert API, and it needs `STEELSIGHT_DETECTION_API_KEY` set on both sides.~~ Burst alerts were removed (CR-02); the API went in V26 on 25 November.
 - Show the camera image once Supabase Storage is added. A worker warned about their pay can't currently see the photo when disputing a violation.
 - The detection service must call `close_stale_check_ins()` and set `shift_id` on check-ins.
 - Managers who were already signed in need to sign in again for their menu to update.

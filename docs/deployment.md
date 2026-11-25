@@ -44,7 +44,7 @@ Create a web service from an **existing image** with:
 | `SUPABASE_SERVICE_KEY` | The Supabase server key |
 | `SUPABASE_STORAGE_BUCKET` | Only if the ticket bucket isn't named `ticket-photos` |
 | `SUPABASE_FACE_BUCKET` | Only if the face bucket isn't named `face-photos`. The detection service needs the same bucket name, because `face_file_path` holds only the file name |
-| `STEELSIGHT_DETECTION_API_KEY` | A long random value, for example from `openssl rand -hex 32`. The detection software sends the same one. |
+| `STEELSIGHT_DETECTION_API_KEY` | Optional since V26: no endpoint under `/api/` is left, and with no key every call there is refused. Set a long random value (`openssl rand -hex 32`) only if an API is added again. |
 | `SUPABASE_EVIDENCE_BUCKET` | Only if the violation photo bucket isn't named `evidence-photos`. The detection app needs the same name |
 | `ADMIN_EMPLOYEE_CODE` | The first admin's code, or leave unset for `ADMIN` |
 | `ADMIN_PASSWORD` | A strong password for the first admin |
@@ -86,7 +86,6 @@ Don't load `scripts/dev-sample-data.sql` as it is, because its accounts have kno
 - The session cookie is marked `Secure`.
 - A ticket photo still opens after restarting the service.
 - Five wrong passwords lock that sign-in, and the message appears.
-- The detection API refuses a wrong `X-Api-Key`.
 - The detection role can sign in through the pooler, and can't read `password_hash`.
 
 ## Free-tier limits

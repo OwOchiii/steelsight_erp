@@ -284,7 +284,7 @@ class ManagerPagesIntegrationTest extends PageTestSupport {
 
         mvc.perform(get("/shifts/" + id + "/edit").with(as(manager)))
                 .andExpect(content().string(containsString("can&#39;t be changed")))
-                .andExpect(content().string(containsString("marked this shift completed when it ended")))
+                .andExpect(content().string(containsString("marked this shift completed when the worker checked out, or when it ended")))
                 .andExpect(content().string(not(containsString("Save shift"))));
         mvc.perform(post("/shifts/" + id + "/cancel").with(as(manager)).with(csrf()))
                 .andExpect(flash().attribute("error", "Only a scheduled shift can be changed"));

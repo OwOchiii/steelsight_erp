@@ -3,7 +3,6 @@ package orochi.steelsight.scheduling.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import orochi.steelsight.exception.BusinessRuleException;
@@ -23,8 +22,6 @@ import java.util.stream.Collectors;
 @Transactional
 @RequiredArgsConstructor
 public class TeamService {
-
-    private static final int MAX_LATE_AFTER_MINUTES = 240;
 
     private final AccessPolicy access;
     private final TeamRepository teams;
@@ -85,22 +82,6 @@ public class TeamService {
         }
         access.require(actorId, Permissions.SHIFT_UPDATE_TEAM);
         return teams.findAllByManagerId(actorId);
-    }
-
-    /** An admin can change any team; a manager only a team they run. */
-    public Team setLateAfterMinutes(Long actorId, Long teamId, Integer minutes) {
-        Team team = teams.require(teamId);
-        if (!access.has(actorId, Permissions.USER_MANAGE)) {
-            access.require(actorId, Permissions.SHIFT_UPDATE_TEAM);
-            if (!team.isManagedBy(actorId)) {
-                throw new AccessDeniedException("This is another manager's team");
-            }
-        }
-        if (minutes == null || minutes < 0 || minutes > MAX_LATE_AFTER_MINUTES) {
-            throw new BusinessRuleException("Enter between 0 and " + MAX_LATE_AFTER_MINUTES + " minutes");
-        }
-        team.setLateAfterMinutes(minutes);
-        return teams.saveAndFlush(team);
     }
 
     private AppUser freeLeader(Long managerId, Long teamId) {

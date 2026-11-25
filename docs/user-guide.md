@@ -7,7 +7,7 @@ How to use the Steelsight ERP, for each role. The labels below are the English o
 | Role | What they do in Steelsight |
 |---|---|
 | **Admin** | Creates and changes every account and team, handles every ticket, decides PPE disputes, can plan any shift, and exports the monthly report for every worker |
-| **Team leader** (Manager) | Plans shifts for their own team, sees their team's attendance, reads and comments on their team's tickets, sets the team's late check-in rule, and exports their team's monthly report for accounting |
+| **Team leader** (Manager) | Plans shifts for their own team, sees their team's attendance, reads and comments on their team's tickets, exports their team's monthly report for accounting, and, like a worker, sees their own violations and safety score and can appeal |
 | **HSE officer** | Reviews PPE violations, names the worker on unidentified ones, gives the admin the facts of a shift when asked, records check-ins by hand, and watches safety by shift |
 | **Worker** | Sees their timetable, violations and safety score, disputes a wrong violation, and opens tickets such as leave requests |
 
@@ -134,14 +134,15 @@ Open **Team** to see the people on your team. You can't edit their details. Ask 
 2. Use **Previous week** and **Next week** to move between weeks.
 3. To add a shift, click **+** in an empty cell. The form opens with that person and day filled in, set to 08:00 to 17:00. Change the times if needed, then click **Add shift**. You can also click **New shift**.
 4. To change a shift, click it in the grid, then edit and click **Save shift**.
-5. To call off a shift before it starts, click **Cancel shift**. This can't be undone. You don't need to finish shifts: within an hour of ending, a shift becomes **Completed** by itself.
+5. To call off a shift before it starts, click **Cancel shift**. This can't be undone. You don't need to finish shifts: a shift becomes **Completed** by itself when the worker checks out, or within an hour of ending if nobody checks out.
 
 You can only plan shifts for people on your own team.
 
 ### 4.3 Late check-in rule
-On **Team**, under **Late check-in rule**, set how many minutes after a shift starts a check-in still counts as on time, then click **Save**. The default is 15.
-
-Late time is made up at the end of the shift, up to that many minutes. For example, on an 08:00 to 17:00 shift with the 15-minute rule, arriving at 08:10 means working until 17:10. Arriving after 08:15 is tagged late, with the work time ending at 17:15.
+The rule is the same for every team and can't be changed: a check-in up to 5 minutes after the shift
+starts is on time; later is late (BR-31). Late time isn't made up at the end of the shift. For example,
+on an 08:00 to 17:00 shift, arriving at 08:05 is on time and paid from 08:00; arriving at 08:20 is late
+and paid from 08:20.
 
 ### 4.4 Attendance
 Open **Attendance** to see who on your team is on site now, and recent visits. Tags show **Check-in late**, **Check-out early**, **No check-out** or **On time**. This page is read-only for team leaders.
@@ -165,7 +166,12 @@ The file has 4 sheets:
 
 Overturned violations don't count. Hours worked include estimated check-outs, which are also counted under **Missing check-outs**.
 
-### 4.7 Tickets
+### 4.7 Your own violations and safety score
+You work on site, so you have a safety score like a worker. Open **Violations** to see the violations
+confirmed against you, your score and your bonus level, and appeal a wrong one, as in 6.3. You can't
+see other people's violations or the review pages.
+
+### 4.8 Tickets
 Team leaders don't decide tickets. Under **My tickets**, **My team's tickets** lists the tickets your team has opened. You can open them and add a comment, for example to confirm a leave request; the admin decides. You can still open your own tickets, as in 6.4.
 
 ## 5. HSE officer
@@ -245,6 +251,12 @@ Zalo is optional. Every notice is also on the bell in this app.
 
 To stop, click **Stop Zalo notices**, or send `/stop` to the bot. If you can't use the page, the Admin
 can make a code for you (3.6).
+
+When the gate camera checks you in or out, the message names the shift it starts or finishes, by its day,
+date and times: `Chấm công vào lúc 07:52, bắt đầu ca T3 24/11 08:00–17:00.` and `Chấm công ra lúc 17:05,
+kết thúc ca T3 24/11 08:00–17:00, số giờ làm …` (your paid hours). A check-in more than 60 minutes before your shift, or
+on a day with no shift, says `(không có ca)` instead. Checking out completes that shift; if you come back
+in before it ends, your new check-in still goes with the same shift.
 
 Once linked, you can also ask the bot about your own shifts. Each shift comes back as one line:
 

@@ -15,7 +15,7 @@
             <dt th:text="#{field.time}">Time</dt><dd th:text="#{common.timeRange(${@display.dateTime(shift.startAt)}, ${@display.time(shift.endAt)})}">Time</dd>
         </dl>
         <p class="quiet divider" th:text="#{shifts.locked}">A finished or cancelled shift can't be changed.</p>
-        <p class="quiet" th:if="${shift.status.name() == 'COMPLETED'}" th:text="#{shifts.completedAuto}">The system marked this shift completed when it ended.</p>
+        <p class="quiet" th:if="${shift.status.name() == 'COMPLETED'}" th:text="#{shifts.completedAuto}">The system marked this shift completed when the worker checked out, or when it ended.</p>
     </section>
 
     <th:block th:if="${shift == null or shift.scheduled}">

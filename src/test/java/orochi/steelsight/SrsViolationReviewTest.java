@@ -359,6 +359,26 @@ class SrsViolationReviewTest extends PageTestSupport {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM zone WHERE name IN ('Gate 2', 'X', 'Sneaky')", Long.class)).isZero();
     }
 
+    /** SRS 3.2.23, V26: each zone gets the next free code of its kind, shown on Zones and never changed. */
+    @Test
+    void aNewZoneGetsTheNextFreeCodeOfItsKind() throws Exception {
+        java.util.List<String> areasBefore = jdbc.queryForList("SELECT code FROM zone", String.class);
+        String nextArea = java.util.stream.IntStream.rangeClosed(0, 25)
+                .mapToObj(i -> "AREA-" + (char) ('A' + i)).filter(code -> !areasBefore.contains(code)).findFirst().orElseThrow();
+
+        mvc.perform(post("/zones/new").param("name", "Rebar yard").param("kind", "WORK_AREA").with(as(admin)).with(csrf()))
+                .andExpect(flash().attribute("success", "The zone was added."));
+        assertThat(jdbc.queryForObject("SELECT code FROM zone WHERE name = 'Rebar yard'", String.class)).isEqualTo(nextArea);
+        mvc.perform(get("/zones").with(as(admin))).andExpect(content().string(containsString(nextArea)));
+
+        // Renaming keeps the code; changing the code itself is refused by the database.
+        Long id = jdbc.queryForObject("SELECT id FROM zone WHERE name = 'Rebar yard'", Long.class);
+        mvc.perform(post("/zones/" + id).param("name", "Rebar and formwork yard").with(as(admin)).with(csrf()));
+        assertThat(jdbc.queryForObject("SELECT code FROM zone WHERE id = ?", String.class, id)).isEqualTo(nextArea);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update("UPDATE zone SET code = 'AREA-Q9' WHERE id = ?", id))
+                .hasMessageContaining("cannot change");
+    }
+
     /** The Admin links a detection app's camera code to a zone; the zone's kind sets what it records. */
     @Test
     void theAdminLinksMovesAndRemovesCameras() throws Exception {

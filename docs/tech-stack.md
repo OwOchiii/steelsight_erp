@@ -18,12 +18,12 @@ GitLab CI/CD is the project's pipeline. While the code is still on GitHub, GitHu
 | Frontend | Dashboard charts | Server-side bars (`web/Charts.java`) with CSS | Bars are worked out in Java and drawn with HTML and CSS | Informative dashboard with no chart library |
 | Backend | Language and runtime | Java 17 (Eclipse Temurin in Docker) | The language the ERP is written in | Long-term support version the team knows |
 | Backend | Application framework | Spring Boot 4.0.0 (Spring Framework 7.0.1) | Web app, configuration and dependency injection | The base of the ERP |
-| Backend | Web layer | Spring Web MVC 7.0.1 on embedded Tomcat 11.0.14 | Page controllers, the Zalo webhook, and the old REST alert API (kept so older detection copies get an answer; it notifies nobody, CR-02) | Serves pages to browsers and takes messages from the Zalo bot |
+| Backend | Web layer | Spring Web MVC 7.0.1 on embedded Tomcat 11.0.14 | Page controllers and the Zalo webhook (the REST alert API was removed in V26, CR-02) | Serves pages to browsers and takes messages from the Zalo bot |
 | Backend | Security | Spring Security 7.0.0, BCrypt | Sign-in by employee code, permission and scope checks, CSRF, an API key for `/api/**` | Each role only sees and changes what it's allowed to |
 | Backend | Sign-in limit | Caffeine 3.2.3 | In-memory count of failed sign-ins | Slows password guessing on the public site |
 | Backend | Data access | Spring Data JPA, Hibernate 7.1.8 | Entities and repositories over PostgreSQL | Reads and writes data without hand-written SQL for common cases |
 | Backend | Connection pool | HikariCP 7.0.2 | Reuses database connections | Stays within Supabase's connection limit |
-| Backend | Schema migrations | Flyway 11.14.1 | Versioned SQL migrations `V1` to `V22`, plus row level security after each run | Only the ERP changes the schema, in a repeatable order |
+| Backend | Schema migrations | Flyway 11.14.1 | Versioned SQL migrations `V1` to `V27`, plus row level security after each run | Only the ERP changes the schema, in a repeatable order |
 | Backend | JDBC driver | PostgreSQL JDBC 42.7.8 | Connects Java to PostgreSQL | Database access |
 | Backend | JSON | Jackson 3.0.2 | Reads and writes JSON | Zalo webhook and Bot API bodies, notification parameters |
 | Backend | Health check | Spring Boot Actuator 4.0.0 | Only `/actuator/health` is public | Render checks that a new release started before switching to it |
@@ -34,7 +34,7 @@ GitLab CI/CD is the project's pipeline. While the code is still on GitHub, GitHu
 | Backend | QR code | qrcodegen 1.8.0 (Nayuki) | Draws the Zalo bot link as an inline SVG QR code on the server | Employees scan it with Zalo to open the bot and send their link code (CR-10) |
 | Backend | Excel export | fastexcel 0.18.4 | Writes the monthly report as an `.xlsx` file by streaming, with the sheets Site summary, Office summary, Violations, Attendance and Absences (BR-71) | Team leaders send safety and attendance figures to accounting for pay and bonuses |
 | Backend | Boilerplate | Lombok 1.18.42 | Generates getters, setters and constructors at compile time | Shorter entity and service code |
-| Database | Relational database | PostgreSQL 17 | 30 tables, with triggers (violation suggestion and HSE alert, shift attachment, notification delivery) and `can_*` permission functions | The shared record for the ERP and the detection service |
+| Database | Relational database | PostgreSQL 17 | 27 tables, with triggers (violation suggestion and HSE alert, shift attachment, check-in and check-out notices, shift completion, notification delivery, zone codes) and `can_*` permission functions | The shared record for the ERP and the detection service |
 | Database | Vector extension | pgvector | Stores face embeddings | Face matching at the gate, and suggestions in work zones |
 | Database | Range extension | btree_gist | Supports an exclusion constraint | Stops a worker having overlapping shifts |
 | Database | Row level security | PostgreSQL RLS | On for every table, with policies only for the detection role | Blocks Supabase's public Data API, and limits what detection can read and write |

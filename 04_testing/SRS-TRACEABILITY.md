@@ -6,7 +6,7 @@ All tests are under `src/test/java/orochi/steelsight/`. Test methods named `brNN
 `crNN_…` or `workflowNNN_…` check that code directly. Run everything with `./mvnw test` (Docker needed
 for the database tests).
 
-**Status (23/11/2026):** 380 tests, all passing.
+**Status (25/11/2026):** 402 tests, all passing.
 
 **Team decision that changes the SRS:** a monitoring zone may have **several cameras** and a work
 zone **belongs to one team**. HSE picks a violator from that team first; the gate keeps the CAM-01
@@ -72,7 +72,7 @@ repo can't test them; see `docs/detection-app-contract.md`.
 | BR-61 | Admin handles all; no self-decision; leader comments | `SrsTicketRulesTest.br61_…`, `HsePagesIntegrationTest` |
 | BR-62 | Status, cancel, decision notice | `SrsTicketRulesTest.br62_…` (2) |
 | BR-63 | Working days Mon–Sat | `SrsTicketRulesTest.br69_…` |
-| BR-64 | Appeal conditions | `SrsTicketRulesTest.br64_…`, `msg38_…`, `msg39_…` |
+| BR-64 | Appeal conditions; a team leader appeals their own violation too (3.1.3, V27) | `SrsTicketRulesTest.br64_…`, `msg38_…`, `msg39_…`, `WorkerAccessPagesTest.aTeamLeaderSeesAndAppealsTheirOwnViolationsButNoOneElses` |
 | BR-65 | Appeal decision, right person | `SrsTicketRulesTest.br65_…` (3) |
 | BR-66 | Attendance error | `SrsTicketRulesTest.msg41_…`, `msg42_…`, `br66_…` |
 | BR-67 | Missing check-out explanation | `SrsTicketRulesTest.br67_…`, `msg42_…`, `SrsWorkflowTest.workflow1210_…` |
@@ -86,8 +86,8 @@ repo can't test them; see `docs/detection-app-contract.md`.
 
 | CR | Status in the ERP |
 |---|---|
-| CR-01 Remove vest numbers | ERP no longer uses them; the detection app stopped writing them (23/11/2026). The tables can be dropped in a later migration |
-| CR-02 Remove burst alert | Done: the API stores and notifies nobody (`DetectionAlertApiTest`); the detection app no longer calls it |
+| CR-01 Remove vest numbers | Done: V26 drops `ppe_vest`, `ppe_linking` and both `ppe_linking_id` columns (`schema_checks.sql`); the detection app stopped writing them on 23/11/2026 |
+| CR-02 Remove burst alert | Done: V26 drops `safety_alert` and the ERP removes `POST /api/v1/detection/alerts` (`schema_checks.sql`); the detection app no longer calls it |
 | CR-03 Zones with kind and name | Done, plus owning team (`SrsViolationReviewTest.cr03_…`) |
 | CR-04 CAM-02 in/out, any time | *Desktop*: PPE rules run on every camera at any time |
 | CR-05 Review statuses, dismiss, stranger | Done |
@@ -109,12 +109,13 @@ repo can't test them; see `docs/detection-app-contract.md`.
 | CR-21 Month lock, report, export log | Done |
 | 1.2.4 Check-in and check-out notices on Zalo | Done (V23 triggers on writes by the detection role; hours from `CheckOutHours`): `ZaloNoticesTest.aGateCheckIn…`, `aGateCheckOut…`, `aCheckOutGoesToZaloOnlyOnceItsHoursAreFilled`, `aCheckOutWhoseHoursCantBeWorkedOut…`, `erpWritesAndAutomaticCloses…` |
 | CR-22 Clock on gate screen | *Desktop*: shown on `/gate` |
+| CR-23 Data model of SRS 3.1.5 | Done in V17–V26; V26 removes `team.late_after_minutes` (BR-31: 5 minutes for the whole site) and gives each zone a fixed `code` (`schema_checks.sql`, `SrsViolationReviewTest.aNewZoneGetsTheNextFreeCodeOfItsKind`). Names and shapes that differ from the SRS ERD are listed in `docs/database-design.md` |
 
 ## Team decisions that differ from the SRS
 
 | Topic | SRS | Code | Test |
 |---|---|---|---|
-| Shift COMPLETED | 3.2.10 #10: a person clicks "Mark completed" after the shift ends | Automatic: the hourly and 23:00 jobs mark every ended shift COMPLETED, except in a locked month (BR-70); no manual button (team decision 23/11/2026) | `SrsShiftsAndJobsTest.endedShiftsAreCompletedAutomatically`, `ManagerPagesIntegrationTest.aFinishedShiftIsCompletedByTheSystem…` |
+| Shift COMPLETED | 3.2.10 #10: a person clicks "Mark completed" after the shift ends | Automatic: a check-out (not the system's close of a stale visit) completes its shift at once (V25, team decision 25/11/2026); the hourly and 23:00 jobs mark every other ended shift COMPLETED; never in a locked month (BR-70); no manual button (team decision 23/11/2026) | `SrsShiftsAndJobsTest.endedShiftsAreCompletedAutomatically`, `ManagerPagesIntegrationTest.aFinishedShiftIsCompletedByTheSystem…`, `ZaloNoticesTest.aCheckOutCompletesTheShift`, `ZaloNoticesTest.aRecordedCheckOutCompletesTheShiftButNotACancelledOne` |
 | Zones | 1.4: one camera per zone | A zone has several cameras and belongs to one team | `SrsViolationReviewTest` |
 | Zalo bot commands | Not in the SRS: the bot only links (code) and unlinks (`/stop`) | A linked person can send `/help`, `/lich [tuantoi]` and `/chamcong [thangtruoc]` and get their own schedule and attendance, one line per shift; an unlinked chat gets only how to link (team decision 24/11/2026) | `ZaloNoticesTest.aLinkedPersonGetsTheListOfCommands…`, `aChatThatIsNotLinked…`, `lichShowsThisWeek…`, `lichSaysSo…`, `chamcongShowsEachShift…`, `chamcongLeavesOut…`, `aLongMonthComesInSeveralMessages…`; `ZaloCommandsTest` |
 
