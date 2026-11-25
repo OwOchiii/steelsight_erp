@@ -287,6 +287,41 @@ def erd(domain, tables_in, tables):
     return f"@startuml\n{STYLE}skinparam linetype ortho\nhide circle\ntitle {domain}\n" + "\n".join(body) + "\n" + "\n".join(links) + "\n@enduml\n"
 
 
+DOMAIN_COLOURS = ["#E3F2FD", "#E8F5E9", "#FFF8E1", "#FFEBEE", "#F3E5F5", "#E0F7FA", "#ECEFF1"]
+
+
+def full_erd(order, domains, tables):
+    """Every table and every foreign key in one diagram. Each table lists its keys only (the full field
+    lists are in the domain diagrams); tables are coloured by domain, with a legend."""
+    body, links = [], []
+    for i, d in enumerate(order):
+        colour = DOMAIN_COLOURS[i % len(DOMAIN_COLOURS)]
+        for t in domains[d]:
+            cols = tables[t]
+            lines = []
+            for c in cols:
+                if c["pk"]:
+                    lines.append(f'* {c["name"]} <<PK{", FK" if c["fk"] else ""}>>')
+            fks = [c for c in cols if c["fk"] and not c["pk"]]
+            if fks:
+                lines.append("--")
+                for c in fks:
+                    lines.append(f'{"" if c["null"] else "* "}{c["name"]} <<FK>>')
+            body.append(f"entity {t} {colour} {{\n  " + "\n  ".join(lines) + "\n}")
+            for c in cols:
+                if c["fk"]:
+                    left = "|o" if c["null"] else "||"
+                    right = "o|" if c["unique"] else "o{"
+                    links.append(f'{c["fk"]} {left}--{right} {t}')
+    legend = ["skinparam legendBackgroundColor #FFFFFF", "legend right", "|= Colour |= Domain |"]
+    for i, d in enumerate(order):
+        legend.append(f"|<{DOMAIN_COLOURS[i % len(DOMAIN_COLOURS)]}>          | {d} |")
+    legend.append("endlegend")
+    return (f"@startuml\n{STYLE}skinparam linetype ortho\nskinparam nodesep 40\nskinparam ranksep 70\nhide circle\n"
+            f"title Entity relationship diagram of the whole database\n"
+            + "\n".join(body) + "\n" + "\n".join(links) + "\n" + "\n".join(legend) + "\n@enduml\n")
+
+
 def domain_overview(order, domains, tables):
     """One box per domain, listing its tables; one arrow per pair of domains, with its foreign key count."""
     colours = ["#E3F2FD", "#E8F5E9", "#FFF8E1", "#FFEBEE", "#F3E5F5", "#E0F7FA", "#ECEFF1"]
@@ -582,6 +617,7 @@ local ..> jar : same image,\nlocal database
 # ===== 2. Database design ===========================================================================
 ORDER, DOMAINS, TABLES = read_schema()
 add("2-0-domains", "Database domains and the links between them", "erd", domain_overview(ORDER, DOMAINS, TABLES), "2.1")
+add("2-0-full-erd", "Entity relationship diagram of the whole database", "erd", full_erd(ORDER, DOMAINS, TABLES), "2.1")
 for i, d in enumerate(ORDER, 1):
     add(f"2-{i}-erd", d, "erd", erd(d, DOMAINS[d], TABLES), f"2.2.{i}")
 

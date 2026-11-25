@@ -36,6 +36,12 @@
   "section": "2.1"
  },
  {
+  "id": "2-0-full-erd",
+  "title": "Entity relationship diagram of the whole database",
+  "kind": "erd",
+  "section": "2.1"
+ },
+ {
   "id": "2-1-erd",
   "title": "Identity and Access Management",
   "kind": "erd",

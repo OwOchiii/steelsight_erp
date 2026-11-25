@@ -163,7 +163,12 @@ Nothing from this day is committed yet.
 | 13:35 | Fix the team leader permission | V27 gives the MANAGER role `VIOLATION_READ_OWN`, so team leaders see their own violations and score and can appeal (SRS 3.1.3); reads stay own-only. `WorkerAccessPagesTest.managerStillCannotOpenViolationPages` replaced by a test of the SRS behaviour, including refusal of someone else's violation and the review pages. Full suite 402 of 402. Report 5 (DEF-01 closed, M11), the case sheets, the authorization matrix, database and system design, tech stack, traceability, Report 4 and the user guide updated; the user guide's late check-in rule (still the old per-team 15 minutes with make-up time) corrected to the fixed 5 minutes | Not committed |
 | 14:07 | A step-by-step tutorial of every SRS workflow, with edge cases; and a button that generates a free employee code, drawing again if it's taken | **Generate** on New account (htmx, Admin only): `EmployeeCodes` gives the role's prefix and five random digits (WRK-48213), checks every account including deleted ones, draws again up to 50 times, then asks for a code by hand. `EmployeeCodesTest` (4, with scripted draws to force collisions) and a page test; full suite 407 of 407. `docs/workflow-tutorial.md`: setup, the 14 workflows with exact buttons, fields and messages, a "Try this" table of edge cases per workflow, and a rules reference. The user guide's account section rewritten (it allowed dots and underscores, an optional phone and WebP, and had no consent tick), and three unused late-rule labels removed | Not committed |
 | 14:17 | A version to test run locally | `compose.local.yaml` (PostgreSQL 17 + pgvector on 55434 and the ERP built from the folder, local profile and storage, containers named `steelsight-local-*` so the developer's stopped `steelsight-db` on 55433 is left alone), `scripts/local.sh` (up, seed, logs, psql, stop, reset) and `docs/local-run.md`. `scripts/dev-sample-data.sql` rewritten for V27: it no longer ran (old category names, violations written as decided, steel-mill zones); now the tutorial's site with 13 accounts, visits with each attendance result, violations in every review state, an appeal with HSE asked, one ticket per category and pending overtime. Run for real: built, started, seeded; 5 roles signed in over HTTP and 17 pages checked; Generate answered in the running app. The stack is left running | Not committed |
-| 17:44 | Make Report 4 diagram-first, like the reference report | `scripts/report4_diagrams.py` writes 61 PlantUML diagrams to `docs/diagrams/src` (architecture, layers, both package diagrams, deployment, a domain overview and an ERD per domain from `docs/database-design.md`, and per feature a class diagram whose operations and fields come from the Java source, sequence diagrams and state diagrams); `scripts/render-diagrams.sh` renders them; `scripts/report4_build.py` rebuilds `Report4_Software_Design_Document.md` with numbered figures, Image Detail links, class specification tables and numbered tables. PlantUML was downloaded with the developer's one-off permission and a test diagram rendered; the 61 figures still have to be rendered | Not committed |
+| 14:58 | Make Report 4 diagram-first, like the reference report | `scripts/report4_diagrams.py` writes 61 PlantUML diagrams to `docs/diagrams/src`: architecture, layers, both package diagrams, deployment, a domain overview and an ERD per domain from `docs/database-design.md`, and per feature a class diagram whose operations and fields come from the Java source (it stops if a named method is gone), 24 sequence diagrams and 14 state diagrams. `scripts/render-diagrams.sh` renders them; `scripts/report4_build.py` rebuilds `Report4_Software_Design_Document.md` with numbered figures, Image Detail links, class specification tables and 58 numbered tables. The usage limit stopped the session at about 15:10, before rendering | Not committed |
+| 17:39 | Continue (after granting one PlantUML download command) | PlantUML 1.2024.7 downloaded with the developer's one-off permission and a test diagram rendered; the generator's signature bug fixed. Rendering the 61 diagrams was left to the developer as one `!` command, since the permission covered only the test | Not committed |
+| 17:46 | Render errors in four class diagrams (pasted) | Two generator bugs: real line breaks inside relationship labels, and class names with spaces used as aliases. Fixed for every diagram (escaped line breaks, safe aliases also in the relationships) | Not committed |
+| 17:49 | All 61 rendered | Images reviewed: the domain overview was a tangle (an arrow per cross-domain foreign key), redrawn as one box per domain with 13 labelled arrows; two labels overlapped in the account lifecycle, fixed with a note. Re-rendered by the developer | Not committed |
+| 17:53 | Can the images be inside the Markdown | They already are, as relative image links that resolve; the builder now also writes `Report4_Software_Design_Document.embedded.md` (11.5 MB) with every image as base64, for viewers without the image folder (not shown by GitHub or GitLab) | Not committed |
+| 20:20 | Write today's chat log and transcript | `transcript/25-11-2026.md` rewritten for the whole day, and this update | Not committed |
 
 ## Decisions made by the developer
 
@@ -237,6 +242,11 @@ Nothing from this day is committed yet.
 ### 2026-11-25
 
 - The design documents go in `docs/`, one per title, and point to `03_implement` for the class and sequence diagrams.
+- Report 5 is written from the template, with another project's Report 5 as reference, and kept as close to the code as possible.
+- A Generate button for employee codes, which redraws when the code is taken.
+- A local version to test-run, and a step-by-step tutorial of every workflow with its edge cases.
+- Report 4 should be diagram-first, like the reference report, with PlantUML figures.
+- One command to download and try PlantUML was allowed; rendering was run by the developer.
 
 ## Decisions suggested by Claude and accepted by the developer
 
@@ -300,6 +310,7 @@ From the deployment plan the developer approved on 6 November:
 ### 2026-11-25
 
 - V26 removes what the SRS removes (vest tables, burst alerts, the per-team late tolerance) and adds `zone.code`.
+- V27 gives team leaders `VIOLATION_READ_OWN` (SRS 3.1.3), found while writing the authorization matrix.
 
 ## Decisions made by Claude and reported to the developer
 
@@ -418,6 +429,11 @@ These came from the request to check every user error, and the developer hasn't 
 - The database gives the zone code, in a trigger, so the ERP, the site setup script and the tests that insert zones get the same codes. Hibernate reads it back (`@Generated`).
 - The `/api/**` key check stays with no endpoint behind it, in case an API comes back; the key is marked optional in `docs/deployment.md`.
 - The bonus reductions stay fixed at 2/4/6% in `SafetyLevel`, since the developer didn't choose; the SRS puts them in `safety_policy`.
+- Report 5's figures come from real runs, and its case sheets are generated from the Surefire and pytest results by `scripts/report5_test_cases.py`. Module, testing type and N/A/B are worked out from class and method names; the report says so. Manual system tests are listed as not run rather than claimed.
+- Generated employee codes are the role's prefix (WRK, MGR, HSE, ADM, or EMP) and five random digits, checked against every account including deleted ones, up to 50 draws.
+- The local version uses its own container names and port 55434, so the developer's stopped `steelsight-db` on 55433 is left alone; the sample data was rewritten to match the tutorial's site.
+- Report 4's architecture figure is a new PlantUML diagram, since `steelsight_architecture_v2.drawio` shows the 6 November design. Without Graphviz, the render script uses PlantUML's built-in layout (Smetana).
+- The embedded-image copy of Report 4 is a separate file, so the repository keeps the small linked version.
 
 ## How the work was checked
 
@@ -510,6 +526,10 @@ These came from the request to check every user error, and the developer hasn't 
 - The detection app's `tests/erp_integration_check.py` against V1–V26: 22 of 22.
 - `docs/database-design.md` was compared with the migrated schema by a script: all 27 tables match column for column, with 52 foreign keys.
 - Not checked: V26 against Supabase, the Zones page in a browser, or the desktop app's zone dropdown.
+- Report 5: full ERP suite with JaCoCo attached from the command line, 402 of 402, 89.2% of lines and 70.6% of branches; detection pytest twice, 166 of 167 then 167 of 167 (one flaky test in the unused vest OCR code).
+- V27: full suite 402 of 402, with the team-leader test rewritten. Generate: `EmployeeCodesTest` (4, with scripted draws forcing collisions) and a page test; full suite 407 of 407, twice.
+- Local version: built and started with `scripts/local.sh`, sample data loaded and checked in the database, 5 roles signed in over HTTP and 17 pages opened, the Generate route called in the running app.
+- Report 4 diagrams: every class and method name resolved against the code; all 61 rendered by the developer; 8 images reviewed, 2 fixed and re-rendered. Not checked: every one of the 61 images, or the report in a browser.
 - The design documents were written from the code: roles and permissions from a migrated throwaway database, routes from the controllers, operations from the public methods, jobs from `JobScheduler` and `SiteJobs`, report sheets from `MonthlyReportWorkbook`. The package diagram was redrawn from the imports after the first draft was too tidy. Every relative link was checked.
 
 ## Problems during the work
@@ -625,11 +645,21 @@ These came from the request to check every user error, and the developer hasn't 
 | `JAVA_HOME` pointed at a Windows JDK | Ran Maven with `JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64` |
 | Many tests and the sample data insert zones without a code, so a `NOT NULL` code broke them | The code is given by a database trigger instead of the ERP |
 | The new zone-code test assumed only work areas hold AREA codes, but other tests change a zone's kind after adding it | The test skips every code already taken |
+| The translations test caught the Generate button's error message without a Vietnamese text | Translation added |
+| The developer's stopped `steelsight-db` container already had that name and port 55433 | The local version uses `steelsight-local-db` and port 55434 |
+| The sample data script no longer ran against the current schema (old category names, decided violations, steel-mill zones) | Rewritten for V27 |
+| The user guide still described the per-team late rule and an account form with optional phone, WebP photos and no consent | Rewritten to match the code |
+| No PDF tools for reading the reference report, and the scratch folder was cleared mid-session (its Python environments and files) | PyMuPDF installed in a new scratch environment; the folder recreated |
+| Rendering PlantUML: Docker wasn't reachable from WSL, and downloading and running the PlantUML jar was refused by the permission check | The developer allowed one download-and-test command; the full render ran as the developer's own `!` command |
+| The usage limit stopped the session at about 15:10 | Continued at 17:39 |
+| Four class diagrams didn't render: line breaks in labels, aliases with spaces | Fixed in the generator for every diagram |
+| The domain overview was unreadable and two labels overlapped in the account lifecycle | Redrawn and re-rendered |
 
 ## Open items
 
 - Nothing from 24 or 25 November is committed: the bot commands, the two review fixes, V24, V25, V26 (vest tables, burst alerts and the team late tolerance removed, zone codes), V27 (team leaders see their own violations), the rewritten `docs/database-design.md`, the new design documents and the logs, along with V23 from 23 November.
-- Update Report 4 (the Software Design Document): it still describes the 4 November design. The new documents in `docs/` (system, database, detailed, integration, security and report design) follow the code and can be its source. Redraw its diagrams, or take them from `03_implement`.
+- Report 4 is rebuilt around 61 PlantUML figures in `Report4_Software_Design_Document.md`. Look through every figure, then carry the text and images into `Report4_Software Design Document.docx`; after a code change, rerun `scripts/report4_diagrams.py`, `scripts/render-diagrams.sh` and `scripts/report4_build.py`. The PlantUML jar is in a temporary folder; keep a copy, or use Docker or an installed `plantuml`.
+- The local stack (`steelsight-local-db`, `steelsight-local-erp`) may still be running: `scripts/local.sh stop` or `reset`.
 - Update Report 3's ERD (3.1.5) from section 4 of `docs/database-design.md`, or decide to change the code instead. Also fix its cover date (September) and restore the 23/11 row of its Record of Changes.
 - Decide whether the bonus reductions (2/4/6%) move into `safety_policy`, as the SRS says, or stay fixed in the ERP.
 - Decide whether to remove the `/api/**` key check, now that no endpoint is left behind it.
