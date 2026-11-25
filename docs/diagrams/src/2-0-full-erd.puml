@@ -1,0 +1,223 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 70
+hide circle
+title Entity relationship diagram of the whole database
+entity role #E3F2FD {
+  * id <<PK>>
+}
+entity permission #E3F2FD {
+  * id <<PK>>
+}
+entity role_permission #E3F2FD {
+  * role_id <<PK, FK>>
+  * permission_id <<PK, FK>>
+}
+entity app_user #E3F2FD {
+  * id <<PK>>
+  --
+  * role_id <<FK>>
+  team_id <<FK>>
+}
+entity zalo_link_code #E3F2FD {
+  * user_id <<PK, FK>>
+}
+entity team #E8F5E9 {
+  * id <<PK>>
+  --
+  manager_id <<FK>>
+}
+entity zone #E8F5E9 {
+  * id <<PK>>
+  --
+  team_id <<FK>>
+}
+entity camera #E8F5E9 {
+  * id <<PK>>
+  --
+  * zone_id <<FK>>
+}
+entity shift #E8F5E9 {
+  * id <<PK>>
+  --
+  * user_id <<FK>>
+  * zone_id <<FK>>
+  * created_by <<FK>>
+  updated_by <<FK>>
+}
+entity face_embedding #FFF8E1 {
+  * id <<PK>>
+  --
+  * user_id <<FK>>
+}
+entity check_in #FFF8E1 {
+  * id <<PK>>
+  --
+  * user_id <<FK>>
+  shift_id <<FK>>
+  zone_id <<FK>>
+  camera_id <<FK>>
+  recorded_by <<FK>>
+}
+entity check_in_correction #FFF8E1 {
+  * id <<PK>>
+  --
+  * check_in_id <<FK>>
+  * corrected_by <<FK>>
+  old_recorded_by <<FK>>
+  ticket_id <<FK>>
+}
+entity pending_overtime #FFF8E1 {
+  * id <<PK>>
+  --
+  * check_in_id <<FK>>
+  * user_id <<FK>>
+  * shift_id <<FK>>
+  overtime_shift_id <<FK>>
+}
+entity violation #FFEBEE {
+  * id <<PK>>
+  --
+  * camera_id <<FK>>
+  * zone_id <<FK>>
+  suggested_user_id <<FK>>
+  taken_by <<FK>>
+  user_id <<FK>>
+  reviewed_by <<FK>>
+  appeal_decided_by <<FK>>
+}
+entity safety_policy #FFEBEE {
+  * id <<PK>>
+}
+entity monthly_score #FFEBEE {
+  * user_id <<PK, FK>>
+  * month <<PK>>
+}
+entity ticket_category #F3E5F5 {
+  * id <<PK>>
+  --
+  * handler_role_id <<FK>>
+}
+entity ticket #F3E5F5 {
+  * id <<PK>>
+  --
+  * category_id <<FK>>
+  * created_by <<FK>>
+  assignee_id <<FK>>
+  resolver_id <<FK>>
+  violation_id <<FK>>
+  shift_id <<FK>>
+  check_in_id <<FK>>
+  zone_id <<FK>>
+}
+entity ticket_comment #F3E5F5 {
+  * id <<PK>>
+  --
+  * ticket_id <<FK>>
+  * author_id <<FK>>
+}
+entity ticket_participant #F3E5F5 {
+  * ticket_id <<PK, FK>>
+  * user_id <<PK, FK>>
+  --
+  * asked_by <<FK>>
+}
+entity notification #E0F7FA {
+  * id <<PK>>
+  --
+  * user_id <<FK>>
+}
+entity notification_delivery #E0F7FA {
+  * notification_id <<PK, FK>>
+}
+entity schedule_notice #E0F7FA {
+  * user_id <<PK, FK>>
+  * month <<PK>>
+}
+entity month_lock #ECEFF1 {
+  * month <<PK>>
+}
+entity report_export #ECEFF1 {
+  * id <<PK>>
+  --
+  * user_id <<FK>>
+}
+entity company_setting #ECEFF1 {
+  * id <<PK>>
+}
+entity job_run #ECEFF1 {
+  * job <<PK>>
+  * scheduled_for <<PK>>
+}
+role ||--o{ role_permission
+permission ||--o{ role_permission
+role ||--o{ app_user
+team |o--o{ app_user
+app_user ||--o| zalo_link_code
+app_user |o--o{ team
+team |o--o{ zone
+zone ||--o{ camera
+app_user ||--o{ shift
+zone ||--o{ shift
+app_user ||--o{ shift
+app_user |o--o{ shift
+app_user ||--o{ face_embedding
+app_user ||--o{ check_in
+shift |o--o{ check_in
+zone |o--o{ check_in
+camera |o--o{ check_in
+app_user |o--o{ check_in
+check_in ||--o{ check_in_correction
+app_user ||--o{ check_in_correction
+app_user |o--o{ check_in_correction
+ticket |o--o{ check_in_correction
+check_in ||--o| pending_overtime
+app_user ||--o{ pending_overtime
+shift ||--o{ pending_overtime
+shift |o--o{ pending_overtime
+camera ||--o{ violation
+zone ||--o{ violation
+app_user |o--o{ violation
+app_user |o--o{ violation
+app_user |o--o{ violation
+app_user |o--o{ violation
+app_user |o--o{ violation
+app_user ||--o{ monthly_score
+role ||--o{ ticket_category
+ticket_category ||--o{ ticket
+app_user ||--o{ ticket
+app_user |o--o{ ticket
+app_user |o--o{ ticket
+violation |o--o{ ticket
+shift |o--o{ ticket
+check_in |o--o{ ticket
+zone |o--o{ ticket
+ticket ||--o{ ticket_comment
+app_user ||--o{ ticket_comment
+ticket ||--o{ ticket_participant
+app_user ||--o{ ticket_participant
+app_user ||--o{ ticket_participant
+app_user ||--o{ notification
+notification ||--o| notification_delivery
+app_user ||--o{ schedule_notice
+app_user ||--o{ report_export
+legend right
+|= Domain |
+<#E3F2FD>| Identity and Access Management |
+<#E8F5E9>| Teams, Zones and Shifts |
+<#FFF8E1>| Attendance |
+<#FFEBEE>| PPE Violations and Safety Score |
+<#F3E5F5>| Tickets |
+<#E0F7FA>| Notifications |
+<#ECEFF1>| Month Closing, Settings and Jobs |
+endlegend
+@enduml

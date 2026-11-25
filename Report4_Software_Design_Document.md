@@ -325,6 +325,13 @@ Variable means no declared limit. Unique says Partial when uniqueness applies on
 description gives the condition. Every `created_at`, `updated_at`, `corrected_at` and similar column
 defaults to now(), and every `updated_at` is set by a trigger.
 
+Figure 7 joins all 27 tables in one diagram, with all 52 foreign keys. Each table shows only its primary and foreign keys and is coloured by its domain; the other fields are in the domain diagrams of Section 2.2.
+
+![Figure 7: Entity relationship diagram of the whole database](docs/diagrams/png/2-0-full-erd.png)
+
+*Figure 7: Entity relationship diagram of the whole database*  
+[Image Detail](docs/diagrams/png/2-0-full-erd.png) · [PlantUML source](docs/diagrams/src/2-0-full-erd.puml)
+
 ### 2.2 Data Dictionary
 
 #### 2.2.1 Identity and Access Management
@@ -334,9 +341,9 @@ WORKER, MANAGER (team leader), HSE_OFFICER and ADMIN, and the Admin holds every 
 Admin creates or changes accounts and face photos. Users sign in with their employee code. A person
 links their own Zalo chat with a one-time code; from then on every notice is also sent there.
 
-![Figure 7: Entity relationship diagram: Identity and Access Management](docs/diagrams/png/2-1-erd.png)
+![Figure 8: Entity relationship diagram: Identity and Access Management](docs/diagrams/png/2-1-erd.png)
 
-*Figure 7: Entity relationship diagram: Identity and Access Management*  
+*Figure 8: Entity relationship diagram: Identity and Access Management*  
 [Image Detail](docs/diagrams/png/2-1-erd.png) · [PlantUML source](docs/diagrams/src/2-1-erd.puml)
 
 ##### 2.2.1.1 role
@@ -423,9 +430,9 @@ can have several cameras, and a work area belongs to the team that works there, 
 from that team first (team decision; the SRS says one camera per zone). A shift is one planned work
 period of one person; a day off is a day with no shift.
 
-![Figure 8: Entity relationship diagram: Teams, Zones and Shifts](docs/diagrams/png/2-2-erd.png)
+![Figure 9: Entity relationship diagram: Teams, Zones and Shifts](docs/diagrams/png/2-2-erd.png)
 
-*Figure 8: Entity relationship diagram: Teams, Zones and Shifts*  
+*Figure 9: Entity relationship diagram: Teams, Zones and Shifts*  
 [Image Detail](docs/diagrams/png/2-2-erd.png) · [PlantUML source](docs/diagrams/src/2-2-erd.puml)
 
 ##### 2.2.2.1 team
@@ -500,9 +507,9 @@ gate, or entered by hand by an HSE Officer. A hand correction keeps what the vis
 `check_in_correction`, because visits feed the monthly report. Time worked after a shift without an
 overtime shift waits in `pending_overtime` for the Admin.
 
-![Figure 9: Entity relationship diagram: Attendance](docs/diagrams/png/2-3-erd.png)
+![Figure 10: Entity relationship diagram: Attendance](docs/diagrams/png/2-3-erd.png)
 
-*Figure 9: Entity relationship diagram: Attendance*  
+*Figure 10: Entity relationship diagram: Attendance*  
 [Image Detail](docs/diagrams/png/2-3-erd.png) · [PlantUML source](docs/diagrams/src/2-3-erd.puml)
 
 ##### 2.2.3.1 face_embedding
@@ -616,9 +623,9 @@ works it out from the violation rows, so it returns to 100 on the 1st with no jo
 reads the frozen rows of `monthly_score` instead (BR-70). The bonus level comes from the thresholds in
 `safety_policy`; the reductions 2%, 4% and 6% are fixed in the ERP (`SafetyLevel`).
 
-![Figure 10: Entity relationship diagram: PPE Violations and Safety Score](docs/diagrams/png/2-4-erd.png)
+![Figure 11: Entity relationship diagram: PPE Violations and Safety Score](docs/diagrams/png/2-4-erd.png)
 
-*Figure 10: Entity relationship diagram: PPE Violations and Safety Score*  
+*Figure 11: Entity relationship diagram: PPE Violations and Safety Score*  
 [Image Detail](docs/diagrams/png/2-4-erd.png) · [PlantUML source](docs/diagrams/src/2-4-erd.puml)
 
 ##### 2.2.4.1 violation
@@ -698,9 +705,9 @@ but not decide it. The Admin can ask an HSE Officer for the facts of a shift, wh
 comment on that ticket (SRS 3.2.22). A PPE appeal links to one confirmed violation, and deciding it
 decides the appeal in the same transaction.
 
-![Figure 11: Entity relationship diagram: Tickets](docs/diagrams/png/2-5-erd.png)
+![Figure 12: Entity relationship diagram: Tickets](docs/diagrams/png/2-5-erd.png)
 
-*Figure 11: Entity relationship diagram: Tickets*  
+*Figure 12: Entity relationship diagram: Tickets*  
 [Image Detail](docs/diagrams/png/2-5-erd.png) · [PlantUML source](docs/diagrams/src/2-5-erd.puml)
 
 ##### 2.2.5.1 ticket_category
@@ -791,9 +798,9 @@ notices come from database triggers, because the detection app writes violations
 directly and the ERP may be asleep: one VIOLATION_ALERT per violation to the HSE Officers on duty
 (BR-54), and CHECK_IN and CHECK_OUT after each gate scan.
 
-![Figure 12: Entity relationship diagram: Notifications](docs/diagrams/png/2-6-erd.png)
+![Figure 13: Entity relationship diagram: Notifications](docs/diagrams/png/2-6-erd.png)
 
-*Figure 12: Entity relationship diagram: Notifications*  
+*Figure 13: Entity relationship diagram: Notifications*  
 [Image Detail](docs/diagrams/png/2-6-erd.png) · [PlantUML source](docs/diagrams/src/2-6-erd.puml)
 
 ##### 2.2.6.1 notification
@@ -844,9 +851,9 @@ month the person already has (BR-18, BR-19).
 
 #### 2.2.7 Month Closing, Settings and Jobs
 
-![Figure 13: Entity relationship diagram: Month Closing, Settings and Jobs](docs/diagrams/png/2-7-erd.png)
+![Figure 14: Entity relationship diagram: Month Closing, Settings and Jobs](docs/diagrams/png/2-7-erd.png)
 
-*Figure 13: Entity relationship diagram: Month Closing, Settings and Jobs*  
+*Figure 14: Entity relationship diagram: Month Closing, Settings and Jobs*  
 [Image Detail](docs/diagrams/png/2-7-erd.png) · [PlantUML source](docs/diagrams/src/2-7-erd.puml)
 
 ##### 2.2.7.1 month_lock
@@ -1007,9 +1014,9 @@ Spring Security authority. Someone whose password an Admin chose must pick their
 
 #### 3.1.1 Class Diagram
 
-![Figure 14: Class diagram for Sign-in and Session](docs/diagrams/png/3-1-class.png)
+![Figure 15: Class diagram for Sign-in and Session](docs/diagrams/png/3-1-class.png)
 
-*Figure 14: Class diagram for Sign-in and Session*  
+*Figure 15: Class diagram for Sign-in and Session*  
 [Image Detail](docs/diagrams/png/3-1-class.png) · [PlantUML source](docs/diagrams/src/3-1-class.puml)
 
 **Class specifications of Sign-in and Session**
@@ -1031,25 +1038,25 @@ Spring Security authority. Someone whose password an Admin chose must pick their
 
 ##### 3.1.2.1 Sequence diagram for Sign in
 
-![Figure 15: Sequence diagram for Sign in](docs/diagrams/png/3-1-seq-signin.png)
+![Figure 16: Sequence diagram for Sign in](docs/diagrams/png/3-1-seq-signin.png)
 
-*Figure 15: Sequence diagram for Sign in*  
+*Figure 16: Sequence diagram for Sign in*  
 [Image Detail](docs/diagrams/png/3-1-seq-signin.png) · [PlantUML source](docs/diagrams/src/3-1-seq-signin.puml)
 
 ##### 3.1.2.2 Sequence diagram for Change password
 
-![Figure 16: Sequence diagram for Change password](docs/diagrams/png/3-1-seq-password.png)
+![Figure 17: Sequence diagram for Change password](docs/diagrams/png/3-1-seq-password.png)
 
-*Figure 16: Sequence diagram for Change password*  
+*Figure 17: Sequence diagram for Change password*  
 [Image Detail](docs/diagrams/png/3-1-seq-password.png) · [PlantUML source](docs/diagrams/src/3-1-seq-password.puml)
 
 #### 3.1.3 State Diagrams
 
 ##### 3.1.3.1 Account lifecycle
 
-![Figure 17: Account lifecycle](docs/diagrams/png/3-1-state-account.png)
+![Figure 18: Account lifecycle](docs/diagrams/png/3-1-state-account.png)
 
-*Figure 17: Account lifecycle*  
+*Figure 18: Account lifecycle*  
 [Image Detail](docs/diagrams/png/3-1-state-account.png) · [PlantUML source](docs/diagrams/src/3-1-state-account.puml)
 
 ### 3.2 Accounts, Face Photos and Zalo Link
@@ -1061,9 +1068,9 @@ embeddings (trigger), unlinks Zalo and cancels its future shifts (BR-07).
 
 #### 3.2.1 Class Diagram
 
-![Figure 18: Class diagram for Accounts, Face Photos and Zalo Link](docs/diagrams/png/3-2-class.png)
+![Figure 19: Class diagram for Accounts, Face Photos and Zalo Link](docs/diagrams/png/3-2-class.png)
 
-*Figure 18: Class diagram for Accounts, Face Photos and Zalo Link*  
+*Figure 19: Class diagram for Accounts, Face Photos and Zalo Link*  
 [Image Detail](docs/diagrams/png/3-2-class.png) · [PlantUML source](docs/diagrams/src/3-2-class.puml)
 
 **Class specifications of Accounts, Face Photos and Zalo Link**
@@ -1083,39 +1090,39 @@ embeddings (trigger), unlinks Zalo and cancels its future shifts (BR-07).
 
 ##### 3.2.2.1 Sequence diagram for Create an account
 
-![Figure 19: Sequence diagram for Create an account](docs/diagrams/png/3-2-seq-create.png)
+![Figure 20: Sequence diagram for Create an account](docs/diagrams/png/3-2-seq-create.png)
 
-*Figure 19: Sequence diagram for Create an account*  
+*Figure 20: Sequence diagram for Create an account*  
 [Image Detail](docs/diagrams/png/3-2-seq-create.png) · [PlantUML source](docs/diagrams/src/3-2-seq-create.puml)
 
 ##### 3.2.2.2 Sequence diagram for Face enrolment
 
-![Figure 20: Sequence diagram for Face enrolment](docs/diagrams/png/3-2-seq-enrol.png)
+![Figure 21: Sequence diagram for Face enrolment](docs/diagrams/png/3-2-seq-enrol.png)
 
-*Figure 20: Sequence diagram for Face enrolment*  
+*Figure 21: Sequence diagram for Face enrolment*  
 [Image Detail](docs/diagrams/png/3-2-seq-enrol.png) · [PlantUML source](docs/diagrams/src/3-2-seq-enrol.puml)
 
 ##### 3.2.2.3 Sequence diagram for Link Zalo
 
-![Figure 21: Sequence diagram for Link Zalo](docs/diagrams/png/3-2-seq-zalo.png)
+![Figure 22: Sequence diagram for Link Zalo](docs/diagrams/png/3-2-seq-zalo.png)
 
-*Figure 21: Sequence diagram for Link Zalo*  
+*Figure 22: Sequence diagram for Link Zalo*  
 [Image Detail](docs/diagrams/png/3-2-seq-zalo.png) · [PlantUML source](docs/diagrams/src/3-2-seq-zalo.puml)
 
 #### 3.2.3 State Diagrams
 
 ##### 3.2.3.1 Face enrolment lifecycle
 
-![Figure 22: Face enrolment lifecycle](docs/diagrams/png/3-2-state-face.png)
+![Figure 23: Face enrolment lifecycle](docs/diagrams/png/3-2-state-face.png)
 
-*Figure 22: Face enrolment lifecycle*  
+*Figure 23: Face enrolment lifecycle*  
 [Image Detail](docs/diagrams/png/3-2-state-face.png) · [PlantUML source](docs/diagrams/src/3-2-state-face.puml)
 
 ##### 3.2.3.2 Zalo link lifecycle
 
-![Figure 23: Zalo link lifecycle](docs/diagrams/png/3-2-state-zalo.png)
+![Figure 24: Zalo link lifecycle](docs/diagrams/png/3-2-state-zalo.png)
 
-*Figure 23: Zalo link lifecycle*  
+*Figure 24: Zalo link lifecycle*  
 [Image Detail](docs/diagrams/png/3-2-state-zalo.png) · [PlantUML source](docs/diagrams/src/3-2-state-zalo.puml)
 
 ### 3.3 Teams, Zones and Cameras
@@ -1127,9 +1134,9 @@ check-ins; every other camera records violations.
 
 #### 3.3.1 Class Diagram
 
-![Figure 24: Class diagram for Teams, Zones and Cameras](docs/diagrams/png/3-3-class.png)
+![Figure 25: Class diagram for Teams, Zones and Cameras](docs/diagrams/png/3-3-class.png)
 
-*Figure 24: Class diagram for Teams, Zones and Cameras*  
+*Figure 25: Class diagram for Teams, Zones and Cameras*  
 [Image Detail](docs/diagrams/png/3-3-class.png) · [PlantUML source](docs/diagrams/src/3-3-class.puml)
 
 **Class specifications of Teams, Zones and Cameras**
@@ -1147,9 +1154,9 @@ check-ins; every other camera records violations.
 
 ##### 3.3.2.1 Sequence diagram for Add a zone and link a camera
 
-![Figure 25: Sequence diagram for Add a zone and link a camera](docs/diagrams/png/3-3-seq-zone.png)
+![Figure 26: Sequence diagram for Add a zone and link a camera](docs/diagrams/png/3-3-seq-zone.png)
 
-*Figure 25: Sequence diagram for Add a zone and link a camera*  
+*Figure 26: Sequence diagram for Add a zone and link a camera*  
 [Image Detail](docs/diagrams/png/3-3-seq-zone.png) · [PlantUML source](docs/diagrams/src/3-3-seq-zone.puml)
 
 ### 3.4 Shift Planning and Timetable
@@ -1162,9 +1169,9 @@ own (BR-18, BR-19). A check-out completes the shift (V25); the hourly job comple
 
 #### 3.4.1 Class Diagram
 
-![Figure 26: Class diagram for Shift Planning and Timetable](docs/diagrams/png/3-4-class.png)
+![Figure 27: Class diagram for Shift Planning and Timetable](docs/diagrams/png/3-4-class.png)
 
-*Figure 26: Class diagram for Shift Planning and Timetable*  
+*Figure 27: Class diagram for Shift Planning and Timetable*  
 [Image Detail](docs/diagrams/png/3-4-class.png) · [PlantUML source](docs/diagrams/src/3-4-class.puml)
 
 **Class specifications of Shift Planning and Timetable**
@@ -1183,25 +1190,25 @@ own (BR-18, BR-19). A check-out completes the shift (V25); the hourly job comple
 
 ##### 3.4.2.1 Sequence diagram for Plan a shift
 
-![Figure 27: Sequence diagram for Plan a shift](docs/diagrams/png/3-4-seq-plan.png)
+![Figure 28: Sequence diagram for Plan a shift](docs/diagrams/png/3-4-seq-plan.png)
 
-*Figure 27: Sequence diagram for Plan a shift*  
+*Figure 28: Sequence diagram for Plan a shift*  
 [Image Detail](docs/diagrams/png/3-4-seq-plan.png) · [PlantUML source](docs/diagrams/src/3-4-seq-plan.puml)
 
 ##### 3.4.2.2 Sequence diagram for Weekly schedule
 
-![Figure 28: Sequence diagram for Weekly schedule](docs/diagrams/png/3-4-seq-weekly.png)
+![Figure 29: Sequence diagram for Weekly schedule](docs/diagrams/png/3-4-seq-weekly.png)
 
-*Figure 28: Sequence diagram for Weekly schedule*  
+*Figure 29: Sequence diagram for Weekly schedule*  
 [Image Detail](docs/diagrams/png/3-4-seq-weekly.png) · [PlantUML source](docs/diagrams/src/3-4-seq-weekly.puml)
 
 #### 3.4.3 State Diagrams
 
 ##### 3.4.3.1 Shift lifecycle
 
-![Figure 29: Shift lifecycle](docs/diagrams/png/3-4-state-shift.png)
+![Figure 30: Shift lifecycle](docs/diagrams/png/3-4-state-shift.png)
 
-*Figure 29: Shift lifecycle*  
+*Figure 30: Shift lifecycle*  
 [Image Detail](docs/diagrams/png/3-4-state-shift.png) · [PlantUML source](docs/diagrams/src/3-4-state-shift.puml)
 
 ### 3.5 Attendance and Pending Overtime
@@ -1216,9 +1223,9 @@ minutes becomes pending overtime until the Admin adds an overtime shift (BR-34, 
 
 #### 3.5.1 Class Diagram
 
-![Figure 30: Class diagram for Attendance and Pending Overtime](docs/diagrams/png/3-5-class.png)
+![Figure 31: Class diagram for Attendance and Pending Overtime](docs/diagrams/png/3-5-class.png)
 
-*Figure 30: Class diagram for Attendance and Pending Overtime*  
+*Figure 31: Class diagram for Attendance and Pending Overtime*  
 [Image Detail](docs/diagrams/png/3-5-class.png) · [PlantUML source](docs/diagrams/src/3-5-class.puml)
 
 **Class specifications of Attendance and Pending Overtime**
@@ -1239,39 +1246,39 @@ minutes becomes pending overtime until the Admin adds an overtime shift (BR-34, 
 
 ##### 3.5.2.1 Sequence diagram for Gate check-in and check-out
 
-![Figure 31: Sequence diagram for Gate check-in and check-out](docs/diagrams/png/3-5-seq-gate.png)
+![Figure 32: Sequence diagram for Gate check-in and check-out](docs/diagrams/png/3-5-seq-gate.png)
 
-*Figure 31: Sequence diagram for Gate check-in and check-out*  
+*Figure 32: Sequence diagram for Gate check-in and check-out*  
 [Image Detail](docs/diagrams/png/3-5-seq-gate.png) · [PlantUML source](docs/diagrams/src/3-5-seq-gate.puml)
 
 ##### 3.5.2.2 Sequence diagram for Correct a visit
 
-![Figure 32: Sequence diagram for Correct a visit](docs/diagrams/png/3-5-seq-correct.png)
+![Figure 33: Sequence diagram for Correct a visit](docs/diagrams/png/3-5-seq-correct.png)
 
-*Figure 32: Sequence diagram for Correct a visit*  
+*Figure 33: Sequence diagram for Correct a visit*  
 [Image Detail](docs/diagrams/png/3-5-seq-correct.png) · [PlantUML source](docs/diagrams/src/3-5-seq-correct.puml)
 
 ##### 3.5.2.3 Sequence diagram for Day end at 23:00
 
-![Figure 33: Sequence diagram for Day end at 23:00](docs/diagrams/png/3-5-seq-dayend.png)
+![Figure 34: Sequence diagram for Day end at 23:00](docs/diagrams/png/3-5-seq-dayend.png)
 
-*Figure 33: Sequence diagram for Day end at 23:00*  
+*Figure 34: Sequence diagram for Day end at 23:00*  
 [Image Detail](docs/diagrams/png/3-5-seq-dayend.png) · [PlantUML source](docs/diagrams/src/3-5-seq-dayend.puml)
 
 #### 3.5.3 State Diagrams
 
 ##### 3.5.3.1 Visit lifecycle
 
-![Figure 34: Visit lifecycle](docs/diagrams/png/3-5-state-visit.png)
+![Figure 35: Visit lifecycle](docs/diagrams/png/3-5-state-visit.png)
 
-*Figure 34: Visit lifecycle*  
+*Figure 35: Visit lifecycle*  
 [Image Detail](docs/diagrams/png/3-5-state-visit.png) · [PlantUML source](docs/diagrams/src/3-5-state-visit.puml)
 
 ##### 3.5.3.2 Pending overtime lifecycle
 
-![Figure 35: Pending overtime lifecycle](docs/diagrams/png/3-5-state-overtime.png)
+![Figure 36: Pending overtime lifecycle](docs/diagrams/png/3-5-state-overtime.png)
 
-*Figure 35: Pending overtime lifecycle*  
+*Figure 36: Pending overtime lifecycle*  
 [Image Detail](docs/diagrams/png/3-5-state-overtime.png) · [PlantUML source](docs/diagrams/src/3-5-state-overtime.puml)
 
 ### 3.6 Violation Review and Appeal
@@ -1291,9 +1298,9 @@ review is:
 
 #### 3.6.1 Class Diagram
 
-![Figure 36: Class diagram for Violation Review and Appeal](docs/diagrams/png/3-6-class.png)
+![Figure 37: Class diagram for Violation Review and Appeal](docs/diagrams/png/3-6-class.png)
 
-*Figure 36: Class diagram for Violation Review and Appeal*  
+*Figure 37: Class diagram for Violation Review and Appeal*  
 [Image Detail](docs/diagrams/png/3-6-class.png) · [PlantUML source](docs/diagrams/src/3-6-class.puml)
 
 **Class specifications of Violation Review and Appeal**
@@ -1311,39 +1318,39 @@ review is:
 
 ##### 3.6.2.1 Sequence diagram for Detect and alert
 
-![Figure 37: Sequence diagram for Detect and alert](docs/diagrams/png/3-6-seq-detect.png)
+![Figure 38: Sequence diagram for Detect and alert](docs/diagrams/png/3-6-seq-detect.png)
 
-*Figure 37: Sequence diagram for Detect and alert*  
+*Figure 38: Sequence diagram for Detect and alert*  
 [Image Detail](docs/diagrams/png/3-6-seq-detect.png) · [PlantUML source](docs/diagrams/src/3-6-seq-detect.puml)
 
 ##### 3.6.2.2 Sequence diagram for Review and confirm
 
-![Figure 38: Sequence diagram for Review and confirm](docs/diagrams/png/3-6-seq-review.png)
+![Figure 39: Sequence diagram for Review and confirm](docs/diagrams/png/3-6-seq-review.png)
 
-*Figure 38: Sequence diagram for Review and confirm*  
+*Figure 39: Sequence diagram for Review and confirm*  
 [Image Detail](docs/diagrams/png/3-6-seq-review.png) · [PlantUML source](docs/diagrams/src/3-6-seq-review.puml)
 
 ##### 3.6.2.3 Sequence diagram for Appeal and decision
 
-![Figure 39: Sequence diagram for Appeal and decision](docs/diagrams/png/3-6-seq-appeal.png)
+![Figure 40: Sequence diagram for Appeal and decision](docs/diagrams/png/3-6-seq-appeal.png)
 
-*Figure 39: Sequence diagram for Appeal and decision*  
+*Figure 40: Sequence diagram for Appeal and decision*  
 [Image Detail](docs/diagrams/png/3-6-seq-appeal.png) · [PlantUML source](docs/diagrams/src/3-6-seq-appeal.puml)
 
 #### 3.6.3 State Diagrams
 
 ##### 3.6.3.1 Violation review lifecycle
 
-![Figure 40: Violation review lifecycle](docs/diagrams/png/3-6-state-review.png)
+![Figure 41: Violation review lifecycle](docs/diagrams/png/3-6-state-review.png)
 
-*Figure 40: Violation review lifecycle*  
+*Figure 41: Violation review lifecycle*  
 [Image Detail](docs/diagrams/png/3-6-state-review.png) · [PlantUML source](docs/diagrams/src/3-6-state-review.puml)
 
 ##### 3.6.3.2 Appeal lifecycle
 
-![Figure 41: Appeal lifecycle](docs/diagrams/png/3-6-state-dispute.png)
+![Figure 42: Appeal lifecycle](docs/diagrams/png/3-6-state-dispute.png)
 
-*Figure 41: Appeal lifecycle*  
+*Figure 42: Appeal lifecycle*  
 [Image Detail](docs/diagrams/png/3-6-state-dispute.png) · [PlantUML source](docs/diagrams/src/3-6-state-dispute.puml)
 
 ### 3.7 Safety Score and Bonus Level
@@ -1356,9 +1363,9 @@ then 1, 2 and 3 at 80, 70 and 60 and below, which reduce the monthly safety bonu
 
 #### 3.7.1 Class Diagram
 
-![Figure 42: Class diagram for Safety Score and Bonus Level](docs/diagrams/png/3-7-class.png)
+![Figure 43: Class diagram for Safety Score and Bonus Level](docs/diagrams/png/3-7-class.png)
 
-*Figure 42: Class diagram for Safety Score and Bonus Level*  
+*Figure 43: Class diagram for Safety Score and Bonus Level*  
 [Image Detail](docs/diagrams/png/3-7-class.png) · [PlantUML source](docs/diagrams/src/3-7-class.puml)
 
 **Class specifications of Safety Score and Bonus Level**
@@ -1375,9 +1382,9 @@ then 1, 2 and 3 at 80, 70 and 60 and below, which reduce the monthly safety bonu
 
 ##### 3.7.2.1 Sequence diagram for View my violations and score
 
-![Figure 43: Sequence diagram for View my violations and score](docs/diagrams/png/3-7-seq-score.png)
+![Figure 44: Sequence diagram for View my violations and score](docs/diagrams/png/3-7-seq-score.png)
 
-*Figure 43: Sequence diagram for View my violations and score*  
+*Figure 44: Sequence diagram for View my violations and score*  
 [Image Detail](docs/diagrams/png/3-7-seq-score.png) · [PlantUML source](docs/diagrams/src/3-7-seq-score.puml)
 
 ### 3.8 Tickets
@@ -1391,9 +1398,9 @@ error or a missing check-out corrects the visit, and the correction names the ti
 
 #### 3.8.1 Class Diagram
 
-![Figure 44: Class diagram for Tickets](docs/diagrams/png/3-8-class.png)
+![Figure 45: Class diagram for Tickets](docs/diagrams/png/3-8-class.png)
 
-*Figure 44: Class diagram for Tickets*  
+*Figure 45: Class diagram for Tickets*  
 [Image Detail](docs/diagrams/png/3-8-class.png) · [PlantUML source](docs/diagrams/src/3-8-class.puml)
 
 **Class specifications of Tickets**
@@ -1410,18 +1417,18 @@ error or a missing check-out corrects the visit, and the correction names the ti
 
 ##### 3.8.2.1 Sequence diagram for Attendance error report
 
-![Figure 45: Sequence diagram for Attendance error report](docs/diagrams/png/3-8-seq-error.png)
+![Figure 46: Sequence diagram for Attendance error report](docs/diagrams/png/3-8-seq-error.png)
 
-*Figure 45: Sequence diagram for Attendance error report*  
+*Figure 46: Sequence diagram for Attendance error report*  
 [Image Detail](docs/diagrams/png/3-8-seq-error.png) · [PlantUML source](docs/diagrams/src/3-8-seq-error.puml)
 
 #### 3.8.3 State Diagrams
 
 ##### 3.8.3.1 Ticket lifecycle
 
-![Figure 46: Ticket lifecycle](docs/diagrams/png/3-8-state-ticket.png)
+![Figure 47: Ticket lifecycle](docs/diagrams/png/3-8-state-ticket.png)
 
-*Figure 46: Ticket lifecycle*  
+*Figure 47: Ticket lifecycle*  
 [Image Detail](docs/diagrams/png/3-8-state-ticket.png) · [PlantUML source](docs/diagrams/src/3-8-state-ticket.puml)
 
 ### 3.9 Notifications and the Zalo Bot
@@ -1441,9 +1448,9 @@ and check-out notices are made by database triggers; the rest by the ERP.
 
 #### 3.9.1 Class Diagram
 
-![Figure 47: Class diagram for Notifications and the Zalo Bot](docs/diagrams/png/3-9-class.png)
+![Figure 48: Class diagram for Notifications and the Zalo Bot](docs/diagrams/png/3-9-class.png)
 
-*Figure 47: Class diagram for Notifications and the Zalo Bot*  
+*Figure 48: Class diagram for Notifications and the Zalo Bot*  
 [Image Detail](docs/diagrams/png/3-9-class.png) · [PlantUML source](docs/diagrams/src/3-9-class.puml)
 
 **Class specifications of Notifications and the Zalo Bot**
@@ -1464,25 +1471,25 @@ and check-out notices are made by database triggers; the rest by the ERP.
 
 ##### 3.9.2.1 Sequence diagram for Notice delivery
 
-![Figure 48: Sequence diagram for Notice delivery](docs/diagrams/png/3-9-seq-deliver.png)
+![Figure 49: Sequence diagram for Notice delivery](docs/diagrams/png/3-9-seq-deliver.png)
 
-*Figure 48: Sequence diagram for Notice delivery*  
+*Figure 49: Sequence diagram for Notice delivery*  
 [Image Detail](docs/diagrams/png/3-9-seq-deliver.png) · [PlantUML source](docs/diagrams/src/3-9-seq-deliver.puml)
 
 ##### 3.9.2.2 Sequence diagram for Bot commands
 
-![Figure 49: Sequence diagram for Bot commands](docs/diagrams/png/3-9-seq-bot.png)
+![Figure 50: Sequence diagram for Bot commands](docs/diagrams/png/3-9-seq-bot.png)
 
-*Figure 49: Sequence diagram for Bot commands*  
+*Figure 50: Sequence diagram for Bot commands*  
 [Image Detail](docs/diagrams/png/3-9-seq-bot.png) · [PlantUML source](docs/diagrams/src/3-9-seq-bot.puml)
 
 #### 3.9.3 State Diagrams
 
 ##### 3.9.3.1 Notice delivery lifecycle
 
-![Figure 50: Notice delivery lifecycle](docs/diagrams/png/3-9-state-delivery.png)
+![Figure 51: Notice delivery lifecycle](docs/diagrams/png/3-9-state-delivery.png)
 
-*Figure 50: Notice delivery lifecycle*  
+*Figure 51: Notice delivery lifecycle*  
 [Image Detail](docs/diagrams/png/3-9-state-delivery.png) · [PlantUML source](docs/diagrams/src/3-9-state-delivery.puml)
 
 ### 3.10 Scheduled Jobs and Month Closing
@@ -1506,27 +1513,27 @@ Render slept runs once on the next tick (CR-12).
 
 #### 3.10.1 Class Diagram
 
-![Figure 51: Class diagram for Scheduled Jobs and Month Closing](docs/diagrams/png/3-10-class.png)
+![Figure 52: Class diagram for Scheduled Jobs and Month Closing](docs/diagrams/png/3-10-class.png)
 
-*Figure 51: Class diagram for Scheduled Jobs and Month Closing*  
+*Figure 52: Class diagram for Scheduled Jobs and Month Closing*  
 [Image Detail](docs/diagrams/png/3-10-class.png) · [PlantUML source](docs/diagrams/src/3-10-class.puml)
 
 #### 3.10.2 Sequence Diagrams
 
 ##### 3.10.2.1 Sequence diagram for Job tick and catch-up
 
-![Figure 52: Sequence diagram for Job tick and catch-up](docs/diagrams/png/3-10-seq-tick.png)
+![Figure 53: Sequence diagram for Job tick and catch-up](docs/diagrams/png/3-10-seq-tick.png)
 
-*Figure 52: Sequence diagram for Job tick and catch-up*  
+*Figure 53: Sequence diagram for Job tick and catch-up*  
 [Image Detail](docs/diagrams/png/3-10-seq-tick.png) · [PlantUML source](docs/diagrams/src/3-10-seq-tick.puml)
 
 #### 3.10.3 State Diagrams
 
 ##### 3.10.3.1 Month lifecycle
 
-![Figure 53: Month lifecycle](docs/diagrams/png/3-10-state-month.png)
+![Figure 54: Month lifecycle](docs/diagrams/png/3-10-state-month.png)
 
-*Figure 53: Month lifecycle*  
+*Figure 54: Month lifecycle*  
 [Image Detail](docs/diagrams/png/3-10-state-month.png) · [PlantUML source](docs/diagrams/src/3-10-state-month.puml)
 
 ### 3.11 Home Page and Monthly Report
@@ -1541,9 +1548,9 @@ Section 5.4.
 
 #### 3.11.1 Class Diagram
 
-![Figure 54: Class diagram for Home Page and Monthly Report](docs/diagrams/png/3-11-class.png)
+![Figure 55: Class diagram for Home Page and Monthly Report](docs/diagrams/png/3-11-class.png)
 
-*Figure 54: Class diagram for Home Page and Monthly Report*  
+*Figure 55: Class diagram for Home Page and Monthly Report*  
 [Image Detail](docs/diagrams/png/3-11-class.png) · [PlantUML source](docs/diagrams/src/3-11-class.puml)
 
 **Class specifications of Home Page and Monthly Report**
@@ -1561,9 +1568,9 @@ Section 5.4.
 
 ##### 3.11.2.1 Sequence diagram for Export the monthly report
 
-![Figure 55: Sequence diagram for Export the monthly report](docs/diagrams/png/3-11-seq-export.png)
+![Figure 56: Sequence diagram for Export the monthly report](docs/diagrams/png/3-11-seq-export.png)
 
-*Figure 55: Sequence diagram for Export the monthly report*  
+*Figure 56: Sequence diagram for Export the monthly report*  
 [Image Detail](docs/diagrams/png/3-11-seq-export.png) · [PlantUML source](docs/diagrams/src/3-11-seq-export.puml)
 
 ### 3.12 Photo Storage
@@ -1575,9 +1582,9 @@ Storage URL.
 
 #### 3.12.1 Class Diagram
 
-![Figure 56: Class diagram for Photo Storage](docs/diagrams/png/3-12-class.png)
+![Figure 57: Class diagram for Photo Storage](docs/diagrams/png/3-12-class.png)
 
-*Figure 56: Class diagram for Photo Storage*  
+*Figure 57: Class diagram for Photo Storage*  
 [Image Detail](docs/diagrams/png/3-12-class.png) · [PlantUML source](docs/diagrams/src/3-12-class.puml)
 
 **Class specifications of Photo Storage**
@@ -1594,9 +1601,9 @@ Storage URL.
 
 ##### 3.12.2.1 Sequence diagram for Show an evidence photo
 
-![Figure 57: Sequence diagram for Show an evidence photo](docs/diagrams/png/3-12-seq-photo.png)
+![Figure 58: Sequence diagram for Show an evidence photo](docs/diagrams/png/3-12-seq-photo.png)
 
-*Figure 57: Sequence diagram for Show an evidence photo*  
+*Figure 58: Sequence diagram for Show an evidence photo*  
 [Image Detail](docs/diagrams/png/3-12-seq-photo.png) · [PlantUML source](docs/diagrams/src/3-12-seq-photo.puml)
 
 ### 3.13 Detection App
@@ -1619,18 +1626,18 @@ app no longer reads (CR-01).
 
 #### 3.13.1 Class Diagram
 
-![Figure 58: Class diagram for the Detection App](docs/diagrams/png/3-13-class.png)
+![Figure 59: Class diagram for the Detection App](docs/diagrams/png/3-13-class.png)
 
-*Figure 58: Class diagram for the Detection App*  
+*Figure 59: Class diagram for the Detection App*  
 [Image Detail](docs/diagrams/png/3-13-class.png) · [PlantUML source](docs/diagrams/src/3-13-class.puml)
 
 #### 3.13.2 Sequence Diagrams
 
 ##### 3.13.2.1 Sequence diagram for Offline outbox and sync
 
-![Figure 59: Sequence diagram for Offline outbox and sync](docs/diagrams/png/3-13-seq-sync.png)
+![Figure 60: Sequence diagram for Offline outbox and sync](docs/diagrams/png/3-13-seq-sync.png)
 
-*Figure 59: Sequence diagram for Offline outbox and sync*  
+*Figure 60: Sequence diagram for Offline outbox and sync*  
 [Image Detail](docs/diagrams/png/3-13-seq-sync.png) · [PlantUML source](docs/diagrams/src/3-13-seq-sync.puml)
 
 ## 4. Integration Design
@@ -1639,9 +1646,9 @@ It lists every interface between the parts of the system:
 the routes of the web ERP, how the detection app works with Supabase, photo storage, the Zalo bot and
 the cameras. Ports and protocols are in Section 1.1.3.
 
-![Figure 60: Integration overview](docs/diagrams/png/4-1-integration.png)
+![Figure 61: Integration overview](docs/diagrams/png/4-1-integration.png)
 
-*Figure 60: Integration overview*  
+*Figure 61: Integration overview*  
 [Image Detail](docs/diagrams/png/4-1-integration.png) · [PlantUML source](docs/diagrams/src/4-1-integration.puml)
 
 ### 4.1 ERP Routes
@@ -1817,9 +1824,9 @@ The ERP connects to the database as the table owner. The detection app's role, `
 is limited by column grants and row level security; its rights are listed in
 Section 4.2.
 
-![Figure 61: Authorization by role](docs/diagrams/png/5-1-authz.png)
+![Figure 62: Authorization by role](docs/diagrams/png/5-1-authz.png)
 
-*Figure 61: Authorization by role*  
+*Figure 62: Authorization by role*  
 [Image Detail](docs/diagrams/png/5-1-authz.png) · [PlantUML source](docs/diagrams/src/5-1-authz.puml)
 
 ### 5.3 Data Protection

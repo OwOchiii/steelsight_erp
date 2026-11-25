@@ -183,6 +183,9 @@ overall = overall.replace("all 52 foreign keys are in the domain diagrams\nof Se
                           "all 52 foreign keys are in the domain diagrams\nof Section 2.2.")
 parts.append("## 2. Database Design\n\n### 2.1 Overall\n\n" + overall.split("\n\nThe overview shows")[0] + "\n\n"
              + fig("2-0-domains") + "\nThe overview shows" + overall.split("\n\nThe overview shows")[1] + "\n")
+parts.append(f"Figure {FIGURES[0] + 1} joins all 27 tables in one diagram, with all 52 foreign keys. Each table "
+             "shows only its primary and foreign keys and is coloured by its domain; the other fields are in the "
+             "domain diagrams of Section 2.2.\n\n" + fig("2-0-full-erd"))
 parts.append("### 2.2 Data Dictionary\n")
 dictionary = section(database, "2. Data Dictionary")
 for n, block in enumerate(re.split(r"\n(?=### 2\.\d )", "\n" + dictionary)[1:], 1):
