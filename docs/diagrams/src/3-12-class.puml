@@ -1,0 +1,101 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Photo Storage
+interface "PhotoStorage" as PhotoStorage <<Interface>> {
+  +store(album, photo): String
+  +load(album, storedName): Resource
+  +delete(album, storedName): void
+  +contentType(storedName): String
+  MAX_BYTES = 5 MB
+}
+
+class "LocalPhotoStorage" as LocalPhotoStorage <<Component>> {
+  +store(album, photo): String
+  +load(album, storedName): Resource
+  +delete(album, storedName): void
+}
+
+class "SupabasePhotoStorage" as SupabasePhotoStorage <<Component>> {
+  +store(album, photo): String
+  +load(album, storedPath): Resource
+  +delete(album, storedPath): void
+}
+
+class "PhotoAlbum" as PhotoAlbum <<Component>> {
+  TICKET -> ticket-photos
+  FACE -> face-photos
+  EVIDENCE -> evidence-photos (read only)
+}
+
+class "PhotoFormat" as PhotoFormat <<Component>> {
+  JPEG or PNG from the file's bytes
+  at least 480 x 480
+}
+
+class "TeamController" as TeamController <<Controller>> {
+  +create(user, form, binding, photo, model, response, redirect): String
+}
+
+class "TicketController" as TicketController <<Controller>> {
+  +photo(user, id): ResponseEntity~<Resource>
+}
+
+class "ViolationController" as ViolationController <<Controller>> {
+  +photo(user, id): ResponseEntity~<Resource>
+}
+
+PhotoStorage <|.. LocalPhotoStorage
+PhotoStorage <|.. SupabasePhotoStorage
+PhotoStorage ..> PhotoAlbum
+LocalPhotoStorage ..> PhotoFormat
+SupabasePhotoStorage ..> PhotoFormat
+TeamController --> PhotoStorage
+TicketController --> PhotoStorage
+ViolationController --> PhotoStorage
+@enduml

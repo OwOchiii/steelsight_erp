@@ -1,0 +1,49 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Offline outbox and sync
+participant "Monitors" as M
+participant "Outbox (SQLite)" as O
+participant ErpSync as S
+participant StorageClient as ST
+database PostgreSQL as DB
+M -> O : put(kind, payload, event_id) (always, online or not)
+loop while running
+  S -> O : head("db") (oldest first)
+  alt nothing due
+    S -> O : wait()
+  else event
+    opt violation with a photo
+      S -> ST : upload(evidence-photos, path)
+    end
+    S -> DB : INSERT ... ON CONFLICT (event_id) DO NOTHING
+    alt stored (or already there)
+      S -> O : mark_done(seq)
+    else network down, timeout, ERP asleep (TransientError)
+      S -> O : mark_retry(seq, error, delay)
+      note right : order kept: a check-out\nnever passes its check-in
+    else refused by the database (PermanentError)
+      S -> O : mark_failed(seq, error)
+    end
+  end
+end
+@enduml

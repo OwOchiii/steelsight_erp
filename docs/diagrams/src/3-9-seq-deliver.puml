@@ -1,0 +1,49 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title A notice is saved, then delivered on Zalo
+participant "Service or\ndatabase trigger" as X
+database PostgreSQL as DB
+participant JobScheduler as J
+participant CheckOutHours as H
+participant ZaloDispatcher as Z
+participant NoticeText as T
+participant ZaloBot as B
+participant "Zalo Bot API" as API
+X -> DB : INSERT notification (kind, params, link)
+DB -> DB : trg_notification_delivery: PENDING if the person\nlinked Zalo, else SKIPPED (BR-15, BR-16)
+loop every minute
+  J -> H : fill(): paid hours into CHECK_OUT params
+  J -> Z : sendDue()
+  Z -> DB : due PENDING rows (CHECK_OUT only once it has hours)\nFOR UPDATE SKIP LOCKED
+  loop each due notice
+    Z -> T : render(kind, params, vi) (cut at 1,900 chars + link)
+    Z -> B : sendNow(chatId, text)
+    B -> API : POST /sendMessage
+    alt accepted
+      Z -> DB : SENT, sent_at, attempts + 1
+    else error
+      Z -> DB : attempts + 1, next try after 1, 5, 15 min;\nafter the third retry FAILED
+    end
+  end
+end
+@enduml

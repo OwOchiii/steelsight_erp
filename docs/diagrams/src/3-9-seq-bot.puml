@@ -1,0 +1,51 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Bot commands (/lich, /chamcong)
+actor Employee
+participant "Zalo" as Z
+participant ZaloController as C
+participant ZaloBot as B
+participant ZaloLinks as L
+participant ZaloCommands as M
+database PostgreSQL as DB
+Employee -> Z : /chamcong
+Z -> C : POST /zalo/webhook
+C -> B : acceptsSecret(header)?
+alt wrong secret, a group chat, or not text
+  C --> Z : 200, nothing done
+else
+  C -> L : handle(chatId, "/chamcong")
+  L -> DB : active owner of this chat?
+  alt not linked
+    L --> C : how to link (no data)
+  else linked
+    L -> M : reply(userId, "/chamcong")
+    M -> DB : this month's shifts, visits, totals, safety score
+    M -> M : one line per shift, totals first;\nsplit at line ends into <= 2,000 chars
+    M --> C : messages
+  end
+  loop each message, in order
+    C -> B : send(chatId, text)
+  end
+end
+@enduml

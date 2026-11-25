@@ -1,0 +1,47 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Review: take and confirm (or dismiss)
+actor "HSE officer" as H
+participant ViolationController as C
+participant ViolationService as V
+participant MonthLocks as L
+database PostgreSQL as DB
+participant NotificationService as N
+H -> C : GET /violations/review
+C -> V : queue(actorId, zone, day, page)
+V -> DB : PENDING_REVIEW and OVERDUE, oldest first
+H -> C : POST /violations/{id}/take
+C -> V : take(actorId, id) -> taken_by, taken_at ("... is going")
+H -> C : POST /violations/{id}/confirm (person or stranger, note, version)
+C -> V : confirm(actorId, id, personId, stranger, note, version)
+V -> L : requireOpen(detected_at)
+alt version changed (someone else decided)
+  V --> C : "This violation was already decided by another officer..."
+else neither person nor stranger
+  V --> C : "Choose the person, or mark the violation as Stranger."
+else
+  V -> DB : user, subject EMPLOYEE, CONFIRMED (SITE)\nor REMINDER (OFFICE); reviewed_by, reviewed_at
+  V -> DB : safety_scores(): new score and level
+  V -> N : VIOLATION_CONFIRMED (score, level, appeal deadline)\nor REMINDER; LEVEL_WORSE if the level dropped
+end
+@enduml

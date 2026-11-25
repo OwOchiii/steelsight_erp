@@ -1,0 +1,137 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Violation Review and Appeal
+class "ViolationController" as ViolationController <<Controller>> {
+  +mine(user, month, page, model): String
+  +review(user, zoneId, day, page, model): String
+  +all(user, month, zoneId, status, person, page, model): String
+  +detail(user, id, model): String
+  +photo(user, id): ResponseEntity~<Resource>
+  +take(user, id, redirect): String
+  +confirm(user, id, personId, stranger, note, version, redirect): String
+  +dismiss(user, id, reason, otherReason, version, redirect): String
+  +dispute(user, id, reason, redirect): String
+  +decide(user, id, decision, hseFacts, note, rightPersonId, redirect): String
+}
+
+class "ViolationService" as ViolationService <<Service>> {
+  +queue(actorId, zoneId, day, page): Page~<Violation>
+  +get(actorId, violationId): Violation
+  +take(actorId, violationId): Violation
+  +candidates(actorId, violation): List~<Candidate>
+  +suggestion(violation): Optional~<AppUser>
+  +confirm(actorId, violationId, personId, stranger, note, expectedVersion): Violation
+  +dismiss(actorId, violationId, reason, otherReason, expectedVersion): Violation
+  +appealDeadline(violation): OffsetDateTime
+  +whyNoAppeal(actorId, violation): String
+  +markAppealed(actorId, violation): void
+  +decideAppeal(actorId, violation, decision, rightPersonId): Violation
+  +listOwn(actorId, month, page): Page~<Violation>
+}
+
+class "TicketService" as TicketService <<Service>> {
+  +openDispute(actorId, violationId, subject, description): Ticket
+  +decideAppeal(actorId, violationId, decision, hseFacts, note, rightPersonId): Violation
+}
+
+class "MonthLocks" as MonthLocks <<Component>> {
+  +requireOpen(moment): void
+}
+
+interface "PhotoStorage" as PhotoStorage <<Interface>> {
+  +load(album, storedName): Resource
+}
+
+class "Violation" as Violation <<Entity>> {
+  -version: Long
+  -user: AppUser
+  -camera: Camera
+  -zone: Zone
+  -violationType: ViolationType
+  -detectedAt: OffsetDateTime
+  -confidence: BigDecimal
+  -snapshotPath: String
+  -boxX: BigDecimal
+  -boxY: BigDecimal
+  -boxW: BigDecimal
+  -boxH: BigDecimal
+  -reviewStatus: ReviewStatus
+  -subject: ViolationSubject
+  -dismissReason: DismissReason
+  -reviewNote: String
+  -suggestedUser: AppUser
+  -suggestionSimilarity: BigDecimal
+  -reviewedBy: AppUser
+  -reviewedAt: OffsetDateTime
+  -takenBy: AppUser
+  -takenAt: OffsetDateTime
+  -disputeStatus: DisputeStatus
+  -appealDecidedBy: AppUser
+  -appealDecidedAt: OffsetDateTime
+  --
+  +confirm(person, reviewer, note, at): void
+  +confirmStranger(reviewer, note, at): void
+  +dismiss(reason, reviewer, note, at): void
+  +recordAppealDecision(decision, decider, at): void
+  +belongsTo(userId): boolean
+}
+
+class "violation triggers" as violation_triggers <<Database>> {
+  trg_violation_worker: zone from camera,\nnamed person -> suggestion
+  trg_violation_alert: VIOLATION_ALERT to\nHSE on duty (or all HSE and Admins)
+}
+
+ViolationController --> ViolationService
+ViolationController --> TicketService
+ViolationController --> PhotoStorage
+ViolationService --> MonthLocks
+ViolationService ..> Violation
+TicketService ..> Violation : appeal ticket
+Violation ..> violation_triggers : on insert
+@enduml

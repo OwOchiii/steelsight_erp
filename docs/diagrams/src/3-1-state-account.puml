@@ -1,0 +1,39 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  ArrowColor #2E7D32
+  StartColor #263238
+  EndColor #263238
+}
+title Account lifecycle
+hide empty description
+[*] --> MustChangePassword : Admin creates the account\n(starting password)
+MustChangePassword --> Active : the person chooses\ntheir own password
+Active --> MustChangePassword : Admin resets the password
+Active --> Deactivated : Admin deactivates\n(sessions ended)
+Deactivated --> Active
+note right of Deactivated
+  Admin reactivates
+  to return to Active
+end note
+MustChangePassword --> Deactivated : Admin deactivates
+Active --> Deleted : Admin deletes\n(face data erased, Zalo unlinked,\nfuture shifts cancelled)
+Deactivated --> Deleted : Admin deletes
+Deleted --> [*]
+state Active {
+  [*] --> SignedOut
+  SignedOut --> SignedIn : right password
+  SignedIn --> SignedOut : sign out, or 30 min idle
+  SignedOut --> LockedOut : 5 failures (client)\nor 20 (code)
+  LockedOut --> SignedOut : 15 minutes pass
+}
+@enduml

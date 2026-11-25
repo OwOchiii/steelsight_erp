@@ -1,0 +1,61 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Sign in
+actor User
+participant "Browser" as B
+participant SignInLimitFilter as F
+participant SignInLimiter as L
+participant "Spring Security\nform login" as S
+participant AppUserDetailsService as D
+participant FirstSignInHandler as H
+database PostgreSQL as DB
+User -> B : employee code, password, Sign in
+B -> F : POST /login (CSRF token)
+F -> L : isLocked(code, address)
+alt 5 failures from this client or 20 for this code in 15 min
+  L --> F : true
+  F --> B : redirect /login?locked
+  B --> User : "Too many failed sign-ins. Try again in 15 minutes."
+else not locked
+  F -> S : continue
+  S -> D : loadUserByUsername(code)
+  D -> DB : active, not deleted account with its role's permissions
+  DB --> D : row
+  D --> S : AuthenticatedUser (authorities = permission codes)
+  S -> S : BCrypt.matches(password, hash)
+  alt wrong code or password
+    S -> L : recordFailure(code, address)
+    S --> B : redirect /login?error
+    B --> User : "The employee code or password is wrong."
+  else right password
+    S -> L : recordSuccess(code, address)
+    S -> H : onAuthenticationSuccess
+    H -> DB : current password hash
+    alt must_change_password
+      H --> B : redirect /account/password
+    else
+      H --> B : redirect to the page asked for, or /
+    end
+  end
+end
+@enduml

@@ -1,0 +1,64 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam rectangle {
+  BorderColor #546E7A
+}
+skinparam package {
+  BorderColor #546E7A
+}
+skinparam node {
+  BackgroundColor #FAFAFA
+  BorderColor #546E7A
+}
+skinparam database {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+title Deployment and CI/CD
+left to right direction
+node "Developer machine" as dev {
+  artifact "git repository" as repo
+  artifact "scripts/local.sh\n(compose.local.yaml)" as local
+}
+node "GitHub (GitLab planned)" as gh {
+  component "Actions: mvn verify\n(Testcontainers)" as test
+  component "Build image\nfrom master" as build
+  artifact "ghcr.io/owochiii/\nsteelsight_erp:<sha>" as image
+}
+node "Render free web service" as render {
+  node "Container (512 MB)" as cont {
+    artifact "app.jar\nSPRING_PROFILES_ACTIVE=prod" as jar
+  }
+}
+node "Supabase" as supa {
+  database "PostgreSQL 17" as pg
+  storage "Storage buckets" as st
+}
+node "Uptime monitor" as up
+node "Site laptop (Windows)" as laptop {
+  artifact "SteelSightAI.exe\n(setup.bat, run.bat)" as exe
+  database "SQLite outbox" as sqlite
+}
+node "Cameras CAM-01..04" as cams
+node "Zalo Bot Platform" as zalo
+repo --> test : push
+test --> build : on master
+build --> image
+image --> jar : deploy hook,\npull
+jar --> pg : Flyway at start-up,\nJDBC/TLS
+jar --> st : HTTPS
+jar <--> zalo : HTTPS
+up --> jar : GET /actuator/health\nevery 5 min
+cams --> exe : RTSP
+exe --> sqlite
+exe --> pg : psycopg/TLS
+exe --> st : HTTPS
+local ..> jar : same image,\nlocal database
+@enduml

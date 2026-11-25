@@ -1,0 +1,45 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam linetype ortho
+hide circle
+title Notifications
+entity notification {
+  * id : bigint <<PK>>
+  --
+  * user_id : bigint <<FK>>
+  * kind : text
+  * params : jsonb
+  link : text
+  read_at : timestamptz
+  * created_at : timestamptz
+}
+entity notification_delivery {
+  * notification_id : bigint <<PK, FK>>
+  --
+  * channel : text
+  * status : text
+  * attempts : integer
+  next_attempt_at : timestamptz
+  sent_at : timestamptz
+  last_error : text
+}
+entity schedule_notice {
+  * user_id : bigint <<PK, FK>>
+  * month : date <<PK>>
+  --
+  * sent_at : timestamptz
+}
+entity app_user {
+  * id : bigint <<PK>>
+}
+app_user ||--o{ notification : user_id
+notification ||--o| notification_delivery : notification_id
+app_user ||--o{ schedule_notice : user_id
+@enduml

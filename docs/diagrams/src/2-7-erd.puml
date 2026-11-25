@@ -1,0 +1,47 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam linetype ortho
+hide circle
+title Month Closing, Settings and Jobs
+entity month_lock {
+  * month : date <<PK>>
+  --
+  * locked_at : timestamptz
+}
+entity report_export {
+  * id : bigint <<PK>>
+  --
+  * user_id : bigint <<FK>>
+  * month : date
+  * scope : text
+  * provisional : boolean
+  * exported_at : timestamptz
+}
+entity company_setting {
+  * id : boolean <<PK>>
+  --
+  * half_day_unexplained : boolean
+  * appeal_working_days : integer
+  * explanation_working_days : integer
+  * version : bigint
+}
+entity job_run {
+  * job : text <<PK>>
+  * scheduled_for : timestamptz <<PK>>
+  --
+  * started_at : timestamptz
+  finished_at : timestamptz
+  result : text
+}
+entity app_user {
+  * id : bigint <<PK>>
+}
+app_user ||--o{ report_export : user_id
+@enduml

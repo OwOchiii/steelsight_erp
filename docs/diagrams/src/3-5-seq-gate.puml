@@ -1,0 +1,56 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Gate check-in and check-out
+actor Worker
+participant "CAM-01" as CAM
+participant "ScannerMonitor\n(detection app)" as G
+participant "Outbox\n(SQLite)" as O
+participant ErpSync as S
+database PostgreSQL as DB
+participant JobScheduler as J
+participant ZaloDispatcher as Z
+Worker -> CAM : looks at the camera
+CAM -> G : frames
+G -> G : face matched twice ~1 s apart (BR-28);\nlast scan today IN and over 5 min ago? (BR-29)
+alt first scan today, or last was OUT
+  G -> O : put(gate_in, user, time, event_id)
+else last was IN, 5 min passed
+  G -> O : put(gate_out, user, time, event_id)
+else within 5 min
+  G --> Worker : gate screen: "scan again at ..."
+end
+S -> O : head("db")
+S -> DB : SELECT close_stale_check_ins(time zone)
+alt gate_in
+  S -> DB : INSERT check_in (method FACE, camera, similarity, event_id)\nON CONFLICT (event_id) DO NOTHING
+  DB -> DB : trg_check_in_attach_shift: shift starting within 60 min (BR-30),\nclose a visit left open from an earlier day
+  DB -> DB : trg_check_in_notify: notice CHECK_IN "Check-in at 07:52, starting shift ..."
+else gate_out
+  S -> DB : UPDATE check_in SET check_out_at
+  DB -> DB : trg_check_out_notify: notice CHECK_OUT
+  DB -> DB : trg_check_out_complete_shift: shift COMPLETED (V25)
+end
+S -> O : mark_done(seq)
+J -> J : every minute: CheckOutHours.fill()\n(paid hours into CHECK_OUT notices)
+J -> Z : sendDue() -> Zalo message
+@enduml

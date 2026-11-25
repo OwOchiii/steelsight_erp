@@ -1,0 +1,57 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Create an account (with Generate)
+actor Admin
+participant Browser as B
+participant TeamController as C
+participant EmployeeCodes as E
+participant PhotoStorage as P
+participant UserService as U
+database PostgreSQL as DB
+Admin -> B : New account, choose the role, Generate
+B -> C : GET /team/new/code?roleName=WORKER (htmx)
+C -> E : suggest(actorId, "WORKER")
+loop up to 50 draws
+  E -> E : "WRK-" + 5 random digits
+  E -> DB : existsByEmployeeCodeIgnoreCase(code)\n(every account, deleted too)
+  break code is free
+  end
+end
+E --> C : WRK-48213
+C --> B : code field with the value (swapped in)
+Admin -> B : name, group, team, phone, starting password,\nphoto, consent, Create account
+B -> C : POST /team/new (multipart)
+C -> P : store(FACE, photo)
+alt not JPEG or PNG by its bytes, over 5 MB, or under 480 x 480
+  P --> C : BusinessRuleException
+  C --> B : form again with the message
+else stored
+  P --> C : stored name
+  C -> U : create(actorId, details, photoPath)
+  U -> U : code pattern, unique code, role, consent,\nname, email, phone (10 digits, unique), password
+  U -> DB : INSERT app_user (BCrypt hash, must_change_password = true,\nface_consent_at = now)
+  U -> DB : queueForEnrolment(user, photo) -> face_embedding FRONT, PENDING
+  U --> C : AppUser
+  C --> B : redirect /team/{id}/edit, "The account was created."
+end
+@enduml

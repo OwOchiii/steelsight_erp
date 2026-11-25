@@ -1,0 +1,116 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Teams, Zones and Cameras
+class "TeamController" as TeamController <<Controller>> {
+  +list(user, page, model): String
+  +createTeam(user, name, managerId, redirect): String
+  +changeLeader(user, id, managerId, redirect): String
+  +deleteTeam(user, id, redirect): String
+}
+
+class "AdminSettingsController" as AdminSettingsController <<Controller>> {
+  +zones(user, model): String
+  +createZone(user, form, binding, model, response, redirect): String
+  +linkCamera(user, code, zoneId, redirect): String
+  +removeCamera(user, id, redirect): String
+  +rename(user, id, name, redirect): String
+  +team(user, id, teamId, redirect): String
+}
+
+class "TeamService" as TeamService <<Service>> {
+  +create(actorId, name, managerId): Team
+  +changeManager(actorId, teamId, managerId): Team
+  +delete(actorId, teamId): void
+  +listLeaderCandidates(actorId): List~<AppUser>
+  +listManaged(actorId): List~<Team>
+}
+
+class "ZoneService" as ZoneService <<Service>> {
+  +create(actorId, name, kind, teamId): Zone
+  +rename(actorId, zoneId, name): Zone
+  +assignTeam(actorId, zoneId, teamId): Zone
+  +linkCamera(actorId, code, zoneId): Camera
+  +removeCamera(actorId, cameraId): void
+  +list(actorId): List~<Zone>
+  +cameras(actorId): Map~<Long, List~<Camera>>
+}
+
+class "Team" as Team <<Entity>> {
+  -name: String
+  -manager: AppUser
+  --
+  +isManagedBy(userId): boolean
+}
+
+class "Zone" as Zone <<Entity>> {
+  -name: String
+  -code: String
+  -kind: ZoneKind
+  -team: Team
+  code: read back from the database (@Generated)
+}
+
+class "Camera" as Camera <<Entity>> {
+  -cameraCode: String
+  -zone: Zone
+  -role: CameraRole
+}
+
+class "zone_code trigger" as zone_code_trigger <<Database>> {
+  zone_next_code(kind): text
+  gives GATE-IN, GATE-PPE, AREA-A ...
+  refuses any change of code
+}
+
+TeamController --> TeamService
+AdminSettingsController --> ZoneService
+Team "0..1" -- "0..*" Zone : owns work areas
+Zone "1" -- "0..*" Camera
+Zone ..> zone_code_trigger : on insert / update
+@enduml

@@ -1,0 +1,119 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Detection app (Python)
+class "Engine" as Engine <<Python>> {
+  +start(): void
+  +stop(): void
+  +frame(cam_index): tuple
+  +stats(): dict
+}
+
+class "CaptureWorker" as CaptureWorker <<Python>> {
+  +start(): void
+  +read_latest(): (seq, frame)
+}
+
+class "Detector" as Detector <<Python>> {
+  +predict_batch(frames): list
+  +violation_type(cls_id): ViolationType
+}
+
+class "FaceService" as FaceService <<Python>> {
+  +update(cam, frame, tracked): dict
+  +embed_photo(img, user_id): (vector, error)
+}
+
+class "ErpGallery" as ErpGallery <<Python>> {
+  +set_rows(rows): void
+  +match(embedding): (id, code, score)
+}
+
+class "ScannerMonitor" as ScannerMonitor <<Python>> {
+  +process(tracked, identities, ...): list
+  +direction_for(uid, now): (IN|OUT, wait)
+}
+
+class "SafetyMonitor" as SafetyMonitor <<Python>> {
+  +process(tracked, ppe_by_pid, ...): list
+  -cooldown: CooldownBook (60 s)
+}
+
+class "Outbox" as Outbox <<Python>> {
+  +put(kind, payload, lane): int
+  +head(lane): dict
+  +mark_done(seq): void
+  +mark_retry(seq, error, delay): void
+  +mark_failed(seq, error): void
+}
+
+class "ErpSync" as ErpSync <<Python>> {
+  +start(): void
+  +apply(conn, item): void
+  -close_stale(): void
+  -enrol_pending(): void
+  -refresh_reference(): void
+}
+
+class "StorageClient" as StorageClient <<Python>> {
+  +upload(bucket, obj, local_path): void
+  +download(bucket, obj): bytes
+}
+
+Engine --> CaptureWorker
+Engine --> Detector
+Engine --> FaceService
+Engine --> ScannerMonitor
+Engine --> SafetyMonitor
+FaceService --> ErpGallery
+ScannerMonitor --> Outbox : gate_in / gate_out
+SafetyMonitor --> Outbox : violation
+ErpSync --> Outbox
+ErpSync --> StorageClient
+ErpSync --> ErpGallery : READY embeddings
+@enduml

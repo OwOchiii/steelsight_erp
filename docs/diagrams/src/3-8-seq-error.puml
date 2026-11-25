@@ -1,0 +1,46 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Attendance error: report and approval
+actor Employee
+actor Admin
+participant TicketController as C
+participant TicketService as T
+participant AttendanceController as AC
+participant CheckInService as S
+database PostgreSQL as DB
+Employee -> C : POST /tickets (ATTENDANCE_ERROR, shift, IN/OUT, gate time, photo)
+C -> T : create(actorId, details)
+alt no photo / shift over 2 days ago / open ticket for this shift
+  T --> C : "Attach a photo..." / "The period for this request has ended." /\n"You already have an open request for this..."
+else
+  T -> DB : INSERT ticket OPEN (+ TICKET_CREATED to the Admins)
+end
+Admin -> C : POST /tickets/{id}/take, then Approve
+C -> T : prepareAttendanceApproval(actorId, id, note)
+C --> Admin : Attendance form with the visit and "answers ticket #id"
+Admin -> AC : POST /attendance/{visit} (corrected time, reason, ticketId)
+AC -> S : correct(..., ticketId)
+S -> DB : correction (ticket_id), visit updated
+S -> T : approveAttendanceError(actorId, id)
+T -> DB : ticket RESOLVED, outcome APPROVED (+ TICKET_DECIDED)
+@enduml

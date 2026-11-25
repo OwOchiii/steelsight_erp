@@ -1,0 +1,96 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Home Page and Monthly Report
+class "HomeController" as HomeController <<Controller>> {
+  +home(user, model): String
+}
+
+class "ReportController" as ReportController <<Controller>> {
+  +page(user, model): String
+  +download(user, month, teamId, request, response): ResponseEntity~<byte[]>
+}
+
+class "MonthlyReportService" as MonthlyReportService <<Service>> {
+  +build(actorId, month, teamId): Report
+  +logExport(actorId, report): void
+  +exports(actorId): List~<Export>
+}
+
+class "MonthlyReportWorkbook" as MonthlyReportWorkbook <<Component>> {
+  +write(report): byte[]
+  +fileName(report, scopeSlug): String
+  sheets: Site summary, Office summary,
+  Violations, Attendance, Absences
+}
+
+class "AttendanceCalculator" as AttendanceCalculator <<Service>> {
+  +rows(userIds, from, to): List~<Row>
+  +summary(rows): ShiftAttendance.Summary
+}
+
+class "SafetyScoreService" as SafetyScoreService <<Service>> {
+  +inMonth(userId, inMonth): Score
+}
+
+class "Charts" as Charts <<Component>> {
+  bars worked out in Java,
+  drawn with HTML and CSS
+}
+
+class "report_export" as report_export <<Database>> {
+  user_id, month, scope, provisional, exported_at
+}
+
+HomeController ..> Charts
+ReportController --> MonthlyReportService
+ReportController --> MonthlyReportWorkbook
+MonthlyReportService --> AttendanceCalculator
+MonthlyReportService --> SafetyScoreService
+MonthlyReportService ..> report_export : logExport
+@enduml

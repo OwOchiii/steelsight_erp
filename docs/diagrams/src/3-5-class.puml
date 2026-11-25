@@ -1,0 +1,153 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Attendance and Pending Overtime
+class "AttendanceController" as AttendanceController <<Controller>> {
+  +mine(user, month, model): String
+  +team(user, view, day, month, model): String
+  +list(user, onSite, day, month, person, flag, page, model): String
+  +newCheckIn(user, ticket, model): String
+  +record(user, form, binding, model, response, redirect): String
+  +edit(user, id, ticket, model): String
+  +correct(user, id, form, binding, model, response, redirect): String
+  +pendingOvertime(user, teamId, model): String
+  +cancelOvertime(user, ids, redirect): String
+  +overtimeNote(user, id, note, redirect): String
+}
+
+class "CheckInService" as CheckInService <<Service>> {
+  +recordManual(actorId, details): CheckIn
+  +correct(actorId, checkInId, checkInAt, checkOutAt, note, expectedVersion, ticketId): CheckIn
+  +listOwn(actorId): List~<CheckIn>
+  +listOnSiteInScope(actorId, page): Page~<VisitStatus>
+  +listCorrections(actorId, checkInId): List~<CheckInCorrection>
+  +listOwnIncomplete(actorId): List~<CheckIn>
+}
+
+class "AttendanceRules" as AttendanceRules <<Service>> {
+  +assess(visit): VisitStatus
+  GRACE = 5 min (BR-31)
+}
+
+class "AttendanceCalculator" as AttendanceCalculator <<Service>> {
+  +rows(userIds, from, to): List~<Row>
+  +summary(rows): ShiftAttendance.Summary
+}
+
+class "PendingOvertimeService" as PendingOvertimeService <<Service>> {
+  +createFromVisits(): int
+  +expire(): int
+  +cancel(actorId, ids): int
+  +leaderNote(actorId, pendingId, note): void
+  +listOpen(actorId, teamId): List~<Row>
+  +prefill(actorId, pendingId, form): void
+}
+
+class "CheckOutHours" as CheckOutHours <<Component>> {
+  +fill(): int
+}
+
+class "Notices" as Notices <<Service>> {
+  +visitRecorded(visit): void
+  +visitCorrected(visit): void
+}
+
+class "CheckIn" as CheckIn <<Entity>> {
+  -version: Long
+  -user: AppUser
+  -shift: Shift
+  -zone: Zone
+  -camera: Camera
+  -checkInAt: OffsetDateTime
+  -checkOutAt: OffsetDateTime
+  -method: CheckInMethod
+  -faceSimilarity: BigDecimal
+  -snapshotPath: String
+  -recordedBy: AppUser
+  -note: String
+  -autoClosed: boolean
+  -incomplete: boolean
+  --
+  +flagIncomplete(at): void
+}
+
+class "CheckInCorrection" as CheckInCorrection <<Entity>> {
+  -checkIn: CheckIn
+  -correctedBy: AppUser
+  -correctedAt: OffsetDateTime
+  -oldCheckInAt: OffsetDateTime
+  -oldCheckOutAt: OffsetDateTime
+  -oldNote: String
+  -oldRecordedBy: AppUser
+  -oldAutoClosed: boolean
+  -newCheckInAt: OffsetDateTime
+  -newCheckOutAt: OffsetDateTime
+  -newNote: String
+  --
+  +of(visit, correctedBy, newCheckInAt, newCheckOutAt, newNote): CheckInCorrection
+}
+
+class "PendingOvertime" as PendingOvertime <<Entity>> {
+  -checkIn, user, shift
+  -startAt, endAt: OffsetDateTime
+  -status: PENDING | VALID | CANCELLED
+  -expiresAt, decidedAt: OffsetDateTime
+  -overtimeShift: Shift
+  -leaderNote: String
+}
+
+AttendanceController --> CheckInService
+AttendanceController --> PendingOvertimeService
+AttendanceController --> AttendanceCalculator
+AttendanceCalculator --> AttendanceRules
+CheckInService --> Notices
+CheckInService ..> CheckInCorrection : writes
+CheckIn "1" -- "0..*" CheckInCorrection
+CheckIn "1" -- "0..1" PendingOvertime
+CheckOutHours ..> AttendanceCalculator
+@enduml

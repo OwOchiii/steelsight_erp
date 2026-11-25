@@ -1,0 +1,121 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Shift Planning and Timetable
+class "ShiftController" as ShiftController <<Controller>> {
+  +week(user, week, page, model): String
+  +newShift(user, workerId, date, pendingOvertimeId, model): String
+  +create(user, form, binding, model, response, redirect): String
+  +edit(user, id, model): String
+  +update(user, id, form, binding, model, response, redirect): String
+  +cancel(user, id, redirect): String
+  +copyLastWeek(user, week, redirect): String
+}
+
+class "TimetableController" as TimetableController <<Controller>> {
+  +timetable(user, week, model): String
+}
+
+class "ShiftService" as ShiftService <<Service>> {
+  +create(actorId, details): Shift
+  +update(actorId, shiftId, details, expectedVersion): Shift
+  +cancel(actorId, shiftId): Shift
+  +copyLastWeek(actorId, anyDayOfWeek): CopyResult
+  +listTeam(actorId, from, to): List~<Shift>
+  +listAll(actorId, from, to): List~<Shift>
+  +listOwnInRange(actorId, from, to): List~<Shift>
+  +isOpenForManagers(day): boolean
+  +publishedAt(day): OffsetDateTime
+}
+
+class "AccessPolicy" as AccessPolicy <<Service>> {
+  +requireCanAssignShift(actorId, workerId): void
+  +requireCanEditShift(actorId, shiftId): void
+}
+
+class "Notices" as Notices <<Service>> {
+  +shiftAdded(shift): void
+  +shiftChanged(before, after): void
+  +shiftCancelled(shift): void
+  +weekSchedule(userId, monday, shifts): void
+}
+
+class "SiteJobs" as SiteJobs <<Component>> {
+  +weeklySchedule(scheduledFor): String
+  +hourly(scheduledFor): String
+}
+
+class "MonthLocks" as MonthLocks <<Component>> {
+  +requireOpen(moment): void
+}
+
+class "Shift" as Shift <<Entity>> {
+  -version: Long
+  -user: AppUser
+  -zone: Zone
+  -startAt: OffsetDateTime
+  -endAt: OffsetDateTime
+  -durationHours: BigDecimal
+  -status: ShiftStatus
+  -kind: ShiftKind
+  -reason: String
+  -createdBy: AppUser
+  -updatedBy: AppUser
+  --
+  +isOvertime(): boolean
+  +hasStarted(now): boolean
+}
+
+ShiftController --> ShiftService
+TimetableController --> ShiftService
+ShiftService --> AccessPolicy
+ShiftService --> Notices
+ShiftService --> MonthLocks
+ShiftService ..> Shift
+SiteJobs --> Notices
+@enduml

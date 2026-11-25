@@ -1,0 +1,53 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Link Zalo
+actor Employee
+participant Browser as B
+participant ZaloController as C
+participant ZaloLinks as L
+participant ZaloStore as S
+participant "Zalo app\nand bot" as Z
+database PostgreSQL as DB
+Employee -> B : Dashboard, Link Zalo
+B -> C : POST /account/zalo/link
+C -> L : newCode(actorId)
+L -> S : saveCode(user, 6 random digits, now + 24 h)\n(a new code replaces the old)
+C --> B : code and QR of the bot link
+Employee -> Z : scan the QR, send the 6 digits
+Z -> C : POST /zalo/webhook (X-Bot-Api-Secret-Token)
+C -> C : acceptsSecret(header)?
+C -> L : handle(chatId, text)
+alt 5 wrong codes in the last hour from this chat
+  L --> C : (silence)
+else code unknown or expired
+  L --> C : "This code is not valid..."
+else chat already linked to another active employee
+  L --> C : "This Zalo account is already linked to another employee..."
+else valid
+  L -> S : useCode(code) (deleted, single use)
+  L -> S : link(user, chatId)
+  S -> DB : app_user.zalo_chat_id = chatId
+  L --> C : "Your Zalo account is now linked..."
+end
+C -> Z : sendMessage(reply)
+@enduml

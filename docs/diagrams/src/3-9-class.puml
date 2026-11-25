@@ -1,0 +1,127 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Notifications and the Zalo Bot
+class "NotificationController" as NotificationController <<Controller>> {
+  +list(user, page, model): String
+  +markRead(user, id): String
+  +markAllRead(user): String
+}
+
+class "ZaloController" as ZaloController <<Controller>> {
+  +webhook(secret, body): ResponseEntity~<Map~<String, Object>>
+}
+
+class "NotificationService" as NotificationService <<Service>> {
+  +notify(userId, kind, params, link): Notification
+  +notifyAll(userIds, kind, params, link): void
+  +listOwn(actorId, page): Page~<Notification>
+  +countUnread(actorId): long
+  +markRead(actorId, notificationId): void
+  +markAllRead(actorId): void
+  +deliveries(notificationIds): Map~<Long, Delivery>
+}
+
+class "NoticeText" as NoticeText <<Service>> {
+  +render(kind, params, locale): String
+  +json(params): String
+  +params(json): Map~<String, Object>
+}
+
+class "ZaloDispatcher" as ZaloDispatcher <<Service>> {
+  +sendDue(): int
+  RETRIES = 1, 5, 15 min
+}
+
+class "ZaloBot" as ZaloBot <<Component>> {
+  +send(chatId, text): void
+  +sendNow(chatId, text): Optional~<String>
+  +registerWebhook(): void
+  +acceptsSecret(given): boolean
+  +botLink(): String
+  +canSend(): boolean
+}
+
+class "ZaloLinks" as ZaloLinks <<Service>> {
+  +handle(chatId, text): List~<String>
+}
+
+class "ZaloCommands" as ZaloCommands <<Component>> {
+  +reply(userId, message): List~<String>
+  +split(text, max): List~<String>
+}
+
+class "Notification" as Notification <<Entity>> {
+  -user: AppUser
+  -kind: NotificationKind
+  -params: String
+  -link: String
+  -readAt: OffsetDateTime
+  -createdAt: OffsetDateTime
+  --
+  +markRead(at): void
+}
+
+class "notification_delivery" as notification_delivery <<Database>> {
+  notification_id (PK, FK)
+  status: PENDING | SENT | FAILED | SKIPPED
+  attempts, next_attempt_at, sent_at, last_error
+  added by trg_notification_delivery
+}
+
+NotificationController --> NotificationService
+NotificationService ..> Notification
+NotificationService --> NoticeText
+ZaloDispatcher --> ZaloBot
+ZaloDispatcher --> NoticeText
+ZaloDispatcher ..> "notification_delivery"
+ZaloController --> ZaloLinks
+ZaloController --> ZaloBot
+ZaloLinks --> ZaloCommands
+Notification "1" -- "0..1" "notification_delivery"
+@enduml

@@ -1,0 +1,36 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  ArrowColor #2E7D32
+  StartColor #263238
+  EndColor #263238
+}
+title Violation review status
+hide empty description
+[*] --> PENDING_REVIEW : detection app writes it\n(only a suggestion)
+PENDING_REVIEW --> OVERDUE : not reviewed by 23:00\nof its day (BR-53)
+PENDING_REVIEW --> CONFIRMED : HSE names a SITE employee
+PENDING_REVIEW --> REMINDER : HSE names an OFFICE employee
+PENDING_REVIEW --> CONFIRMED : HSE marks a Stranger\n(subject STRANGER, no person)
+PENDING_REVIEW --> DISMISSED : HSE dismisses with a reason
+OVERDUE --> CONFIRMED
+OVERDUE --> REMINDER
+OVERDUE --> DISMISSED
+CONFIRMED --> [*]
+REMINDER --> [*]
+DISMISSED --> [*]
+note right of CONFIRMED
+  Only a confirmed violation of an
+  employee counts in the score and
+  can be appealed (BR-64)
+end note
+@enduml

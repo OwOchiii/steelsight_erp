@@ -1,0 +1,52 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam rectangle {
+  BorderColor #546E7A
+}
+skinparam package {
+  BorderColor #546E7A
+}
+skinparam node {
+  BackgroundColor #FAFAFA
+  BorderColor #546E7A
+}
+skinparam database {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+title Detection app: package diagram (steelsight)
+skinparam linetype ortho
+package "engine.py" as engine #E0F7FA
+package web #E3F2FD
+package vision #E0F7FA
+package people #E0F7FA
+package gate #E0F7FA
+package safety #E0F7FA
+package records #E0F7FA
+package erp #FFF8E1
+package core #ECEFF1
+web ..> engine : polls frames\nand events
+engine ..> vision : capture,\ndetector, tracker
+engine ..> people : faces
+engine ..> gate : scanner
+engine ..> safety : PPE rules
+engine ..> records : local log,\nevidence
+gate ..> erp : outbox events
+safety ..> erp : outbox events
+erp ..> people : face gallery,\nenrolment
+erp ..> core
+vision ..> core
+records ..> core
+note right of erp
+  outbox.py, sync.py (ErpSync),
+  mapping.py: writes to Supabase
+  as steelsight_detection
+end note
+@enduml

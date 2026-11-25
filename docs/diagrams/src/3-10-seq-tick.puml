@@ -1,0 +1,43 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Every minute: due jobs, run once, caught up after sleep
+participant "Spring @Scheduled" as SP
+participant JobScheduler as J
+participant SiteJobs as S
+database PostgreSQL as DB
+SP -> J : tick() (also at start-up after Render wakes)
+J -> J : CheckOutHours.fill(), ZaloDispatcher.sendDue()
+loop each job (hourly, day-end, morning, old-tickets,\nweekly-schedule, month-end, cancel-last-month-overtime, month-lock)
+  J -> J : latest due time (Vietnam time)
+  alt due within the catch-up window
+    J -> DB : INSERT job_run (job, due) ON CONFLICT DO NOTHING
+    alt claimed
+      J -> S : run(due)
+      S --> J : result or "FAILED: ..."
+      J -> DB : finished_at, result
+    else already ran
+      J -> J : skip
+    end
+  end
+end
+@enduml

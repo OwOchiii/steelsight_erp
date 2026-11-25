@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  ArrowColor #2E7D32
+  StartColor #263238
+  EndColor #263238
+}
+title Zalo link lifecycle
+hide empty description
+[*] --> NotLinked
+NotLinked --> CodeIssued : Link Zalo / New link code\n(6 digits, 24 h)
+CodeIssued --> CodeIssued : new code\n(old one stops working)
+CodeIssued --> NotLinked : 24 h pass
+CodeIssued --> Linked : right code sent to the bot
+Linked --> NotLinked : /stop, Stop Zalo notices,\nAdmin unlinks, or account deleted
+Linked : notices are sent on Zalo
+NotLinked : notices stay in the ERP\n(delivery SKIPPED)
+@enduml
