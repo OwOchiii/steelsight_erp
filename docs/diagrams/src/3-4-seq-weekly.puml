@@ -1,0 +1,42 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Weekly schedule (Saturday 18:00)
+participant JobScheduler as J
+participant SiteJobs as S
+participant Notices as N
+database PostgreSQL as DB
+participant ZaloDispatcher as Z
+J -> DB : INSERT job_run ('weekly-schedule', Saturday 18:00)\nON CONFLICT DO NOTHING
+alt already ran for this time
+  DB --> J : nothing claimed
+else claimed
+  J -> S : weeklySchedule(scheduledFor)
+  loop every active employee
+    S -> DB : next week's shifts
+    S -> N : weekSchedule(userId, monday, shifts)
+    N -> DB : notice WEEKLY_SCHEDULE or WEEKLY_EMPTY\n(+ delivery row by trigger)
+  end
+  J -> DB : job_run finished_at, result
+end
+J -> Z : sendDue() on the next minute
+@enduml

@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  ArrowColor #2E7D32
+  StartColor #263238
+  EndColor #263238
+}
+title Ticket lifecycle
+hide empty description
+[*] --> OPEN : employee sends it\n(PPE appeal from the violation)
+OPEN --> IN_PROGRESS : an Admin takes it\nor it is assigned
+OPEN --> CANCELLED : the author cancels it
+IN_PROGRESS --> CANCELLED : the author cancels it
+OPEN --> RESOLVED : decided
+IN_PROGRESS --> RESOLVED : Admin decides:\nAPPROVED / REJECTED,\nor UPHELD / OVERTURNED for an appeal
+RESOLVED --> [*]
+CANCELLED --> [*]
+note right of IN_PROGRESS
+  The team leader reads and comments;
+  an HSE officer who was asked adds facts;
+  an Admin can't decide their own ticket
+end note
+@enduml

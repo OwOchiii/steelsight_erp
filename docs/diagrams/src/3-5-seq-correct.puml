@@ -1,0 +1,48 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Record or correct a visit by hand
+actor "HSE officer" as H
+participant AttendanceController as C
+participant CheckInService as S
+participant MonthLocks as L
+participant Notices as N
+database PostgreSQL as DB
+H -> C : POST /attendance/{id} (in, out, reason, version)
+C -> S : correct(actorId, id, in, out, reason, version, ticketId)
+S -> S : require CHECKIN_EDIT
+S -> L : requireOpen(old and new check-in month)
+S -> S : reason 10-500? out after in? version current?
+alt stale version
+  S --> C : StaleEditException (form shows the newer visit)
+else overlaps another visit of the person
+  S --> C : "This person already has a visit at that time."
+else valid
+  S -> DB : INSERT check_in_correction (old and new values, who, when)
+  S -> DB : UPDATE check_in (recorded_by = HSE, version + 1)
+  S -> N : visitCorrected(visit) -> notice VISIT_CORRECTED
+  opt the form answers an attendance error ticket
+    S -> DB : ticket RESOLVED, APPROVED (approveAttendanceError)
+  end
+  C --> H : "The check-in was corrected."
+end
+@enduml

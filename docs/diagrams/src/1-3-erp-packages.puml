@@ -1,0 +1,77 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam rectangle {
+  BorderColor #546E7A
+}
+skinparam package {
+  BorderColor #546E7A
+}
+skinparam node {
+  BackgroundColor #FAFAFA
+  BorderColor #546E7A
+}
+skinparam database {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+title Web ERP: package diagram (orochi.steelsight)
+skinparam linetype ortho
+package web #E3F2FD
+package security #F3E5F5
+package jobs #FFF8E1
+package reporting #FFF8E1
+package ticketing #FFF8E1
+package attendance #FFF8E1
+package ppe #FFF8E1
+package scheduling #FFF8E1
+package notification #FFF8E1
+package identity #FFF8E1
+package calendar #ECEFF1
+package storage #ECEFF1
+package "model, repository,\nexception, validation, config" as base #ECEFF1
+web ..> security
+web ..> reporting
+web ..> ticketing
+web ..> attendance
+web ..> ppe
+web ..> scheduling
+web ..> notification
+web ..> identity
+web ..> storage
+security ..> identity
+jobs ..> attendance
+jobs ..> notification
+jobs ..> scheduling
+jobs ..> calendar
+reporting ..> attendance
+reporting ..> ppe
+ticketing ..> attendance
+ticketing ..> ppe
+ticketing ..> notification
+attendance ..> ticketing
+attendance ..> ppe
+attendance ..> scheduling
+attendance ..> notification
+ppe ..> scheduling
+ppe ..> notification
+ppe ..> calendar
+scheduling ..> ppe
+scheduling ..> notification
+scheduling ..> identity
+notification ..> attendance
+notification ..> identity
+identity ..> attendance
+identity ..> storage
+identity ..> base
+attendance ..> calendar
+note bottom of base
+  Every feature package also uses these.
+end note
+@enduml

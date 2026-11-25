@@ -1,0 +1,79 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam rectangle {
+  BorderColor #546E7A
+}
+skinparam package {
+  BorderColor #546E7A
+}
+skinparam node {
+  BackgroundColor #FAFAFA
+  BorderColor #546E7A
+}
+skinparam database {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+title Steelsight: technology architecture
+left to right direction
+actor "Worker, Team Leader,\nHSE Officer, Admin" as users
+actor "Guard at the gate" as guard
+node "Browser\n(phone or desktop)" as browser
+node "Zalo app\n(phone)" as zaloapp
+cloud "Render (free web service)" as render {
+  node "Render HTTPS proxy\n(TLS, onrender.com)" as proxy
+  node "Docker: web ERP\nJava 17 JRE, non-root" as erpc {
+    rectangle "Spring Boot 4\nSpring MVC + Security\nThymeleaf + htmx\nTailwind CSS" as web
+    rectangle "Services and\nscheduled jobs\n(JobScheduler)" as services
+    rectangle "Spring Data JPA\nFlyway V1-V27" as data
+  }
+}
+cloud "Supabase" as supa {
+  database "PostgreSQL 17\npgvector, btree_gist\nRLS on every table\n27 tables, triggers" as pg
+  storage "Storage (private buckets)\nface-photos\nticket-photos\nevidence-photos" as st
+}
+cloud "Zalo Bot Platform" as zbp
+node "Site laptop (Windows, NVIDIA GPU)" as laptop {
+  rectangle "Detection app (Python)\npywebview + FastAPI on 127.0.0.1" as det {
+    rectangle "YOLO26\n(TensorRT / ONNX)" as yolo
+    rectangle "InsightFace\nbuffalo_l" as face
+    rectangle "PPE rules,\ngate scanner,\nvoice (edge-tts)" as rules
+    database "SQLite\noutbox + local log" as outbox
+    rectangle "ErpSync\n(psycopg)" as sync
+  }
+}
+node "Cameras (RTSP 554)\nCAM-01 attendance\nCAM-02 gate PPE\nCAM-03, CAM-04 work areas" as cams
+node "Gate screen\n+ speaker" as screen
+node "GitHub Actions\n(GitLab CI later)\nmvn verify, image" as ci
+node "Container registry\nghcr.io" as reg
+
+users --> browser
+browser --> proxy : HTTPS 443
+proxy --> web : HTTP $PORT
+web --> services
+services --> data
+data --> pg : JDBC/TLS 5432\nsession pooler\n(table owner)
+services --> st : HTTPS REST\nserver key
+services --> zbp : sendMessage,\nsetWebhook
+zbp --> web : POST /zalo/webhook\n(secret header)
+zbp --> zaloapp
+cams --> yolo : RTSP
+cams --> face
+yolo --> rules
+face --> rules
+rules --> outbox
+outbox --> sync
+sync --> pg : psycopg/TLS 5432\nsteelsight_detection role
+sync --> st : evidence photos up,\nenrolment photos down
+rules --> screen
+guard --> screen
+ci --> reg : push image
+reg --> render : deploy hook,\npull image
+@enduml

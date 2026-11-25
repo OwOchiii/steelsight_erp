@@ -1,0 +1,50 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Face enrolment (ERP to detection app)
+actor Admin
+participant TeamController as C
+participant UserService as U
+database PostgreSQL as DB
+participant "Supabase Storage" as ST
+participant "ErpSync\n(detection app)" as S
+participant "FaceService\n(InsightFace)" as F
+Admin -> C : POST /team/{id}/face/LEFT (photo)
+C -> U : changeFaceAngle(actorId, userId, LEFT, path)
+U -> DB : lock the account; FRONT photo exists?
+alt no FRONT photo yet
+  U --> C : "Add the photo looking at the camera first"
+else
+  U -> DB : face_embedding (user, LEFT): status PENDING, vector cleared
+end
+loop every ENROLL_POLL_SECONDS
+  S -> DB : SELECT PENDING face_embedding rows
+  S -> ST : download source photo
+  S -> F : embed_photo(image)
+  alt exactly one face found
+    S -> DB : UPDATE status READY, embedding vector(512), model_name
+  else no face, several faces, unreadable
+    S -> DB : UPDATE status FAILED, error_message
+  end
+  S -> DB : reload READY embeddings into the gate gallery
+end
+@enduml

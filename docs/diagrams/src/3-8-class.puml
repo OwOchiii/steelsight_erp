@@ -1,0 +1,146 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Tickets
+class "TicketController" as TicketController <<Controller>> {
+  +list(user, status, team, page, model): String
+  +queue(user, categoryId, status, resolved, page, model): String
+  +newTicket(user, category, shiftId, checkInId, model): String
+  +create(user, form, binding, photo, model, response, redirect): String
+  +detail(user, id, model): String
+  +comment(user, id, body, redirect): String
+  +take(user, id, redirect): String
+  +assign(user, id, assigneeId, redirect): String
+  +askHse(user, id, officerId, redirect): String
+  +facts(user, id, hseFacts, redirect): String
+  +decide(user, id, outcome, note, redirect): String
+  +cancel(user, id, redirect): String
+  +photo(user, id): ResponseEntity~<Resource>
+}
+
+class "TicketService" as TicketService <<Service>> {
+  +create(actorId, details): Ticket
+  +openDispute(actorId, violationId, subject, description): Ticket
+  +addComment(actorId, ticketId, body): TicketComment
+  +assign(actorId, ticketId, assigneeId): Ticket
+  +askHse(actorId, ticketId, officerId): void
+  +saveHseFacts(actorId, ticketId, facts): Ticket
+  +decide(actorId, ticketId, outcome, note): Ticket
+  +prepareAttendanceApproval(actorId, ticketId, note): Ticket
+  +approveAttendanceError(actorId, ticketId, note): Ticket
+  +cancel(actorId, ticketId): Ticket
+  +listOwn(actorId): List~<Ticket>
+  +listQueue(actorId, resolved, page): Page~<Ticket>
+  +listTeam(actorId, page): Page~<Ticket>
+}
+
+class "AccessPolicy" as AccessPolicy <<Service>> {
+  +requireCanReadTicket(actorId, ticketId): void
+  +requireCanUpdateTicket(actorId, ticketId): void
+  +requireCanCommentTicket(actorId, ticketId): void
+}
+
+class "CheckInService" as CheckInService <<Service>> {
+  +correct(actorId, checkInId, checkInAt, checkOutAt, note, expectedVersion, ticketId): CheckIn
+}
+
+class "Ticket" as Ticket <<Entity>> {
+  -version: Long
+  -category: TicketCategory
+  -subject: String
+  -description: String
+  -createdBy: AppUser
+  -assignee: AppUser
+  -resolver: AppUser
+  -violation: Violation
+  -zone: Zone
+  -photoPath: String
+  -status: TicketStatus
+  -resolvedAt: OffsetDateTime
+  -outcome: TicketOutcome
+  -decisionNote: String
+  -hseFacts: String
+  -cancelledAt: OffsetDateTime
+  -direction: Direction
+  -gateTime: OffsetDateTime
+  -leaveType: LeaveType
+  -leaveFrom: OffsetDateTime
+  -leaveTo: OffsetDateTime
+  --
+  +decide(decided, note, by, at): void
+  +cancel(at): void
+  +assignTo(user): void
+}
+
+class "TicketCategory" as TicketCategory <<Entity>> {
+  -categoryName: String
+  -handlerRole: Role
+  -code: CategoryCode
+  -active: boolean
+}
+
+class "TicketComment" as TicketComment <<Entity>> {
+  -ticket: Ticket
+  -author: AppUser
+  -body: String
+  -createdAt: OffsetDateTime
+}
+
+class "TicketParticipant" as TicketParticipant <<Entity>> {
+  -ticket, user (PK)
+  -askedBy: AppUser
+  -askedAt: OffsetDateTime
+}
+
+TicketController --> TicketService
+TicketService --> AccessPolicy
+TicketService ..> CheckInService : attendance error\napproved by correcting
+TicketCategory "1" -- "0..*" Ticket
+Ticket "1" -- "0..*" TicketComment
+Ticket "1" -- "0..*" TicketParticipant : HSE asked for facts
+@enduml

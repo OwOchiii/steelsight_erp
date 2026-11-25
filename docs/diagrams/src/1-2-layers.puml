@@ -1,0 +1,74 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam rectangle {
+  BorderColor #546E7A
+}
+skinparam package {
+  BorderColor #546E7A
+}
+skinparam node {
+  BackgroundColor #FAFAFA
+  BorderColor #546E7A
+}
+skinparam database {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+title Web ERP: layered architecture
+skinparam linetype ortho
+rectangle "1. Client layer" as L1 #E3F2FD {
+  rectangle "Browser: server-rendered pages\n(Thymeleaf HTML, htmx swaps, Tailwind CSS)" as b
+}
+rectangle "2. Web layer (package web, api)" as L2 #E8F5E9 {
+  rectangle "Page controllers\nTeam, Shift, Attendance, Violation,\nTicket, Report, Notification, AdminSettings" as pc
+  rectangle "ZaloController\n(/zalo/webhook)" as zc
+  rectangle "Forms, Display,\nSiteTime, Charts" as fh
+}
+rectangle "3. Security layer (package security)" as L3 #F3E5F5 {
+  rectangle "SecurityConfig: page chain\n(form login, CSRF, sessions)\nand /api/** chain (API key)" as sc
+  rectangle "SignInLimitFilter,\nPasswordChangeRequiredFilter,\nAppUserDetailsService" as sf
+}
+rectangle "4. Business layer (feature services)" as L4 #FFF8E1 {
+  rectangle "identity\nUserService, AccessPolicy,\nEmployeeCodes" as s1
+  rectangle "scheduling\nTeamService, ZoneService,\nShiftService" as s2
+  rectangle "attendance\nCheckInService, AttendanceRules,\nPendingOvertimeService" as s3
+  rectangle "ppe\nViolationService,\nSafetyScoreService" as s4
+  rectangle "ticketing\nTicketService" as s5
+  rectangle "notification\nNotificationService,\nZaloDispatcher, ZaloLinks" as s6
+  rectangle "reporting\nMonthlyReportService" as s7
+  rectangle "jobs\nJobScheduler, SiteJobs" as s8
+}
+rectangle "5. Persistence layer" as L5 #ECEFF1 {
+  rectangle "Spring Data JPA repositories\nand JdbcTemplate queries" as repo
+  rectangle "PhotoStorage\n(Local / Supabase)" as ps
+}
+rectangle "6. Data layer" as L6 #FFEBEE {
+  database "PostgreSQL 17 (Supabase)\ntables, triggers, can_*() functions,\nsafety_scores(), RLS" as db
+  storage "Supabase Storage\nprivate buckets" as bucket
+}
+b --> sc
+sc --> pc
+pc --> s1
+pc --> s2
+pc --> s3
+pc --> s4
+pc --> s5
+pc --> s7
+zc --> s6
+s8 --> s3
+s8 --> s6
+s1 --> repo
+s3 --> repo
+s4 --> repo
+s5 --> repo
+s1 --> ps
+repo --> db
+ps --> bucket
+@enduml

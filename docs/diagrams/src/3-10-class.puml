@@ -1,0 +1,106 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Scheduled Jobs and Month Closing
+class "JobScheduler" as JobScheduler <<Component>> {
+  +atStartup(): void
+  +tick(): void
+  +runOnce(name, scheduledFor): String
+  @Scheduled(fixedDelay = 60 s)
+}
+
+class "SiteJobs" as SiteJobs <<Component>> {
+  +hourly(scheduledFor): String
+  +dayEnd(scheduledFor): String
+  +morning(scheduledFor): String
+  +oldTickets(scheduledFor): String
+  +weeklySchedule(scheduledFor): String
+  +monthEnd(scheduledFor): String
+  +cancelLastMonthOvertime(scheduledFor): String
+  +lockMonth(scheduledFor): String
+}
+
+class "SiteCalendar" as SiteCalendar <<Component>> {
+  +now(): OffsetDateTime
+  +isWorkingDay(day): boolean
+  +nthWorkingDay(month, n): LocalDate
+  +lastWorkingDay(month): LocalDate
+  +deadline(from, workingDays): OffsetDateTime
+}
+
+class "MonthLocks" as MonthLocks <<Component>> {
+  +isLocked(month): boolean
+  +requireOpen(moment): void
+}
+
+class "CheckOutHours" as CheckOutHours <<Component>> {
+  +fill(): int
+}
+
+class "ZaloDispatcher" as ZaloDispatcher <<Service>> {
+  +sendDue(): int
+}
+
+class "job_run" as job_run <<Database>> {
+  job, scheduled_for (PK)
+  started_at, finished_at, result
+}
+
+class "month_lock" as month_lock <<Database>> {
+  month (PK)
+  locked_at
+}
+
+JobScheduler --> SiteJobs
+JobScheduler --> CheckOutHours
+JobScheduler --> ZaloDispatcher
+JobScheduler ..> job_run : claims each run once
+SiteJobs --> SiteCalendar
+SiteJobs ..> month_lock : lockMonth
+MonthLocks ..> month_lock
+@enduml

@@ -1,0 +1,36 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Day end at 23:00: Incomplete, pending overtime, overdue
+participant JobScheduler as J
+participant SiteJobs as S
+participant PendingOvertimeService as P
+database PostgreSQL as DB
+participant NotificationService as N
+J -> DB : claim job_run ('day-end', 23:00)
+J -> S : dayEnd(scheduledFor)
+S -> DB : close_stale_check_ins(): no check-out 20 min after the shift\n-> incomplete = true; open 4 h after -> closed, auto_closed (BR-35)
+S -> N : notify INCOMPLETE_ATTENDANCE to each flagged person
+S -> P : createFromVisits(): time after shift end + 20 min\nwithout an overtime shift -> pending_overtime PENDING (BR-34)
+S -> DB : today's PENDING_REVIEW violations -> OVERDUE (BR-53)
+J -> DB : job_run finished
+@enduml

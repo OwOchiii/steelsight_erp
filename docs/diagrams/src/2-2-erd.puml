@@ -1,0 +1,61 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam linetype ortho
+hide circle
+title Teams, Zones and Shifts
+entity team {
+  * id : bigint <<PK>>
+  --
+  * name : text
+  manager_id : bigint <<FK>>
+}
+entity zone {
+  * id : bigint <<PK>>
+  --
+  * name : text
+  * code : text
+  * kind : text
+  team_id : bigint <<FK>>
+}
+entity camera {
+  * id : bigint <<PK>>
+  --
+  * camera_code : text
+  * zone_id : bigint <<FK>>
+  * role : text
+}
+entity shift {
+  * id : bigint <<PK>>
+  --
+  * user_id : bigint <<FK>>
+  * zone_id : bigint <<FK>>
+  * start_at : timestamptz
+  * end_at : timestamptz
+  duration_hours : numeric
+  * kind : text
+  reason : text
+  * status : text
+  * created_by : bigint <<FK>>
+  updated_by : bigint <<FK>>
+  * version : bigint
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+entity app_user {
+  * id : bigint <<PK>>
+}
+app_user |o--o{ team : manager_id
+team |o--o{ zone : team_id
+zone ||--o{ camera : zone_id
+app_user ||--o{ shift : user_id
+zone ||--o{ shift : zone_id
+app_user ||--o{ shift : created_by
+app_user |o--o{ shift : updated_by
+@enduml

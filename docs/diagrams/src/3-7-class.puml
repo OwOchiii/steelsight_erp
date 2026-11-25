@@ -1,0 +1,110 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Safety Score and Bonus Level
+class "ViolationController" as ViolationController <<Controller>> {
+  +mine(user, month, page, model): String
+}
+
+class "SafetyController" as SafetyController <<Controller>> {
+  +shifts(user, week, model): String
+}
+
+class "WorkerController" as WorkerController <<Controller>> {
+  +list(user, q, page, model): String
+  +detail(user, id, model): String
+}
+
+class "SafetyScoreService" as SafetyScoreService <<Service>> {
+  +own(actorId, inMonth): Score
+  +of(actorId, workerId): Score
+  +current(userId): Score
+  +inMonth(userId, inMonth): Score
+  +listWorkers(actorId, search, page): Page~<WorkerScore>
+  +listTimeSlots(actorId, from, to): List~<TimeSlot>
+}
+
+class "SafetyLevel" as SafetyLevel <<Component>> {
+  LEVEL_0 (0%)
+  LEVEL_1 (-2%)
+  LEVEL_2 (-4%)
+  LEVEL_3 (-6%)
+  +reductionPercent(): int
+}
+
+class "SiteJobs" as SiteJobs <<Component>> {
+  +lockMonth(scheduledFor): String
+  +lock(month): String
+}
+
+class "safety_scores(at)" as safety_scores_at_ <<Database>> {
+  live: 100 - 5 x confirmed, not overturned,
+  SITE staff, WORKER or MANAGER role
+  locked month: frozen monthly_score rows
+}
+
+class "safety_policy" as safety_policy <<Database>> {
+  points_per_violation = 5
+  level1_at = 80, level2_at = 70, level3_at = 60
+  time_zone
+}
+
+class "monthly_score" as monthly_score <<Database>> {
+  user_id, month (PK)
+  violations, score, level, frozen_at
+}
+
+ViolationController --> SafetyScoreService
+SafetyController --> SafetyScoreService
+WorkerController --> SafetyScoreService
+SafetyScoreService ..> safety_scores_at_
+SafetyScoreService ..> SafetyLevel
+safety_scores_at_ ..> "safety_policy"
+safety_scores_at_ ..> "monthly_score"
+SiteJobs ..> "monthly_score" : freezes at the lock
+@enduml

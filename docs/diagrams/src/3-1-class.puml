@@ -1,0 +1,124 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Sign-in and Session
+class "AuthController" as AuthController <<Controller>> {
+  +login(): String
+}
+
+class "AccountController" as AccountController <<Controller>> {
+  +passwordForm(session, model): String
+  +changePassword(user, form, binding, session, model, response, redirect): String
+}
+
+class "SecurityConfig" as SecurityConfig <<Component>> {
+  +apiFilterChain(http, limiter, apiKey): SecurityFilterChain
+  +securityFilterChain(http, signInLimiter, users, sessionRegistry): SecurityFilterChain
+}
+
+class "SignInLimitFilter" as SignInLimitFilter <<Component>> {
+  #doFilterInternal(request, response, chain): void
+}
+
+class "SignInLimiter" as SignInLimiter <<Component>> {
+  ~isLocked(code, address): boolean
+  ~recordFailure(code, address): void
+  ~recordSuccess(code, address): void
+  -failures: Cache~<String, Integer>
+  FAILURES_PER_CLIENT = 5
+  FAILURES_PER_CODE = 20
+  LOCK = 15 min
+}
+
+class "AppUserDetailsService" as AppUserDetailsService <<Service>> {
+  +loadUserByUsername(employeeCode): UserDetails
+}
+
+class "FirstSignInHandler" as FirstSignInHandler <<Component>> {
+  +onAuthenticationSuccess(request, response, authentication): void
+}
+
+class "PasswordChangeRequiredFilter" as PasswordChangeRequiredFilter <<Component>> {
+  PAGE = "/account/password"
+  #doFilterInternal(request, response, chain): void
+}
+
+class "UserSessions" as UserSessions <<Component>> {
+  +endAll(userId): void
+  +endOthers(userId, keptSessionId): void
+}
+
+class "UserService" as UserService <<Service>> {
+  +changeOwnPassword(actorId, currentPassword, newPassword): void
+  +resetPassword(actorId, userId, newPassword): void
+}
+
+class "AuthenticatedUser" as AuthenticatedUser <<Component>> {
+  +can(permission): boolean
+}
+
+class "AppUser" as AppUser <<Entity>> {
+  -version: Long
+  -role: Role
+  -employeeCode: String
+  -passwordHash: String
+  -isActive: boolean
+  -mustChangePassword: boolean
+}
+
+SecurityConfig ..> SignInLimitFilter
+SecurityConfig ..> PasswordChangeRequiredFilter
+SecurityConfig ..> FirstSignInHandler
+SignInLimitFilter --> SignInLimiter
+AppUserDetailsService ..> AuthenticatedUser : creates
+AppUserDetailsService ..> AppUser : reads
+AccountController --> UserService
+AccountController --> UserSessions
+FirstSignInHandler ..> AppUser
+UserService ..> AppUser
+@enduml

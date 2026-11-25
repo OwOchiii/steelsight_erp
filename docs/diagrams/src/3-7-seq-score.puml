@@ -1,0 +1,42 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title View my violations and safety score
+actor "Worker or team leader" as W
+participant ViolationController as C
+participant ViolationService as V
+participant SafetyScoreService as S
+database PostgreSQL as DB
+W -> C : GET /violations?month=2026-11
+C -> V : listOwn(actorId, month, page)
+V -> V : require VIOLATION_READ_OWN (WORKER, MANAGER since V27)
+V -> DB : own CONFIRMED and REMINDER violations of the month
+C -> S : own(actorId, month)
+S -> DB : SELECT * FROM safety_scores(month)
+alt month locked
+  DB --> S : frozen monthly_score row
+else open month
+  DB --> S : live score from violation rows
+end
+S --> C : score, level, reduction %, confirmed count
+C --> W : list with the score, bonus level and appeal links
+@enduml

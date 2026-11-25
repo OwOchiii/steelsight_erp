@@ -1,0 +1,151 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #546E7A
+  HeaderBackgroundColor #ECEFF1
+}
+skinparam class<<Controller>> {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam class<<Service>> {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam class<<Repository>> {
+  BackgroundColor #FFF8E1
+  BorderColor #F9A825
+}
+skinparam class<<Entity>> {
+  BackgroundColor #F5F5F5
+  BorderColor #616161
+}
+skinparam class<<Component>> {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+}
+skinparam class<<Interface>> {
+  BackgroundColor #FFFFFF
+  BorderColor #6A1B9A
+}
+skinparam class<<Database>> {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+skinparam class<<Python>> {
+  BackgroundColor #E0F7FA
+  BorderColor #00838F
+}
+hide empty members
+title Accounts, Face Photos and Zalo Link
+class "TeamController" as TeamController <<Controller>> {
+  +newAccount(user, model): String
+  +suggestCode(user, roleName, model): String
+  +create(user, form, binding, photo, model, response, redirect): String
+  +update(user, id, form, binding, model, response, redirect): String
+  +changeRole(user, id, roleName, redirect): String
+  +changeTeam(user, id, teamId, redirect): String
+  +deactivate(user, id, redirect): String
+  +newZaloCode(user, id, redirect): String
+}
+
+class "ZaloController" as ZaloController <<Controller>> {
+  +link(user, redirect): String
+  +unlink(user, redirect): String
+  +webhook(secret, body): ResponseEntity~<Map~<String, Object>>
+}
+
+class "UserService" as UserService <<Service>> {
+  +create(actorId, details, facePhotoPath): AppUser
+  +updateProfile(actorId, userId, profile, expectedVersion): AppUser
+  +changeRole(actorId, userId, roleName): AppUser
+  +assignTeam(actorId, userId, teamId): AppUser
+  +changeGroup(actorId, userId, group): AppUser
+  +changeFacePhoto(actorId, userId, photoPath): AppUser
+  +changeFaceAngle(actorId, userId, pose, photoPath): FaceEmbedding
+  +removeFaceAngle(actorId, userId, pose): void
+  +resetPassword(actorId, userId, newPassword): void
+  +setActive(actorId, userId, active): AppUser
+  +softDelete(actorId, userId): void
+}
+
+class "EmployeeCodes" as EmployeeCodes <<Service>> {
+  +suggest(actorId, roleName): String
+  MAX_TRIES = 50
+}
+
+class "AccessPolicy" as AccessPolicy <<Service>> {
+  +has(actorId, permission): boolean
+  +require(actorId, permission): void
+  +canUpdateUser(actorId, targetUserId): boolean
+}
+
+class "ZaloLinks" as ZaloLinks <<Service>> {
+  +newCode(actorId): String
+  +currentCode(userId): Optional~<ZaloStore.LinkCode>
+  +handle(chatId, text): List~<String>
+  +unlink(actorId): void
+  +isLinked(actorId): boolean
+}
+
+interface "PhotoStorage" as PhotoStorage <<Interface>> {
+  +store(album, photo): String
+  +load(album, storedName): Resource
+  +delete(album, storedName): void
+}
+
+class "FaceEmbeddingRepository" as FaceEmbeddingRepository <<Repository>> {
+  +queueForEnrolment(userId, sourceFilePath): int
+  +deleteAngle(userId, pose): int
+}
+
+class "AppUserRepository" as AppUserRepository <<Repository>> {
+  +existsByEmployeeCodeIgnoreCase(code): boolean
+  +requireForUpdate(id): AppUser
+}
+
+class "AppUser" as AppUser <<Entity>> {
+  -version: Long
+  -role: Role
+  -team: Team
+  -employeeCode: String
+  -fullName: String
+  -email: String
+  -phoneNumber: String
+  -passwordHash: String
+  -faceFilePath: String
+  -isActive: boolean
+  -mustChangePassword: boolean
+  -staffGroup: StaffGroup
+}
+
+class "FaceEmbedding" as FaceEmbedding <<Entity>> {
+  -user: AppUser
+  -pose: FacePose
+  -sourceFilePath: String
+  -status: EmbeddingStatus
+  -modelName: String
+  -errorMessage: String
+}
+
+TeamController --> UserService
+TeamController --> EmployeeCodes
+TeamController --> PhotoStorage
+TeamController --> ZaloLinks
+ZaloController --> ZaloLinks
+UserService --> AccessPolicy
+UserService --> AppUserRepository
+UserService --> FaceEmbeddingRepository
+UserService --> PhotoStorage : removes replaced\nphotos after commit
+EmployeeCodes --> AppUserRepository
+AppUser "1" -- "0..3" FaceEmbedding : FRONT, LEFT, RIGHT
+@enduml

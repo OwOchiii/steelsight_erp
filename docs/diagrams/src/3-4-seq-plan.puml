@@ -1,0 +1,55 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Plan a shift
+actor "Team leader" as M
+participant ShiftController as C
+participant ShiftService as S
+participant AccessPolicy as A
+participant Notices as N
+database PostgreSQL as DB
+M -> C : POST /shifts (worker, zone, kind, day, start, end, reason)
+C -> S : create(actorId, details)
+S -> S : complete? 30 min to 12 h? overtime reason 10-500?
+S -> A : requireCanAssignShift(actor, worker)
+alt worker not in the leader's team
+  A --> C : AccessDeniedException (403)
+end
+S -> S : requireAllowed(actor, kind, start)
+alt leader and kind OVERTIME
+  S --> C : "Only the Admin plans overtime shifts"
+else leader and the week was sent (after Saturday 18:00)
+  S --> C : "The schedule of this week has been sent..."
+else shift already started
+  S --> C : "This shift has already started and cannot be changed."
+else allowed
+  S -> DB : INSERT shift
+  alt overlaps another shift of the worker
+    DB --> S : exclusion constraint (btree_gist)
+    S --> C : "This worker already has a shift at that time" (+ times)
+  else saved
+    S -> N : shiftAdded(shift)
+    N -> DB : notice SHIFT_ADDED (if the week was already sent)
+    C --> M : redirect /shifts, "The shift was added."
+  end
+end
+@enduml

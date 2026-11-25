@@ -1,0 +1,98 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam linetype ortho
+hide circle
+title Tickets
+entity ticket_category {
+  * id : bigint <<PK>>
+  --
+  * category_name : text
+  code : text
+  * handler_role_id : bigint <<FK>>
+  * active : boolean
+}
+entity ticket {
+  * id : bigint <<PK>>
+  --
+  * category_id : bigint <<FK>>
+  * subject : text
+  * description : text
+  * created_by : bigint <<FK>>
+  assignee_id : bigint <<FK>>
+  resolver_id : bigint <<FK>>
+  * status : text
+  outcome : text
+  decision_note : text
+  hse_facts : text
+  violation_id : bigint <<FK>>
+  shift_id : bigint <<FK>>
+  check_in_id : bigint <<FK>>
+  direction : text
+  gate_time : timestamptz
+  leave_type : text
+  leave_from : timestamptz
+  leave_to : timestamptz
+  zone_id : bigint <<FK>>
+  photo_path : text
+  resolved_at : timestamptz
+  cancelled_at : timestamptz
+  * version : bigint
+  * created_at : timestamptz
+  * updated_at : timestamptz
+  deleted_at : timestamptz
+}
+entity ticket_comment {
+  * id : bigint <<PK>>
+  --
+  * ticket_id : bigint <<FK>>
+  * author_id : bigint <<FK>>
+  * body : text
+  * created_at : timestamptz
+}
+entity ticket_participant {
+  * ticket_id : bigint <<PK, FK>>
+  * user_id : bigint <<PK, FK>>
+  --
+  * asked_by : bigint <<FK>>
+  * asked_at : timestamptz
+}
+entity app_user {
+  * id : bigint <<PK>>
+}
+entity check_in {
+  * id : bigint <<PK>>
+}
+entity role {
+  * id : bigint <<PK>>
+}
+entity shift {
+  * id : bigint <<PK>>
+}
+entity violation {
+  * id : bigint <<PK>>
+}
+entity zone {
+  * id : bigint <<PK>>
+}
+role ||--o{ ticket_category : handler_role_id
+ticket_category ||--o{ ticket : category_id
+app_user ||--o{ ticket : created_by
+app_user |o--o{ ticket : assignee_id
+app_user |o--o{ ticket : resolver_id
+violation |o--o{ ticket : violation_id
+shift |o--o{ ticket : shift_id
+check_in |o--o{ ticket : check_in_id
+zone |o--o{ ticket : zone_id
+ticket ||--o{ ticket_comment : ticket_id
+app_user ||--o{ ticket_comment : author_id
+ticket ||--o{ ticket_participant : ticket_id
+app_user ||--o{ ticket_participant : user_id
+app_user ||--o{ ticket_participant : asked_by
+@enduml

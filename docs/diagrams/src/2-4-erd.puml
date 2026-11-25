@@ -1,0 +1,80 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam linetype ortho
+hide circle
+title PPE Violations and Safety Score
+entity violation {
+  * id : bigint <<PK>>
+  --
+  * camera_id : bigint <<FK>>
+  * zone_id : bigint <<FK>>
+  * violation_type : text
+  * detected_at : timestamptz
+  confidence : numeric
+  * snapshot_path : text
+  box_x : numeric
+  box_y : numeric
+  box_w : numeric
+  box_h : numeric
+  suggested_user_id : bigint <<FK>>
+  suggestion_similarity : numeric
+  * review_status : text
+  taken_by : bigint <<FK>>
+  taken_at : timestamptz
+  user_id : bigint <<FK>>
+  subject : text
+  dismiss_reason : text
+  review_note : text
+  reviewed_by : bigint <<FK>>
+  reviewed_at : timestamptz
+  * dispute_status : text
+  appeal_decided_by : bigint <<FK>>
+  appeal_decided_at : timestamptz
+  event_id : uuid
+  * version : bigint
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+entity safety_policy {
+  * id : boolean <<PK>>
+  --
+  * points_per_violation : integer
+  * level1_at : integer
+  * level2_at : integer
+  * level3_at : integer
+  * time_zone : text
+}
+entity monthly_score {
+  * user_id : bigint <<PK, FK>>
+  * month : date <<PK>>
+  --
+  * violations : integer
+  * score : integer
+  * level : integer
+  * frozen_at : timestamptz
+}
+entity app_user {
+  * id : bigint <<PK>>
+}
+entity camera {
+  * id : bigint <<PK>>
+}
+entity zone {
+  * id : bigint <<PK>>
+}
+camera ||--o{ violation : camera_id
+zone ||--o{ violation : zone_id
+app_user |o--o{ violation : suggested_user_id
+app_user |o--o{ violation : taken_by
+app_user |o--o{ violation : user_id
+app_user |o--o{ violation : reviewed_by
+app_user |o--o{ violation : appeal_decided_by
+app_user ||--o{ monthly_score : user_id
+@enduml

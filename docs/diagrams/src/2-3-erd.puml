@@ -1,0 +1,108 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam linetype ortho
+hide circle
+title Attendance
+entity face_embedding {
+  * id : bigint <<PK>>
+  --
+  * user_id : bigint <<FK>>
+  * pose : text
+  * source_file_path : text
+  * status : text
+  embedding : vector
+  model_name : text
+  error_message : text
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+entity check_in {
+  * id : bigint <<PK>>
+  --
+  * user_id : bigint <<FK>>
+  shift_id : bigint <<FK>>
+  zone_id : bigint <<FK>>
+  camera_id : bigint <<FK>>
+  * check_in_at : timestamptz
+  check_out_at : timestamptz
+  * method : text
+  face_similarity : numeric
+  snapshot_path : text
+  recorded_by : bigint <<FK>>
+  note : text
+  * auto_closed : boolean
+  * incomplete : boolean
+  incomplete_at : timestamptz
+  event_id : uuid
+  * version : bigint
+  * created_at : timestamptz
+  * updated_at : timestamptz
+}
+entity check_in_correction {
+  * id : bigint <<PK>>
+  --
+  * check_in_id : bigint <<FK>>
+  * corrected_by : bigint <<FK>>
+  * corrected_at : timestamptz
+  * old_check_in_at : timestamptz
+  old_check_out_at : timestamptz
+  old_note : text
+  old_recorded_by : bigint <<FK>>
+  * old_auto_closed : boolean
+  * new_check_in_at : timestamptz
+  new_check_out_at : timestamptz
+  new_note : text
+  ticket_id : bigint <<FK>>
+}
+entity pending_overtime {
+  * id : bigint <<PK>>
+  --
+  * check_in_id : bigint <<FK>>
+  * user_id : bigint <<FK>>
+  * shift_id : bigint <<FK>>
+  * start_at : timestamptz
+  * end_at : timestamptz
+  * status : text
+  * created_at : timestamptz
+  * expires_at : timestamptz
+  decided_at : timestamptz
+  overtime_shift_id : bigint <<FK>>
+  leader_note : text
+}
+entity app_user {
+  * id : bigint <<PK>>
+}
+entity camera {
+  * id : bigint <<PK>>
+}
+entity shift {
+  * id : bigint <<PK>>
+}
+entity ticket {
+  * id : bigint <<PK>>
+}
+entity zone {
+  * id : bigint <<PK>>
+}
+app_user ||--o{ face_embedding : user_id
+app_user ||--o{ check_in : user_id
+shift |o--o{ check_in : shift_id
+zone |o--o{ check_in : zone_id
+camera |o--o{ check_in : camera_id
+app_user |o--o{ check_in : recorded_by
+check_in ||--o{ check_in_correction : check_in_id
+app_user ||--o{ check_in_correction : corrected_by
+app_user |o--o{ check_in_correction : old_recorded_by
+ticket |o--o{ check_in_correction : ticket_id
+check_in ||--o| pending_overtime : check_in_id
+app_user ||--o{ pending_overtime : user_id
+shift ||--o{ pending_overtime : shift_id
+shift |o--o{ pending_overtime : overtime_shift_id
+@enduml

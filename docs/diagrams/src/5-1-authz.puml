@@ -1,0 +1,43 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam rectangle {
+  BorderColor #546E7A
+}
+skinparam package {
+  BorderColor #546E7A
+}
+skinparam node {
+  BackgroundColor #FAFAFA
+  BorderColor #546E7A
+}
+skinparam database {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+title What each role reaches
+left to right direction
+actor Worker
+actor "Team leader" as TL
+actor "HSE officer" as HSE
+actor Admin
+rectangle "Own: timetable, attendance,\nviolations and score, tickets,\nnotifications, Zalo link" as own
+rectangle "Team: shift grid (regular),\nteam attendance, team tickets\n(read, comment), team report" as team
+rectangle "Safety: review queue, violation\nlist, time slots, record and\ncorrect visits, facts when asked" as safety
+rectangle "Administration: accounts, teams,\nzones, cameras, ticket queue,\nappeals, overtime, settings, site report" as admin
+Worker --> own
+TL --> own
+TL --> team
+HSE --> own
+HSE --> safety
+Admin --> own
+Admin --> team
+Admin --> safety
+Admin --> admin
+@enduml

@@ -1,0 +1,56 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Appeal a violation and the Admin's decision
+actor Employee
+actor Admin
+actor "HSE officer" as H
+participant ViolationController as C
+participant TicketService as T
+participant ViolationService as V
+database PostgreSQL as DB
+participant NotificationService as N
+Employee -> C : POST /violations/{id}/dispute (reason)
+C -> T : openDispute(actorId, id, subject, reason)
+T -> V : whyNoAppeal(actor, violation)
+alt not theirs, a reminder, already appealed, or past 3 working days
+  V --> C : reason (no appeal)
+else
+  T -> DB : ticket PPE appeal (OPEN), violation DISPUTED
+  T -> N : TICKET_CREATED to the Admins
+end
+Admin -> T : askHse(ticket, officer) -> ticket_participant
+T -> N : ASKED_FOR_FACTS to the HSE officer
+H -> T : saveHseFacts(ticket, facts)
+Admin -> C : POST /violations/{id}/decision (facts, note, UPHELD | OVERTURNED, right person)
+C -> T : decideAppeal(actorId, id, decision, facts, note, rightPerson)
+alt the Admin opened the appeal
+  T --> C : refused: another Admin decides
+else note or facts too short
+  T --> C : rule message
+else
+  T -> V : decideAppeal(actor, violation, decision, rightPerson)
+  V -> DB : dispute UPHELD or OVERTURNED, appeal_decided_by/at\n(OVERTURNED: points back; right person gets it reopened)
+  T -> DB : ticket RESOLVED with outcome and note (same transaction)
+  T -> N : APPEAL_DECIDED to the employee
+end
+@enduml

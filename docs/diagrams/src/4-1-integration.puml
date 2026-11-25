@@ -1,0 +1,41 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam rectangle {
+  BorderColor #546E7A
+}
+skinparam package {
+  BorderColor #546E7A
+}
+skinparam node {
+  BackgroundColor #FAFAFA
+  BorderColor #546E7A
+}
+skinparam database {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+title Interfaces between the parts
+left to right direction
+rectangle "Browser" as b
+rectangle "Web ERP" as e #E8F5E9
+database "PostgreSQL" as db
+storage "Supabase Storage" as st
+rectangle "Zalo Bot Platform" as z
+rectangle "Detection app" as d #E0F7FA
+rectangle "Cameras" as c
+b --> e : 4.1 pages and htmx\n(session + CSRF)
+e --> db : JDBC (owner)
+d --> db : 4.2 psycopg\n(steelsight_detection)
+e --> st : 4.3 REST (server key)
+d --> st : 4.3 evidence photos
+e --> z : 4.4 sendMessage
+z --> e : 4.4 webhook
+c --> d : 4.5 RTSP
+@enduml

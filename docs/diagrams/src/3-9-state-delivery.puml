@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  ArrowColor #2E7D32
+  StartColor #263238
+  EndColor #263238
+}
+title Zalo delivery lifecycle
+hide empty description
+[*] --> PENDING : notice saved and the\nperson linked Zalo
+[*] --> SKIPPED : notice saved, no Zalo link
+PENDING --> SENT : Zalo accepted it
+PENDING --> PENDING : error: retry after\n1, 5, 15 min
+PENDING --> FAILED : third retry failed
+PENDING --> SKIPPED : the chat was unlinked\nbefore sending
+SENT --> [*]
+FAILED --> [*]
+SKIPPED --> [*]
+@enduml

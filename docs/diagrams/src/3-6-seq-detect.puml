@@ -1,0 +1,43 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title A PPE violation is detected and HSE is alerted
+actor Worker
+participant "CAM-03" as CAM
+participant "SafetyMonitor\n(detection app)" as M
+participant "Outbox" as O
+participant ErpSync as S
+participant "Supabase Storage" as ST
+database PostgreSQL as DB
+participant "Speaker" as SP
+Worker -> CAM : works without a hard hat
+CAM -> M : frames, person boxes, PPE classes
+M -> SP : spoken reminder (BR-42)
+M -> M : hard hat missing 10 s / vest 3 s (BR-43);\nboth missing = one NO_HARD_HAT_AND_VEST (BR-45);\ncooldown 60 s per person and item (BR-44)
+M -> O : put(violation, type, time, box, photo,\nsuggested face + similarity, event_id)
+S -> O : head("db")
+S -> ST : upload evidence photo (evidence-photos)
+S -> DB : INSERT violation (suggested_user_id, ...)\nON CONFLICT (event_id) DO NOTHING
+DB -> DB : trg_violation_worker: zone from camera;\nreview_status PENDING_REVIEW, no person (BR-48)
+DB -> DB : trg_violation_alert: HSE officers with a shift now\nget VIOLATION_ALERT; nobody on duty -> all HSE and Admins (BR-54)
+S -> O : mark_done(seq)
+@enduml

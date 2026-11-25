@@ -1,0 +1,45 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Export the monthly report
+actor "Team leader or Admin" as U
+participant ReportController as C
+participant MonthlyReportService as R
+participant AttendanceCalculator as A
+participant SafetyScoreService as S
+participant MonthlyReportWorkbook as W
+database PostgreSQL as DB
+U -> C : GET /team/report?month=2026-11&teamId=...
+C -> R : build(actorId, month, teamId)
+R -> R : REPORT_EXPORT_ALL, or REPORT_EXPORT_TEAM for the own team
+alt month not started
+  R --> C : "This month has not started yet."
+else
+  R -> A : rows(employees, month) -> paid hours, late, early,\nabsences, overtime, Incomplete, leave
+  R -> S : inMonth(each SITE employee) -> score, level, reduction
+  R -> DB : violations and visits of the month
+  R --> C : Report (provisional unless the month is locked)
+  C -> W : write(report) (fastexcel, streamed, reader's language)
+  C -> R : logExport(actorId, report) -> report_export
+  C --> U : .xlsx download
+end
+@enduml

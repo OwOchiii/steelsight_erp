@@ -1,0 +1,66 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam linetype ortho
+hide circle
+title Identity and Access Management
+entity role {
+  * id : bigint <<PK>>
+  --
+  * role_name : text
+}
+entity permission {
+  * id : bigint <<PK>>
+  --
+  * code : text
+  * module : text
+  * action : text
+  description : text
+}
+entity role_permission {
+  * role_id : bigint <<PK, FK>>
+  * permission_id : bigint <<PK, FK>>
+  --
+}
+entity app_user {
+  * id : bigint <<PK>>
+  --
+  * role_id : bigint <<FK>>
+  team_id : bigint <<FK>>
+  * employee_code : text
+  * full_name : text
+  email : text
+  phone_number : text
+  * password_hash : text
+  face_file_path : text
+  * is_active : boolean
+  * must_change_password : boolean
+  * staff_group : text
+  face_consent_at : timestamptz
+  zalo_chat_id : text
+  * version : bigint
+  * created_at : timestamptz
+  * updated_at : timestamptz
+  deleted_at : timestamptz
+}
+entity zalo_link_code {
+  * user_id : bigint <<PK, FK>>
+  --
+  * code : text
+  * expires_at : timestamptz
+}
+entity team {
+  * id : bigint <<PK>>
+}
+role ||--o{ role_permission : role_id
+permission ||--o{ role_permission : permission_id
+role ||--o{ app_user : role_id
+team |o--o{ app_user : team_id
+app_user ||--o| zalo_link_code : user_id
+@enduml

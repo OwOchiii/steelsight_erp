@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  ArrowColor #2E7D32
+  StartColor #263238
+  EndColor #263238
+}
+title Pending overtime lifecycle
+hide empty description
+[*] --> PENDING : check-out more than 20 min\nafter the shift end (BR-34)
+PENDING --> VALID : Admin adds an overtime shift\ncovering it (BR-38)
+PENDING --> CANCELLED : Admin cancels it
+PENDING --> CANCELLED : 48 h pass, or the 2nd of\nnext month (BR-37)
+VALID --> [*]
+CANCELLED --> [*]
+PENDING : paid at 0%,\nleader may add a note
+@enduml

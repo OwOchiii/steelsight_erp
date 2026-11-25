@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  ArrowColor #2E7D32
+  StartColor #263238
+  EndColor #263238
+}
+title Appeal (dispute_status) lifecycle
+hide empty description
+[*] --> NONE
+NONE --> DISPUTED : the employee appeals within\n3 working days (once)
+DISPUTED --> UPHELD : Admin upholds\n(the violation stands)
+DISPUTED --> OVERTURNED : Admin overturns\n(5 points back)
+UPHELD --> [*]
+OVERTURNED --> [*]
+@enduml

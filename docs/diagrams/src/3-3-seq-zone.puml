@@ -1,0 +1,40 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequence {
+  ParticipantBackgroundColor #E8F5E9
+  ParticipantBorderColor #2E7D32
+  ActorBackgroundColor #E3F2FD
+  ActorBorderColor #1565C0
+  LifeLineBorderColor #90A4AE
+  DatabaseBackgroundColor #FFEBEE
+  DatabaseBorderColor #C62828
+  GroupBorderColor #78909C
+  GroupBackgroundColor #FAFAFA
+}
+skinparam responseMessageBelowArrow true
+autonumber
+title Add a zone and link a camera
+actor Admin
+participant AdminSettingsController as C
+participant ZoneService as Z
+database PostgreSQL as DB
+Admin -> C : POST /zones/new (name, kind, team)
+C -> Z : create(actorId, name, kind, teamId)
+Z -> Z : 2 to 50 characters, unique name;\nonly a work area has a team
+Z -> DB : INSERT zone (name, kind, team_id)
+DB -> DB : trg_zone_code: code = zone_next_code(kind)\n(first free GATE-IN / GATE-PPE / AREA-x)
+DB --> Z : zone with its code
+C --> Admin : "The zone was added." (Zones shows the code)
+Admin -> C : POST /zones/cameras (code CAM-03, zone)
+C -> Z : linkCamera(actorId, "CAM-03", zoneId)
+Z -> Z : 2 to 50 letters, digits, . - _
+Z -> DB : camera by code: new or moved;\nrole = ATTENDANCE for a gate attendance zone, else PPE
+C --> Admin : "The camera was linked to the zone."
+@enduml

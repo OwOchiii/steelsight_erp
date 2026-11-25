@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam state {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  ArrowColor #2E7D32
+  StartColor #263238
+  EndColor #263238
+}
+title Month lifecycle
+hide empty description
+[*] --> Open
+Open --> Open : scores live from violations;\nreports marked Provisional
+Open --> Locked : 23:59 of the 2nd working day of\nthe next month (scores frozen)
+Locked : shifts, visits, violations and scores\nof the month no longer change (BR-70)
+Locked --> [*]
+@enduml

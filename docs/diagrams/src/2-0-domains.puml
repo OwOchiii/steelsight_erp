@@ -1,0 +1,45 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 130
+skinparam roundCorner 6
+skinparam ArrowColor #37474F
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam rectangle {
+  BorderColor #546E7A
+}
+skinparam package {
+  BorderColor #546E7A
+}
+skinparam node {
+  BackgroundColor #FAFAFA
+  BorderColor #546E7A
+}
+skinparam database {
+  BackgroundColor #FFEBEE
+  BorderColor #C62828
+}
+title Database domains and the links between them
+rectangle "<b>Identity and Access Management</b>\n----\nrole\npermission\nrole_permission\napp_user\nzalo_link_code" as D0 #E3F2FD
+rectangle "<b>Teams, Zones and Shifts</b>\n----\nteam\nzone\ncamera\nshift" as D1 #E8F5E9
+rectangle "<b>Attendance</b>\n----\nface_embedding\ncheck_in\ncheck_in_correction\npending_overtime" as D2 #FFF8E1
+rectangle "<b>PPE Violations and Safety Score</b>\n----\nviolation\nsafety_policy\nmonthly_score" as D3 #FFEBEE
+rectangle "<b>Tickets</b>\n----\nticket_category\nticket\nticket_comment\nticket_participant" as D4 #F3E5F5
+rectangle "<b>Notifications</b>\n----\nnotification\nnotification_delivery\nschedule_notice" as D5 #E0F7FA
+rectangle "<b>Month Closing, Settings and Jobs</b>\n----\nmonth_lock\nreport_export\ncompany_setting\njob_run" as D6 #ECEFF1
+D0 ..> D1 : 1 FK
+D1 ..> D0 : 4 FKs
+D2 ..> D0 : 6 FKs
+D2 ..> D1 : 5 FKs
+D2 ..> D4 : 1 FK
+D3 ..> D0 : 6 FKs
+D3 ..> D1 : 2 FKs
+D4 ..> D0 : 7 FKs
+D4 ..> D1 : 2 FKs
+D4 ..> D2 : 1 FK
+D4 ..> D3 : 1 FK
+D5 ..> D0 : 2 FKs
+D6 ..> D0 : 1 FK
+@enduml
